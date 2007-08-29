@@ -700,23 +700,30 @@ swfdec_movie_get_operator_for_blend_mode (guint blend_mode)
       SWFDEC_ERROR ("shouldn't need to get operator without blend mode?!");
     case 2:
       return CAIRO_OPERATOR_OVER;
+    case 3:
+      return CAIRO_OPERATOR_MULTIPLY;
+    case 4:
+      return CAIRO_OPERATOR_SCREEN;
+    case 5:
+      return CAIRO_OPERATOR_LIGHTEN;
+    case 6:
+      return CAIRO_OPERATOR_DARKEN;
+    case 7:
+      return CAIRO_OPERATOR_DIFFERENCE;
     case 8:
       return CAIRO_OPERATOR_ADD;
+    case 9:
+      return CAIRO_OPERATOR_SUBTRACT;
+    case 10:
+      return CAIRO_OPERATOR_INVERT;
     case 11:
       return CAIRO_OPERATOR_DEST_IN;
     case 12:
       return CAIRO_OPERATOR_DEST_OUT;
-    case 3:
-    case 4:
-    case 5:
-    case 6:
-    case 7:
-    case 9:
-    case 10:
     case 13:
+      return CAIRO_OPERATOR_OVERLAY;
     case 14:
-      SWFDEC_WARNING ("blend mode %u unimplemented in cairo", blend_mode);
-      return CAIRO_OPERATOR_OVER;
+      return CAIRO_OPERATOR_HARD_LIGHT;
     default:
       SWFDEC_WARNING ("invalid blend mode %u", blend_mode);
       return CAIRO_OPERATOR_OVER;
