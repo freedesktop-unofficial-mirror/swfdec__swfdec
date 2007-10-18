@@ -175,6 +175,7 @@ run_test (gpointer testp, gpointer unused)
 	g_error_free (error);
       } else {
 	g_string_append (output, result);
+	g_free (result);
       }
     }
     g_string_free (string, TRUE);
@@ -209,6 +210,8 @@ main (int argc, char **argv)
   GError *error = NULL;
 
   g_thread_init (NULL);
+  /* by default get rid of the loads of warnings the tests produce */
+  g_setenv ("SWFDEC_DEBUG", "2", FALSE);
   swfdec_init ();
   failed_tests = g_string_new ("");
 

@@ -32,14 +32,18 @@
 #include "swfdec_as_strings.h"
 #include "swfdec_button_movie.h"
 #include "swfdec_debug.h"
+#include "swfdec_draw.h"
 #include "swfdec_event.h"
 #include "swfdec_graphic.h"
 #include "swfdec_loader_internal.h"
 #include "swfdec_player_internal.h"
 #include "swfdec_sprite.h"
 #include "swfdec_sprite_movie.h"
-#include "swfdec_swf_instance.h"
+#include "swfdec_resource.h"
 #include "swfdec_system.h"
+#include "swfdec_utils.h"
+#include "swfdec_load_object.h"
+#include "swfdec_as_internal.h"
 
 /*** MOVIE ***/
 
@@ -63,6 +67,7 @@ swfdec_movie_init (SwfdecMovie * movie)
   swfdec_color_transform_init_identity (&movie->original_ctrans);
 
   movie->visible = TRUE;
+  movie->cache_state = SWFDEC_MOVIE_INVALID_CONTENTS;
 
   swfdec_rect_init_empty (&movie->extents);
 }
@@ -79,7 +84,8 @@ swfdec_movie_invalidate (SwfdecMovie *movie)
 {
   SwfdecRect rect = movie->extents;
 
-  SWFDEC_LOG ("invalidating %g %g  %g %g", rect.x0, rect.y0, rect.x1, rect.y1);
+  SWFDEC_LOG ("%s invalidating %g %g  %g %g", movie->name, 
+      rect.x0, rect.y0, rect.x1, rect.y1);
   if (swfdec_rect_is_empty (&rect))
     return;
   while (movie->parent) {
@@ -121,7 +127,7 @@ swfdec_movie_update_extents (SwfdecMovie *movie)
   SwfdecRect *rect = &movie->original_extents;
   SwfdecRect *extents = &movie->extents;
 
-  swfdec_rect_init_empty (rect);
+  *rect = movie->draw_extents;
   for (walk = movie->list; walk; walk = walk->next) {
     swfdec_rect_union (rect, rect, &SWFDEC_MOVIE (walk->data)->extents);
   }
@@ -162,8 +168,6 @@ swfdec_movie_update_matrix (SwfdecMovie *movie)
     cairo_matrix_rotate (&movie->matrix, d * G_PI / 180);
   }
   swfdec_matrix_ensure_invertible (&movie->matrix, &movie->inverse_matrix);
-
-  swfdec_movie_update_extents (movie);
 }
 
 static void
@@ -179,20 +183,22 @@ swfdec_movie_do_update (SwfdecMovie *movie)
   }
 
   switch (movie->cache_state) {
-    case SWFDEC_MOVIE_INVALID_CHILDREN:
+    case SWFDEC_MOVIE_INVALID_MATRIX:
+      swfdec_movie_update_matrix (movie);
+      /* fall through */
+    case SWFDEC_MOVIE_INVALID_CONTENTS:
+      swfdec_movie_update_extents (movie);
+      swfdec_movie_invalidate (movie);
       break;
     case SWFDEC_MOVIE_INVALID_EXTENTS:
       swfdec_movie_update_extents (movie);
       break;
-    case SWFDEC_MOVIE_INVALID_MATRIX:
-      swfdec_movie_update_matrix (movie);
+    case SWFDEC_MOVIE_INVALID_CHILDREN:
       break;
     case SWFDEC_MOVIE_UP_TO_DATE:
     default:
       g_assert_not_reached ();
   }
-  if (movie->cache_state > SWFDEC_MOVIE_INVALID_EXTENTS)
-    swfdec_movie_invalidate (movie);
   movie->cache_state = SWFDEC_MOVIE_UP_TO_DATE;
 }
 
@@ -381,8 +387,8 @@ swfdec_movie_execute_script (SwfdecMovie *movie, SwfdecEventType condition)
   g_return_if_fail (condition != 0);
 
   if (movie->events) {
-    swfdec_event_list_execute (movie->events, 
-	SWFDEC_AS_OBJECT (movie), condition, 0);
+    swfdec_event_list_execute (movie->events, SWFDEC_AS_OBJECT (movie), 
+	SWFDEC_SECURITY (movie->resource), condition, 0);
   }
   name = swfdec_event_type_get_name (condition);
   if (name != NULL)
@@ -730,16 +736,49 @@ swfdec_movie_get_operator_for_blend_mode (guint blend_mode)
   }
 }
 
+/* NB: Since there is no way to union paths in cairo, we use masks 
+ * instead. To create the mask, we force black rendering using the color 
+ * transform and then do the usual rendering.
+ * Using a mask will of course cause artifacts on non pixel-aligned 
+ * boundaries, but without the help of cairo, there is no way to avoid 
+ * this. */ 
+static cairo_pattern_t *
+swfdec_movie_push_clip (cairo_t *cr, SwfdecMovie *clip_movie, 
+    const SwfdecRect *inval)
+{
+  SwfdecColorTransform black;
+  cairo_pattern_t *mask;
+
+  swfdec_color_transform_init_color (&black, SWFDEC_COLOR_COMBINE (0, 0, 0, 255));
+  cairo_push_group_with_content (cr, CAIRO_CONTENT_ALPHA);
+  swfdec_movie_render (clip_movie, cr, &black, inval);
+  mask = cairo_pop_group (cr);
+  cairo_push_group (cr);
+
+  return mask;
+}
+
+static cairo_pattern_t *
+swfdec_movie_pop_clip (cairo_t *cr, cairo_pattern_t *mask)
+{
+  cairo_pop_group_to_source (cr);
+  cairo_mask (cr, mask);
+  cairo_pattern_destroy (mask);
+  return NULL;
+}
+
 void
 swfdec_movie_render (SwfdecMovie *movie, cairo_t *cr,
-    const SwfdecColorTransform *color_transform, const SwfdecRect *inval, gboolean fill)
+    const SwfdecColorTransform *color_transform, const SwfdecRect *inval)
 {
   SwfdecMovieClass *klass;
   GList *g;
+  GSList *walk;
   int clip_depth = 0;
   SwfdecColorTransform trans;
   SwfdecRect rect;
   gboolean group;
+  cairo_pattern_t *mask = NULL;
 
   g_return_if_fail (SWFDEC_IS_MOVIE (movie));
   g_return_if_fail (cr != NULL);
@@ -780,49 +819,52 @@ swfdec_movie_render (SwfdecMovie *movie, cairo_t *cr,
   swfdec_color_transform_chain (&trans, &movie->original_ctrans, color_transform);
   swfdec_color_transform_chain (&trans, &movie->color_transform, &trans);
 
+  /* exeute the movie's drawing commands */
+  for (walk = movie->draws; walk; walk = walk->next) {
+    SwfdecDraw *draw = walk->data;
+
+    if (!swfdec_rect_intersect (NULL, &draw->extents, &rect))
+      continue;
+    
+    swfdec_draw_paint (draw, cr, &trans);
+  }
+
+  /* draw the children movies */
   for (g = movie->list; g; g = g_list_next (g)) {
     SwfdecMovie *child = g->data;
-
-    if (child->clip_depth) {
-      if (clip_depth) {
-	/* FIXME: is clipping additive? */
-	SWFDEC_INFO ("unsetting clip depth %d for new clip depth", clip_depth);
-	cairo_restore (cr);
-	clip_depth = 0;
-      }
-      if (fill == FALSE) {
-	SWFDEC_WARNING ("clipping inside clipping not implemented");
-      } else {
-	/* FIXME FIXME FIXME: overlapping objects in the clip movie cause problems
-	 * due to them being accumulated with CAIRO_FILL_RULE_EVEN_ODD
-	 */
-	SWFDEC_INFO ("clipping up to depth %d by using %p with depth %d", child->clip_depth,
-	    child, child->depth);
-	clip_depth = child->clip_depth;
-	cairo_save (cr);
-	swfdec_movie_render (child, cr, &trans, &rect, FALSE);
-	cairo_clip (cr);
-	continue;
-      }
-    }
 
     if (clip_depth && child->depth > clip_depth) {
       SWFDEC_INFO ("unsetting clip depth %d for depth %d", clip_depth, child->depth);
       clip_depth = 0;
-      cairo_restore (cr);
+      mask = swfdec_movie_pop_clip (cr, mask);
+    }
+
+    if (child->clip_depth) {
+      if (clip_depth) {
+	/* FIXME: is clipping additive? */
+	SWFDEC_FIXME ("unsetting clip depth %d for new clip depth %d", clip_depth,
+	    child->clip_depth);
+	mask = swfdec_movie_pop_clip (cr, mask);
+      }
+      SWFDEC_INFO ("clipping up to depth %d by using %p with depth %d", child->clip_depth,
+	  child, child->depth);
+      clip_depth = child->clip_depth;
+      mask = swfdec_movie_push_clip (cr, child, &rect);
+      continue;
     }
 
     SWFDEC_LOG ("rendering %p with depth %d", child, child->depth);
-    swfdec_movie_render (child, cr, &trans, &rect, fill);
+    swfdec_movie_render (child, cr, &trans, &rect);
   }
   if (clip_depth) {
     SWFDEC_INFO ("unsetting clip depth %d after rendering", clip_depth);
     clip_depth = 0;
-    cairo_restore (cr);
+    mask = swfdec_movie_pop_clip (cr, mask);
   }
+  g_assert (mask == NULL);
   klass = SWFDEC_MOVIE_GET_CLASS (movie);
   if (klass->render)
-    klass->render (movie, cr, &trans, &rect, fill);
+    klass->render (movie, cr, &trans, &rect);
 #if 0
   /* code to draw a red rectangle around the area occupied by this movie clip */
   {
@@ -887,13 +929,14 @@ static void
 swfdec_movie_dispose (GObject *object)
 {
   SwfdecMovie * movie = SWFDEC_MOVIE (object);
+  GSList *iter;
 
   g_assert (movie->list == NULL);
 
   SWFDEC_LOG ("disposing movie %s (depth %d)", movie->name, movie->depth);
-  if (movie->swf) {
-    g_object_unref (movie->swf);
-    movie->swf = NULL;
+  if (movie->resource) {
+    g_object_unref (movie->resource);
+    movie->resource = NULL;
   }
   if (movie->events) {
     swfdec_event_list_free (movie->events);
@@ -903,6 +946,11 @@ swfdec_movie_dispose (GObject *object)
     g_object_unref (movie->graphic);
     movie->graphic = NULL;
   }
+  for (iter = movie->variable_listeners; iter != NULL; iter = iter->next) {
+    g_free (iter->data);
+  }
+  g_slist_free (movie->variable_listeners);
+  movie->variable_listeners = NULL;
 
   G_OBJECT_CLASS (swfdec_movie_parent_class)->dispose (G_OBJECT (movie));
 }
@@ -912,43 +960,70 @@ swfdec_movie_mark (SwfdecAsObject *object)
 {
   SwfdecMovie *movie = SWFDEC_MOVIE (object);
   GList *walk;
+  GSList *iter;
 
   swfdec_as_string_mark (movie->original_name);
   swfdec_as_string_mark (movie->name);
   for (walk = movie->list; walk; walk = walk->next) {
     swfdec_as_object_mark (walk->data);
   }
+  for (iter = movie->variable_listeners; iter != NULL; iter = iter->next) {
+    SwfdecMovieVariableListener *listener = iter->data;
+    swfdec_as_object_mark (listener->object);
+    swfdec_as_string_mark (listener->name);
+  }
 
   SWFDEC_AS_OBJECT_CLASS (swfdec_movie_parent_class)->mark (object);
 }
 
 /* FIXME: This function can definitely be implemented easier */
-static SwfdecMovie *
-swfdec_movie_get_by_name (SwfdecPlayer *player, const char *name)
+SwfdecMovie *
+swfdec_movie_get_by_name (SwfdecMovie *movie, const char *name)
 {
   GList *walk;
-  int i = SWFDEC_AS_CONTEXT (player)->version;
+  int i;
   gulong l;
+  guint version = SWFDEC_AS_OBJECT (movie)->context->version;
   char *end;
+  SwfdecPlayer *player = SWFDEC_PLAYER (SWFDEC_AS_OBJECT (movie)->context);
 
-  if ((i >= 7 && !g_str_has_prefix (name, "_level")) ||
-      strncasecmp (name, "_level", 6) != 0)
-    return NULL;
+  if ((version >= 7 && g_str_has_prefix (name, "_level")) ||
+      (version < 7 && strncasecmp (name, "_level", 6) == 0)) {
+    errno = 0;
+    l = strtoul (name + 6, &end, 10);
+    if (errno != 0 || *end != 0 || l > G_MAXINT)
+      return NULL;
+    i = l - 16384;
+    for (walk = player->roots; walk; walk = walk->next) {
+      SwfdecMovie *cur = walk->data;
+      if (cur->depth < i)
+	continue;
+      if (cur->depth == i)
+	return cur;
+      break;
+    }
+  }
 
-  errno = 0;
-  l = strtoul (name + 6, &end, 10);
-  if (errno != 0 || *end != 0 || l > G_MAXINT)
-    return NULL;
-  i = l - 16384;
-  for (walk = player->roots; walk; walk = walk->next) {
+  for (walk = movie->list; walk; walk = walk->next) {
     SwfdecMovie *cur = walk->data;
-    if (cur->depth < i)
+    if (cur->original_name == SWFDEC_AS_STR_EMPTY)
       continue;
-    if (cur->depth == i)
+    if ((version >= 7 && cur->name == name) ||
+	(version < 7 && swfdec_str_case_equal (cur->name, name)))
       return cur;
-    break;
   }
   return NULL;
+}
+
+SwfdecMovie *
+swfdec_movie_get_root (SwfdecMovie *movie)
+{
+  g_return_val_if_fail (SWFDEC_IS_MOVIE (movie), NULL);
+
+  while (movie->parent)
+    movie = movie->parent;
+
+  return movie;
 }
 
 static gboolean
@@ -981,13 +1056,79 @@ swfdec_movie_get_variable (SwfdecAsObject *object, SwfdecAsObject *orig,
     return TRUE;
   }
   
-  movie = swfdec_movie_get_by_name (SWFDEC_PLAYER (object->context), variable);
+  movie = swfdec_movie_get_by_name (movie, variable);
   if (movie) {
     SWFDEC_AS_VALUE_SET_OBJECT (val, SWFDEC_AS_OBJECT (movie));
     *flags = 0;
     return TRUE;
   }
   return FALSE;
+}
+
+void
+swfdec_movie_add_variable_listener (SwfdecMovie *movie, SwfdecAsObject *object,
+    const char *name, const SwfdecMovieVariableListenerFunction function)
+{
+  SwfdecMovieVariableListener *listener;
+  GSList *iter;
+
+  for (iter = movie->variable_listeners; iter != NULL; iter = iter->next) {
+    listener = iter->data;
+
+    if (listener->object == object && listener->name == name &&
+	listener->function == function)
+      break;
+  }
+  if (iter != NULL)
+    return;
+
+  listener = g_new0 (SwfdecMovieVariableListener, 1);
+  listener->object = object;
+  listener->name = name;
+  listener->function = function;
+
+  movie->variable_listeners = g_slist_prepend (movie->variable_listeners,
+      listener);
+}
+
+void
+swfdec_movie_remove_variable_listener (SwfdecMovie *movie,
+    SwfdecAsObject *object, const char *name,
+    const SwfdecMovieVariableListenerFunction function)
+{
+  GSList *iter;
+
+  for (iter = movie->variable_listeners; iter != NULL; iter = iter->next) {
+    SwfdecMovieVariableListener *listener = iter->data;
+
+    if (listener->object == object && listener->name == name &&
+	listener->function == function)
+      break;
+  }
+  if (iter == NULL)
+    return;
+
+  g_free (iter->data);
+  movie->variable_listeners =
+    g_slist_remove (movie->variable_listeners, iter->data);
+}
+
+static void
+swfdec_movie_call_variable_listeners (SwfdecMovie *movie, const char *name,
+    const SwfdecAsValue *val)
+{
+  GSList *iter;
+
+  for (iter = movie->variable_listeners; iter != NULL; iter = iter->next) {
+    SwfdecMovieVariableListener *listener = iter->data;
+
+    if (listener->name != name &&
+	(SWFDEC_AS_OBJECT (movie)->context->version >= 7 ||
+	 !swfdec_str_case_equal (listener->name, name)))
+      continue;
+
+    listener->function (listener->object, name, val);
+  }
 }
 
 static void
@@ -998,8 +1139,12 @@ swfdec_movie_set_variable (SwfdecAsObject *object, const char *variable,
 
   if (movie->state == SWFDEC_MOVIE_STATE_DESTROYED)
     return;
+
   if (swfdec_movie_set_asprop (movie, variable, val))
     return;
+
+  swfdec_movie_call_variable_listeners (movie, variable, val);
+
   SWFDEC_AS_OBJECT_CLASS (swfdec_movie_parent_class)->set (object, variable, val, flags);
 }
 
@@ -1008,7 +1153,7 @@ swfdec_movie_get_debug (SwfdecAsObject *object)
 {
   SwfdecMovie *movie = SWFDEC_MOVIE (object);
 
-  return swfdec_movie_get_path (movie);
+  return swfdec_movie_get_path (movie, TRUE);
 }
 
 static gboolean
@@ -1076,6 +1221,7 @@ swfdec_movie_set_depth (SwfdecMovie *movie, int depth)
  * @player: a #SwfdecPlayer
  * @depth: depth of movie
  * @parent: the parent movie or %NULL to make this a root movie
+ * @resource: the resource that is responsible for this movie
  * @graphic: the graphic that is displayed by this movie or %NULL to create an 
  *           empty movieclip
  * @name: a garbage-collected string to be used as the name for this movie or 
@@ -1091,13 +1237,15 @@ swfdec_movie_set_depth (SwfdecMovie *movie, int depth)
  * Returns: a new #SwfdecMovie
  **/
 SwfdecMovie *
-swfdec_movie_new (SwfdecPlayer *player, int depth, SwfdecMovie *parent, SwfdecGraphic *graphic, const char *name)
+swfdec_movie_new (SwfdecPlayer *player, int depth, SwfdecMovie *parent, SwfdecResource *resource,
+    SwfdecGraphic *graphic, const char *name)
 {
   SwfdecMovie *movie;
   gsize size;
 
   g_return_val_if_fail (SWFDEC_IS_PLAYER (player), NULL);
   g_return_val_if_fail (parent == NULL || SWFDEC_IS_MOVIE (parent), NULL);
+  g_return_val_if_fail (SWFDEC_IS_RESOURCE (resource), NULL);
   g_return_val_if_fail (graphic == NULL || SWFDEC_IS_GRAPHIC (graphic), NULL);
 
   /* create the right movie */
@@ -1119,11 +1267,13 @@ swfdec_movie_new (SwfdecPlayer *player, int depth, SwfdecMovie *parent, SwfdecGr
   g_object_ref (movie);
   /* set essential properties */
   movie->parent = parent;
+  movie->resource = g_object_ref (resource);
   if (parent) {
-    movie->swf = g_object_ref (parent->swf);
     parent->list = g_list_insert_sorted (parent->list, movie, swfdec_movie_compare_depths);
     SWFDEC_DEBUG ("inserting %s %s (depth %d) into %s %p", G_OBJECT_TYPE_NAME (movie), movie->name,
 	movie->depth,  G_OBJECT_TYPE_NAME (parent), parent);
+    /* invalidate the parent, so it gets visible */
+    swfdec_movie_queue_update (parent, SWFDEC_MOVIE_INVALID_CHILDREN);
   } else {
     player->roots = g_list_insert_sorted (player->roots, movie, swfdec_movie_compare_depths);
   }
@@ -1148,6 +1298,11 @@ swfdec_movie_new (SwfdecPlayer *player, int depth, SwfdecMovie *parent, SwfdecGr
   player->movies = g_list_prepend (player->movies, movie);
   /* only add the movie here, because it needs to be setup for the debugger */
   swfdec_as_object_add (SWFDEC_AS_OBJECT (movie), SWFDEC_AS_CONTEXT (player), size);
+  /* only setup here, the resource assumes it can access the player via the movie */
+  if (resource->movie == NULL) {
+    g_assert (SWFDEC_IS_SPRITE_MOVIE (movie));
+    swfdec_resource_set_movie (resource, SWFDEC_SPRITE_MOVIE (movie));
+  }
   return movie;
 }
 
@@ -1183,7 +1338,7 @@ swfdec_movie_set_static_properties (SwfdecMovie *movie, const cairo_matrix_t *tr
   }
   if (ratio >= 0 && (guint) ratio != movie->original_ratio) {
     movie->original_ratio = ratio;
-    swfdec_movie_queue_update (movie, SWFDEC_MOVIE_INVALID_EXTENTS);
+    swfdec_movie_queue_update (movie, SWFDEC_MOVIE_INVALID_CONTENTS);
   }
   if (clip_depth && clip_depth != movie->clip_depth) {
     movie->clip_depth = clip_depth;
@@ -1232,7 +1387,7 @@ swfdec_movie_duplicate (SwfdecMovie *movie, const char *name, int depth)
     swfdec_movie_remove (copy);
   }
   copy = swfdec_movie_new (SWFDEC_PLAYER (SWFDEC_AS_OBJECT (movie)->context), depth, 
-      parent, movie->graphic, name);
+      parent, movie->resource, movie->graphic, name);
   if (copy == NULL)
     return NULL;
   swfdec_movie_set_static_properties (copy, &movie->original_transform,
@@ -1253,7 +1408,7 @@ swfdec_movie_new_for_content (SwfdecMovie *parent, const SwfdecContent *content)
 
   SWFDEC_DEBUG ("new movie for parent %p", parent);
   player = SWFDEC_PLAYER (SWFDEC_AS_OBJECT (parent)->context);
-  movie = swfdec_movie_new (player, content->depth, parent, content->graphic, 
+  movie = swfdec_movie_new (player, content->depth, parent, parent->resource, content->graphic, 
       content->name ? swfdec_as_context_get_string (SWFDEC_AS_CONTEXT (player), content->name) : NULL);
 
   swfdec_movie_set_static_properties (movie, content->has_transform ? &content->transform : NULL,
@@ -1269,45 +1424,59 @@ swfdec_movie_new_for_content (SwfdecMovie *parent, const SwfdecContent *content)
   return movie;
 }
 
-void
-swfdec_movie_load (SwfdecMovie *movie, const char *url, const char *target,
-    SwfdecLoaderRequest request, const char *data, gsize data_len)
+static void
+swfdec_movie_load_variables_on_data (SwfdecAsContext *cx,
+    SwfdecAsObject *object, guint argc, SwfdecAsValue *argv,
+    SwfdecAsValue *ret)
 {
-  SwfdecPlayer *player;
+  SwfdecAsObject *target;
+  SwfdecAsValue val;
+
+  if (argc < 1)
+    return;
+
+  if (!SWFDEC_AS_VALUE_IS_STRING (&argv[0]))
+    return;
+
+  swfdec_as_object_get_variable (object, SWFDEC_AS_STR_target, &val);
+  g_return_if_fail (SWFDEC_AS_VALUE_IS_OBJECT (&val));
+  target = SWFDEC_AS_VALUE_GET_OBJECT (&val);
+  g_return_if_fail (SWFDEC_IS_MOVIE (target));
+
+  swfdec_as_object_decode (target, swfdec_as_value_to_string (cx, &argv[0]));
+
+  if (cx->version >= 6)
+    swfdec_as_object_call (target, SWFDEC_AS_STR_onData, 0, NULL, NULL);
+}
+
+void
+swfdec_movie_load_variables (SwfdecMovie *movie, const char *url,
+    SwfdecLoaderRequest request, SwfdecBuffer *data)
+{
+  SwfdecAsObject *loader;
+  SwfdecAsContext *context;
+  SwfdecAsValue val;
 
   g_return_if_fail (SWFDEC_IS_MOVIE (movie));
   g_return_if_fail (url != NULL);
-  g_return_if_fail (target != NULL);
 
-  player = SWFDEC_PLAYER (SWFDEC_AS_OBJECT (movie)->context);
-  /* yay for the multiple uses of GetURL - one of the crappier Flash things */
-  if (g_str_has_prefix (target, "_level")) {
-    const char *nr = target + strlen ("_level");
-    char *end;
-    guint depth;
-
-    errno = 0;
-    depth = strtoul (nr, &end, 10);
-    if (errno == 0 && *end == '\0') {
-      if (url[0] == '\0') {
-	swfdec_player_remove_level (player, depth);
-      } else {
-	SwfdecLoader *loader = swfdec_loader_load (movie->swf->loader, url,
-	    request, data, data_len);
-	g_assert (loader);
-	swfdec_player_add_level_from_loader (player, depth, loader, NULL);
-      }
-    } else {
-      SWFDEC_ERROR ("%s does not specify a valid level", target);
-    }
-    /* FIXME: what do we do here? Is returning correct?*/
+  if (request != SWFDEC_LOADER_REQUEST_DEFAULT) {
+    SWFDEC_FIXME ("loadVariables: Different request-modes not supported");
     return;
   }
-  swfdec_player_launch (player, url, target);
+
+  context = SWFDEC_AS_OBJECT (movie)->context;
+  loader = swfdec_as_object_new_empty (context);
+  swfdec_as_object_add_function (loader, SWFDEC_AS_STR_onData, 0,
+      swfdec_movie_load_variables_on_data, 0);
+  SWFDEC_AS_VALUE_SET_OBJECT (&val, SWFDEC_AS_OBJECT (movie));
+  swfdec_as_object_set_variable (loader, SWFDEC_AS_STR_target, &val);
+
+  swfdec_load_object_new (loader, url, request, data);
 }
 
 char *
-swfdec_movie_get_path (SwfdecMovie *movie)
+swfdec_movie_get_path (SwfdecMovie *movie, gboolean dot)
 {
   GString *s;
 
@@ -1317,16 +1486,24 @@ swfdec_movie_get_path (SwfdecMovie *movie)
   do {
     if (movie->parent) {
       g_string_prepend (s, movie->name);
-      g_string_prepend_c (s, '.');
+      g_string_prepend_c (s, (dot ? '.' : '/'));
     } else {
-      char *ret = g_strdup_printf ("_level%u%s",
-	movie->depth + 16384, s->str);
-      g_string_free (s, TRUE);
+      char *ret;
+      if (dot) {
+	ret = g_strdup_printf ("_level%u%s", movie->depth + 16384, s->str);
+	g_string_free (s, TRUE);
+      } else {
+	if (s->str[0] != '/')
+	  g_string_prepend_c (s, '/');
+	ret = g_string_free (s, FALSE);
+      }
       return ret;
     }
     movie = movie->parent;
   } while (TRUE);
+
   g_assert_not_reached ();
+
   return NULL;
 }
 
@@ -1362,3 +1539,28 @@ swfdec_depth_classify (int depth)
     return SWFDEC_DEPTH_CLASS_RESERVED;
   return SWFDEC_DEPTH_CLASS_EMPTY;
 }
+
+/**
+ * swfdec_movie_get_own_resource:
+ * @movie: movie to query
+ *
+ * Queries the movie for his own resource. A movie only has its own resource if
+ * it contains data loaded with the loadMovie() function, or if it is the root
+ * movie.
+ *
+ * Returns: The own resource of @movie or %NULL
+ **/
+SwfdecResource *
+swfdec_movie_get_own_resource (SwfdecMovie *movie)
+{
+  g_return_val_if_fail (SWFDEC_IS_MOVIE (movie), NULL);
+
+  if (!SWFDEC_IS_SPRITE_MOVIE (movie))
+    return NULL;
+
+  if (SWFDEC_MOVIE (movie->resource->movie) != movie)
+    return NULL;
+
+  return movie->resource;
+}
+

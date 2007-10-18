@@ -28,12 +28,13 @@
  * SECTION:SwfdecURL
  * @title: SwfdecURL
  * @short_description: URL handling in Swfdec
- * @see_also #SwfdecLoader
  *
  * SwfdecURL is Swfdec's way of handling URLs. You probably don't need to mess 
  * with this type unless you want to write a #SwfdecLoader. In that case you 
- * will want to use @swfdec_loader_get_url() to get its url and then use the 
+ * will want to use swfdec_loader_get_url() to get its url and then use the 
  * functions in this section to access it.
+ *
+ * @see_also: #SwfdecLoader
  */
 
 /**
@@ -88,7 +89,7 @@ swfdec_url_new (const char *string)
     SWFDEC_ERROR ("URL %s has no protocol", string);
     return url;
   }
-  url->protocol = g_strndup (string, s - string);
+  url->protocol = g_utf8_strdown (string, s - string);
   string = s + 3;
   s = strchr (string, '/');
   if (s == NULL) {
@@ -137,7 +138,7 @@ swfdec_url_new_relative (const SwfdecURL *url, const char *string)
   g_string_append (str, "://");
   if (url->host)
     g_string_append (str, url->host);
-  if (string[0] == '/') {
+  if (string[0] == '/' && !swfdec_url_has_protocol (url, "file")) {
     /* absolute URL */
     g_string_append (str, string);
   } else {
@@ -241,6 +242,24 @@ swfdec_url_get_protocol (const SwfdecURL *url)
 }
 
 /**
+ * swfdec_url_has_protocol:
+ * @url: a url
+ * @protocol: protocol name to check for
+ *
+ * Checks if the given @url references the given @protocol
+ *
+ * Returns: %TRUE if both protocols match, %FALSE otherwise
+ **/
+gboolean
+swfdec_url_has_protocol (const SwfdecURL *url, const char *protocol)
+{
+  g_return_val_if_fail (url != NULL, FALSE);
+  g_return_val_if_fail (protocol != NULL, FALSE);
+
+  return g_str_equal (url->protocol, protocol);
+}
+
+/**
  * swfdec_url_get_host:
  * @url: a #SwfdecURL
  *
@@ -293,4 +312,20 @@ swfdec_url_get_query (const SwfdecURL *url)
   return url->query;
 }
 
+/**
+ * swfdec_url_is_local:
+ * @url: the url to check
+ *
+ * Checks if the given @url references a local resource. Local resources are
+ * treated differently by Flash, since they get a higher degree of trust.
+ *
+ * Returns: %TRUE if the given url is local.
+ **/
+gboolean
+swfdec_url_is_local (const SwfdecURL *url)
+{
+  g_return_val_if_fail (url != NULL, FALSE);
 
+  /* FIXME: If we ever support gnome-vfs, this might become tricky */
+  return swfdec_url_has_protocol (url, "file");
+}

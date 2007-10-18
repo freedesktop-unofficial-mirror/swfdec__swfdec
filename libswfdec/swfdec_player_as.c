@@ -26,6 +26,7 @@
 
 #include "swfdec_player_internal.h"
 #include "swfdec_as_function.h"
+#include "swfdec_as_internal.h"
 #include "swfdec_as_native_function.h"
 #include "swfdec_as_object.h"
 #include "swfdec_as_strings.h"
@@ -58,7 +59,7 @@ swfdec_player_do_set_interval (gboolean repeat, SwfdecAsContext *cx, guint argc,
       SWFDEC_INFO ("interval duration is %u, making it %u msecs", msecs, MIN_INTERVAL_TIME);
       msecs = MIN_INTERVAL_TIME;
     }
-    id = swfdec_interval_new_function (player, msecs, TRUE, 
+    id = swfdec_interval_new_function (player, msecs, repeat, 
 	SWFDEC_AS_FUNCTION (object), argc - 2, &argv[2]);
   } else {
     const char *name;
@@ -72,19 +73,29 @@ swfdec_player_do_set_interval (gboolean repeat, SwfdecAsContext *cx, guint argc,
       SWFDEC_INFO ("interval duration is %u, making it %u msecs", msecs, MIN_INTERVAL_TIME);
       msecs = MIN_INTERVAL_TIME;
     }
-    id = swfdec_interval_new_object (player, msecs, TRUE, object, name, argc - 3, &argv[3]);
+    id = swfdec_interval_new_object (player, msecs, repeat, object, name, argc - 3, &argv[3]);
   }
   SWFDEC_AS_VALUE_SET_INT (rval, id);
 }
 
-static void
+SWFDEC_AS_NATIVE (250, 0, swfdec_player_setInterval)
+void
 swfdec_player_setInterval (SwfdecAsContext *cx, SwfdecAsObject *obj, 
     guint argc, SwfdecAsValue *argv, SwfdecAsValue *rval)
 {
   swfdec_player_do_set_interval (TRUE, cx, argc, argv, rval);
 }
 
-static void
+SWFDEC_AS_NATIVE (250, 2, swfdec_player_setTimeout)
+void
+swfdec_player_setTimeout (SwfdecAsContext *cx, SwfdecAsObject *obj, 
+    guint argc, SwfdecAsValue *argv, SwfdecAsValue *rval)
+{
+  swfdec_player_do_set_interval (FALSE, cx, argc, argv, rval);
+}
+
+SWFDEC_AS_NATIVE (250, 1, swfdec_player_clearInterval)
+void
 swfdec_player_clearInterval (SwfdecAsContext *cx, SwfdecAsObject *obj,
     guint argc, SwfdecAsValue *argv, SwfdecAsValue *rval)
 {
@@ -104,22 +115,58 @@ swfdec_get_asnative (SwfdecAsContext *cx, guint x, guint y)
 
   for (i = 0; native_funcs[i].func != NULL; i++) {
     if (native_funcs[i].x == x && native_funcs[i].y == y) {
-      return swfdec_as_native_function_new (cx, native_funcs[i].name,
+      SwfdecAsFunction *fun = swfdec_as_native_function_new (cx, native_funcs[i].name,
 	  native_funcs[i].func, 0, NULL);
+      if (native_funcs[i].get_type) {
+	swfdec_as_native_function_set_construct_type (SWFDEC_AS_NATIVE_FUNCTION (fun),
+	    native_funcs[i].get_type ());
+      }
+      return fun;
     }
   }
+  SWFDEC_WARNING ("no AsNative (%u, %u)", x, y);
   return NULL;
 }
 
+// same as ASnative, but also sets prototype
 static void
-swfdec_player_ASnative (SwfdecAsContext *cx, SwfdecAsObject *obj,
+swfdec_player_ASconstructor (SwfdecAsContext *cx, SwfdecAsObject *object,
+    guint argc, SwfdecAsValue *argv, SwfdecAsValue *rval)
+{
+  SwfdecAsValue val;
+  SwfdecAsObject *proto;
+  SwfdecAsFunction *func;
+  guint x, y;
+
+  SWFDEC_AS_CHECK (0, NULL, "ii", &x, &y);
+
+  func = swfdec_get_asnative (cx, x, y);
+  if (func) {
+    proto = swfdec_as_object_new (cx);
+
+    SWFDEC_AS_VALUE_SET_OBJECT (&val, proto);
+    swfdec_as_object_set_variable_and_flags (SWFDEC_AS_OBJECT (func),
+	SWFDEC_AS_STR_prototype, &val,
+	SWFDEC_AS_VARIABLE_HIDDEN | SWFDEC_AS_VARIABLE_PERMANENT);
+
+    SWFDEC_AS_VALUE_SET_OBJECT (&val, SWFDEC_AS_OBJECT (func));
+    swfdec_as_object_set_variable_and_flags (proto, SWFDEC_AS_STR_constructor,
+	&val, SWFDEC_AS_VARIABLE_HIDDEN | SWFDEC_AS_VARIABLE_PERMANENT);
+
+    SWFDEC_AS_VALUE_SET_OBJECT (rval, SWFDEC_AS_OBJECT (func));
+  } else {
+    SWFDEC_FIXME ("ASconstructor for %u %u missing", x, y);
+  }
+}
+
+static void
+swfdec_player_ASnative (SwfdecAsContext *cx, SwfdecAsObject *object,
     guint argc, SwfdecAsValue *argv, SwfdecAsValue *rval)
 {
   SwfdecAsFunction *func;
   guint x, y;
 
-  x = swfdec_as_value_to_integer (cx, &argv[0]);
-  y = swfdec_as_value_to_integer (cx, &argv[1]);
+  SWFDEC_AS_CHECK (0, NULL, "ii", &x, &y);
 
   func = swfdec_get_asnative (cx, x, y);
   if (func) {
@@ -137,16 +184,13 @@ ASSetNative (SwfdecAsContext *cx, SwfdecAsObject *object,
   SwfdecAsFunction *function;
   SwfdecAsObject *target;
   SwfdecAsValue val;
+  SwfdecAsVariableFlag flags;
   const char *s;
   char **names;
   guint i, x, y;
 
-  if (argc < 3)
-    return;
+  SWFDEC_AS_CHECK (0, NULL, "ois", &target, &x, &s);
 
-  target = swfdec_as_value_to_object (cx, &argv[0]);
-  x = swfdec_as_value_to_integer (cx, &argv[1]);
-  s = swfdec_as_value_to_string (cx, &argv[2]);
   if (argc > 3)
     y = swfdec_as_value_to_integer (cx, &argv[3]);
   else
@@ -154,8 +198,15 @@ ASSetNative (SwfdecAsContext *cx, SwfdecAsObject *object,
   names = g_strsplit (s, ",", -1);
   for (i = 0; names[i]; i++) {
     s = names[i];
-    if (s[0] >= '0' && s[0] <= '9') {
-      SWFDEC_FIXME ("implement the weird numbers");
+    flags = 0;
+    if (s[0] == '6') {
+      flags |= SWFDEC_AS_VARIABLE_VERSION_6_UP;
+      s++;
+    } else if (s[0] == '7') {
+      flags |= SWFDEC_AS_VARIABLE_VERSION_7_UP;
+      s++;
+    } else if (s[0] == '8') {
+      flags |= SWFDEC_AS_VARIABLE_VERSION_8_UP;
       s++;
     }
     function = swfdec_get_asnative (cx, x, y);
@@ -164,7 +215,8 @@ ASSetNative (SwfdecAsContext *cx, SwfdecAsObject *object,
       break;
     }
     SWFDEC_AS_VALUE_SET_OBJECT (&val, SWFDEC_AS_OBJECT (function));
-    swfdec_as_object_set_variable (target, swfdec_as_context_get_string (cx, s), &val);
+    swfdec_as_object_set_variable_and_flags (target,
+	swfdec_as_context_get_string (cx, s), &val, flags);
     y++;
   }
   g_strfreev (names);
@@ -177,6 +229,7 @@ ASSetNativeAccessor (SwfdecAsContext *cx, SwfdecAsObject *object,
 {
   SwfdecAsFunction *get, *set;
   SwfdecAsObject *target;
+  SwfdecAsVariableFlag flags;
   const char *s;
   char **names;
   guint i, x, y;
@@ -194,8 +247,15 @@ ASSetNativeAccessor (SwfdecAsContext *cx, SwfdecAsObject *object,
   names = g_strsplit (s, ",", -1);
   for (i = 0; names[i]; i++) {
     s = names[i];
-    if (s[0] >= '0' && s[0] <= '9') {
-      SWFDEC_FIXME ("implement the weird numbers");
+    flags = 0;
+    if (s[0] == '6') {
+      flags |= SWFDEC_AS_VARIABLE_VERSION_6_UP;
+      s++;
+    } else if (s[0] == '7') {
+      flags |= SWFDEC_AS_VARIABLE_VERSION_7_UP;
+      s++;
+    } else if (s[0] == '8') {
+      flags |= SWFDEC_AS_VARIABLE_VERSION_8_UP;
       s++;
     }
     get = swfdec_get_asnative (cx, x, y++);
@@ -205,12 +265,13 @@ ASSetNativeAccessor (SwfdecAsContext *cx, SwfdecAsObject *object,
       break;
     }
     swfdec_as_object_add_variable (target, swfdec_as_context_get_string (cx, s),
-	get, set);
+	get, set, flags);
   }
   g_strfreev (names);
 }
 
-static void
+SWFDEC_AS_NATIVE (101, 8, swfdec_player_object_registerClass)
+void
 swfdec_player_object_registerClass (SwfdecAsContext *cx, SwfdecAsObject *object,
     guint argc, SwfdecAsValue *argv, SwfdecAsValue *rval)
 {
@@ -227,18 +288,15 @@ swfdec_player_object_registerClass (SwfdecAsContext *cx, SwfdecAsObject *object,
   SWFDEC_AS_VALUE_SET_BOOLEAN (rval, TRUE);
 }
 
+/* This is ran at the beginning of swfdec_as_context_startup.
+ * Yes, this is a hack */
 void
-swfdec_player_init_global (SwfdecPlayer *player, guint version)
+swfdec_player_preinit_global (SwfdecAsContext *context, guint version)
 {
-  SwfdecAsContext *context = SWFDEC_AS_CONTEXT (player);
-
-  swfdec_as_object_add_function (context->Object, SWFDEC_AS_STR_registerClass, 
-      0, swfdec_player_object_registerClass, 2);
-  swfdec_as_object_add_function (context->global, SWFDEC_AS_STR_setInterval, 
-      0, swfdec_player_setInterval, 2);
-  swfdec_as_object_add_function (context->global, SWFDEC_AS_STR_clearInterval, 
-      0, swfdec_player_clearInterval, 1);
+  /* init these two before swfdec_as_context_startup, so they won't get
+   * __proto__ and constructor properties */
   swfdec_as_object_add_function (context->global, SWFDEC_AS_STR_ASnative, 
       0, swfdec_player_ASnative, 2);
+  swfdec_as_object_add_function (context->global, SWFDEC_AS_STR_ASconstructor,
+      0, swfdec_player_ASconstructor, 2);
 }
-

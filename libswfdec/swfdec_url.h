@@ -40,6 +40,11 @@ const char *		swfdec_url_get_protocol		(const SwfdecURL *      url);
 const char *		swfdec_url_get_host		(const SwfdecURL *      url);
 const char *		swfdec_url_get_path		(const SwfdecURL *      url);
 const char *		swfdec_url_get_query		(const SwfdecURL *      url);
+
+gboolean		swfdec_url_has_protocol		(const SwfdecURL *	url,
+							 const char *		protocol);
+
+gboolean		swfdec_url_is_local		(const SwfdecURL *	url);
 							 
 
 G_END_DECLS

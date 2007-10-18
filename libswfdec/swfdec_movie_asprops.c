@@ -32,7 +32,7 @@
 #include "swfdec_player_internal.h"
 #include "swfdec_sprite.h"
 #include "swfdec_sprite_movie.h"
-#include "swfdec_swf_instance.h"
+#include "swfdec_resource.h"
 
 static void
 mc_x_get (SwfdecMovie *movie, SwfdecAsValue *rval)
@@ -107,8 +107,10 @@ mc_xscale_set (SwfdecMovie *movie, const SwfdecAsValue *val)
     return;
   }
   movie->modified = TRUE;
-  movie->xscale = d;
-  swfdec_movie_queue_update (movie, SWFDEC_MOVIE_INVALID_MATRIX);
+  if (movie->xscale != d) {
+    movie->xscale = d;
+    swfdec_movie_queue_update (movie, SWFDEC_MOVIE_INVALID_MATRIX);
+  }
 }
 
 static void
@@ -128,8 +130,10 @@ mc_yscale_set (SwfdecMovie *movie, const SwfdecAsValue *val)
     return;
   }
   movie->modified = TRUE;
-  movie->yscale = d;
-  swfdec_movie_queue_update (movie, SWFDEC_MOVIE_INVALID_MATRIX);
+  if (movie->yscale != d) {
+    movie->yscale = d;
+    swfdec_movie_queue_update (movie, SWFDEC_MOVIE_INVALID_MATRIX);
+  }
 }
 
 static void
@@ -241,7 +245,10 @@ mc_width_set (SwfdecMovie *movie, const SwfdecAsValue *val)
   cur = rint (movie->original_extents.x1 - movie->original_extents.x0);
   cur = SWFDEC_TWIPS_TO_DOUBLE ((SwfdecTwips) cur);
   if (cur != 0) {
-    movie->xscale = 100 * d / cur;
+    d = 100 * d / cur;
+    if (d == movie->xscale)
+      return;
+    movie->xscale = d;
   } else {
     movie->xscale = 0;
     movie->yscale = 0;
@@ -278,7 +285,10 @@ mc_height_set (SwfdecMovie *movie, const SwfdecAsValue *val)
   cur = rint (movie->original_extents.y1 - movie->original_extents.y0);
   cur = SWFDEC_TWIPS_TO_DOUBLE ((SwfdecTwips) cur);
   if (cur != 0) {
-    movie->yscale = 100 * d / cur;
+    d = 100 * d / cur;
+    if (d == movie->yscale)
+      return;
+    movie->yscale = d;
   } else {
     movie->xscale = 0;
     movie->yscale = 0;
@@ -314,8 +324,10 @@ mc_rotation_set (SwfdecMovie *movie, const SwfdecAsValue *val)
     SWFDEC_ERROR ("FIXME: implement correct rounding errors here");
   }
   movie->modified = TRUE;
-  movie->rotation = d;
-  swfdec_movie_queue_update (movie, SWFDEC_MOVIE_INVALID_MATRIX);
+  if (movie->rotation != d) {
+    movie->rotation = d;
+    swfdec_movie_queue_update (movie, SWFDEC_MOVIE_INVALID_MATRIX);
+  }
 }
 
 static void
@@ -351,9 +363,27 @@ mc_parent (SwfdecMovie *movie, SwfdecAsValue *rval)
 static void
 mc_root (SwfdecMovie *movie, SwfdecAsValue *rval)
 {
-  while (movie->parent)
-    movie = movie->parent;
+  movie = swfdec_movie_get_root (movie);
   SWFDEC_AS_VALUE_SET_OBJECT (rval, SWFDEC_AS_OBJECT (movie));
+}
+
+static void
+mc_target_get (SwfdecMovie *movie, SwfdecAsValue *rval)
+{
+  GString *s;
+
+  s = g_string_new ("");
+  while (movie->parent) {
+    g_string_prepend (s, movie->name);
+    g_string_prepend_c (s, '/');
+    movie = movie->parent;
+  }
+  if (s->len == 0) {
+    SWFDEC_AS_VALUE_SET_STRING (rval, SWFDEC_AS_STR_SLASH);
+  } else {
+    SWFDEC_AS_VALUE_SET_STRING (rval, swfdec_as_context_give_string (
+	  SWFDEC_AS_OBJECT (movie)->context, g_string_free (s, FALSE)));
+  }
 }
 
 static void
@@ -361,7 +391,7 @@ mc_url_get (SwfdecMovie *movie, SwfdecAsValue *rval)
 {
   SWFDEC_AS_VALUE_SET_STRING (rval, swfdec_as_context_get_string (
 	SWFDEC_AS_OBJECT (movie)->context,
-	swfdec_url_get_url (swfdec_loader_get_url (movie->swf->loader))));
+	swfdec_url_get_url (swfdec_loader_get_url (movie->resource->loader))));
 }
 
 struct {
@@ -381,7 +411,7 @@ struct {
   { 0, SWFDEC_AS_STR__width,	mc_width_get,	    mc_width_set },
   { 0, SWFDEC_AS_STR__height,	mc_height_get,	    mc_height_set },
   { 0, SWFDEC_AS_STR__rotation,	mc_rotation_get,    mc_rotation_set },
-  { 1, SWFDEC_AS_STR__target,	NULL,  NULL }, //"_target"
+  { 1, SWFDEC_AS_STR__target,	mc_target_get,  NULL }, //"_target"
   { 1, SWFDEC_AS_STR__framesloaded,mc_framesloaded,    NULL},
   { 0, SWFDEC_AS_STR__name,	mc_name_get,	    mc_name_set },
   { 1, SWFDEC_AS_STR__droptarget,	NULL,  NULL }, //"_droptarget"

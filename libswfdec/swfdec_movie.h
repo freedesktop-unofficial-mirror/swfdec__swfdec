@@ -75,12 +75,23 @@ struct _SwfdecContent {
 #define SWFDEC_MOVIE_CLASS(klass)            (G_TYPE_CHECK_CLASS_CAST ((klass), SWFDEC_TYPE_MOVIE, SwfdecMovieClass))
 #define SWFDEC_MOVIE_GET_CLASS(obj)          (G_TYPE_INSTANCE_GET_CLASS ((obj), SWFDEC_TYPE_MOVIE, SwfdecMovieClass))
 
+/* NB: each following state includes the previous */
 typedef enum {
-  SWFDEC_MOVIE_UP_TO_DATE = 0,
-  SWFDEC_MOVIE_INVALID_CHILDREN,
-  SWFDEC_MOVIE_INVALID_EXTENTS,
-  SWFDEC_MOVIE_INVALID_MATRIX
+  SWFDEC_MOVIE_UP_TO_DATE = 0,		/* everything OK */
+  SWFDEC_MOVIE_INVALID_CHILDREN,	/* call update on children */
+  SWFDEC_MOVIE_INVALID_EXTENTS,		/* recalculate extents */
+  SWFDEC_MOVIE_INVALID_CONTENTS,	/* trigger an invalidation */
+  SWFDEC_MOVIE_INVALID_MATRIX		/* matrix is invalid, recalculate */
 } SwfdecMovieCacheState;
+
+typedef void (*SwfdecMovieVariableListenerFunction) (SwfdecAsObject *object,
+    const char *name, const SwfdecAsValue *val);
+
+typedef struct {
+  SwfdecAsObject *			object;
+  const char *				name;
+  SwfdecMovieVariableListenerFunction	function;
+} SwfdecMovieVariableListener;
 
 struct _SwfdecMovie {
   SwfdecAsObject	object;
@@ -91,6 +102,7 @@ struct _SwfdecMovie {
   int			depth;			/* depth of movie (equals content->depth unless explicitly set) */
   SwfdecMovieCacheState	cache_state;		/* whether we are up to date */
   SwfdecMovieState	state;			/* state the movie is in */
+  GSList		*variable_listeners;	/* textfield's listening to changes in variables - SwfdecMovieVariableListener */
 
   /* static properties (set by PlaceObject tags) */
   const char *		original_name;		/* the original name - GC'd and static */
@@ -102,7 +114,7 @@ struct _SwfdecMovie {
 
   /* parenting information */
   SwfdecMovie *		parent;			/* movie that contains us or NULL for root movies */
-  SwfdecSwfInstance *	swf;			/* the instance that created us */
+  SwfdecResource *	resource;     		/* the resource that created us */
 
   /* positioning - the values are applied in this order */
   SwfdecRect		extents;		/* the extents occupied after transform is applied */
@@ -120,11 +132,18 @@ struct _SwfdecMovie {
   gboolean		visible;		/* whether we currently can be seen or iterate */
   gboolean		will_be_removed;	/* it's known that this movie will not survive the next iteration */
 
+  /* drawing state */
+  /* FIXME: could it be that shape drawing (SwfdecGraphicMovie etc) uses these same objects? */
+  SwfdecRect		draw_extents;		/* extents of the items in the following list */
+  GSList *		draws;			/* all the items to draw */
+  SwfdecDraw *		draw_fill;	      	/* current fill style or NULL */
+  SwfdecDraw *		draw_line;	      	/* current line style or NULL */
+  int			draw_x;			/* current x position for drawing */
+  int			draw_y;			/* current y position for drawing */
+
   /* leftover unimplemented variables from the Actionscript spec */
 #if 0
   int droptarget;
-  char *target;
-  char *url;
 #endif
 };
 
@@ -141,8 +160,7 @@ struct _SwfdecMovieClass {
   void			(* render)		(SwfdecMovie *		movie, 
 						 cairo_t *		cr,
 						 const SwfdecColorTransform *trans,
-						 const SwfdecRect *	inval,
-						 gboolean		fill);
+						 const SwfdecRect *	inval);
 
   /* mouse handling */
   gboolean		(* mouse_in)		(SwfdecMovie *		movie,
@@ -164,6 +182,7 @@ GType		swfdec_movie_get_type		(void);
 SwfdecMovie *	swfdec_movie_new		(SwfdecPlayer *		player,
 						 int			depth,
 						 SwfdecMovie *		parent,
+						 SwfdecResource *	resource,
 						 SwfdecGraphic *	graphic,
 						 const char *		name);
 SwfdecMovie *	swfdec_movie_new_for_content  	(SwfdecMovie *		parent,
@@ -174,6 +193,9 @@ SwfdecMovie *	swfdec_movie_duplicate		(SwfdecMovie *		movie,
 void		swfdec_movie_initialize		(SwfdecMovie *		movie);
 SwfdecMovie *	swfdec_movie_find		(SwfdecMovie *		movie,
 						 int			depth);
+SwfdecMovie *	swfdec_movie_get_by_name	(SwfdecMovie *		movie,
+						 const char *		name);
+SwfdecMovie *	swfdec_movie_get_root		(SwfdecMovie *		movie);
 void		swfdec_movie_remove		(SwfdecMovie *		movie);
 void		swfdec_movie_destroy		(SwfdecMovie *		movie);
 void		swfdec_movie_set_static_properties 
@@ -211,24 +233,22 @@ gboolean	swfdec_movie_mouse_in		(SwfdecMovie *		movie,
 SwfdecMovie *	swfdec_movie_get_movie_at	(SwfdecMovie *		movie,
 						 double			x,
 						 double			y);
-char *		swfdec_movie_get_path		(SwfdecMovie *		movie);
+char *		swfdec_movie_get_path		(SwfdecMovie *		movie,
+						 gboolean		dot);
 void		swfdec_movie_render		(SwfdecMovie *		movie,
 						 cairo_t *		cr, 
 						 const SwfdecColorTransform *trans,
-						 const SwfdecRect *	inval,
-						 gboolean		fill);
+						 const SwfdecRect *	inval);
 void		swfdec_movie_execute_script	(SwfdecMovie *		movie,
 						 SwfdecEventType	condition);
 gboolean      	swfdec_movie_queue_script	(SwfdecMovie *		movie,
   						 SwfdecEventType	condition);
 void		swfdec_movie_set_variables	(SwfdecMovie *		movie,
 						 const char *		variables);
-void		swfdec_movie_load		(SwfdecMovie *		movie,
+void		swfdec_movie_load_variables	(SwfdecMovie *		movie,
 						 const char *		url,
-						 const char *		target,
 						 SwfdecLoaderRequest	request,
-						 const char *		data,
-						 gsize			data_len);
+						 SwfdecBuffer *		data);
 
 int		swfdec_movie_compare_depths	(gconstpointer		a,
 						 gconstpointer		b);
@@ -244,6 +264,16 @@ gboolean	swfdec_movie_set_asprop		(SwfdecMovie *		movie,
 gboolean	swfdec_movie_get_asprop		(SwfdecMovie *		movie,
 						 const char *		name,
 						 SwfdecAsValue *	val);
+
+void		swfdec_movie_add_variable_listener (SwfdecMovie *	movie,
+						 SwfdecAsObject *	object,
+						 const char *		name,
+						 const SwfdecMovieVariableListenerFunction	function);
+void		swfdec_movie_remove_variable_listener (SwfdecMovie *	movie,
+						 SwfdecAsObject *	object,
+						 const char *		name,
+						 const SwfdecMovieVariableListenerFunction	function);
+SwfdecResource *swfdec_movie_get_own_resource	(SwfdecMovie *		movie);
 
 G_END_DECLS
 #endif

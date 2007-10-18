@@ -21,7 +21,7 @@
 #include "config.h"
 #endif
 
-#include <strings.h>
+#include <string.h>
 
 #include "swfdec_as_object.h"
 #include "swfdec_as_context.h"
@@ -29,9 +29,13 @@
 #include "swfdec_as_internal.h"
 #include "swfdec_as_native_function.h"
 #include "swfdec_as_stack.h"
+#include "swfdec_as_string.h"
 #include "swfdec_as_strings.h"
 #include "swfdec_debug.h"
 #include "swfdec_movie.h"
+#include "swfdec_security_allow.h"
+
+#define SWFDEC_AS_OBJECT_PROTOTYPE_RECURSION_LIMIT 256
 
 /**
  * SECTION:SwfdecAsObject
@@ -113,6 +117,12 @@ struct _SwfdecAsVariable {
   SwfdecAsFunction *	set;		/* setter or %NULL */
 };
 
+typedef struct {
+  SwfdecAsFunction *	watch;		/* watcher or %NULL */
+  SwfdecAsValue		watch_data;	/* user data to watcher */
+  guint			refcount;	/* refcount - misused for recursion detection */
+} SwfdecAsWatch;
+
 G_DEFINE_TYPE (SwfdecAsObject, swfdec_as_object, G_TYPE_OBJECT)
 
 static void
@@ -141,11 +151,23 @@ swfdec_as_object_mark_property (gpointer key, gpointer value, gpointer unused)
 }
 
 static void
+swfdec_as_object_mark_watch (gpointer key, gpointer value, gpointer unused)
+{
+  SwfdecAsWatch *watch = value;
+
+  swfdec_as_string_mark (key);
+  swfdec_as_object_mark (SWFDEC_AS_OBJECT (watch->watch));
+  swfdec_as_value_mark (&watch->watch_data);
+}
+
+static void
 swfdec_as_object_do_mark (SwfdecAsObject *object)
 {
   if (object->prototype)
     swfdec_as_object_mark (object->prototype);
   g_hash_table_foreach (object->properties, swfdec_as_object_mark_property, NULL);
+  if (object->watches)
+    g_hash_table_foreach (object->watches, swfdec_as_object_mark_watch, NULL);
 }
 
 static void
@@ -156,7 +178,7 @@ swfdec_as_object_do_add (SwfdecAsObject *object)
 static gboolean
 swfdec_as_object_lookup_case_insensitive (gpointer key, gpointer value, gpointer user_data)
 {
-  return strcasecmp (key, user_data) == 0;
+  return g_ascii_strcasecmp (key, user_data) == 0;
 }
 
 static gboolean
@@ -222,37 +244,103 @@ swfdec_as_object_do_get (SwfdecAsObject *object, SwfdecAsObject *orig,
   return TRUE;
 }
 
+static SwfdecAsWatch *
+swfdec_as_watch_new (SwfdecAsFunction *function)
+{
+  SwfdecAsWatch *watch;
+
+  if (!swfdec_as_context_use_mem (SWFDEC_AS_OBJECT (function)->context, 
+	sizeof (SwfdecAsWatch)))
+    return NULL;
+
+  watch = g_slice_new (SwfdecAsWatch);
+  watch->refcount = 1;
+  watch->watch = function;
+  SWFDEC_AS_VALUE_SET_UNDEFINED (&watch->watch_data);
+  return watch;
+}
+
+static inline gboolean
+swfdec_as_watch_can_recurse (SwfdecAsWatch *watch)
+{
+  guint version;
+
+  version = SWFDEC_AS_OBJECT (watch->watch)->context->version;
+  if (version <= 6) {
+    return watch->refcount <= 1;
+  } else {
+    return watch->refcount <= 64 + 1;
+  }
+}
+
+static inline void
+swfdec_as_watch_ref (SwfdecAsWatch *watch)
+{
+  watch->refcount++;
+}
+
+static inline void
+swfdec_as_watch_unref (SwfdecAsWatch *watch)
+{
+  watch->refcount--;
+  if (watch->refcount == 0) {
+    swfdec_as_context_unuse_mem (SWFDEC_AS_OBJECT (watch->watch)->context, 
+	sizeof (SwfdecAsWatch));
+    g_slice_free (SwfdecAsWatch, watch);
+  }
+}
+
+SwfdecAsObject *
+swfdec_as_object_prototype_for_version (SwfdecAsObject *object, guint version,
+    gboolean check7)
+{
+  if (object->prototype == NULL)
+    return NULL;
+
+  if (object->prototype_flags & SWFDEC_AS_VARIABLE_VERSION_6_UP && version < 6)
+    return NULL;
+  // don't check for NOT_6 flag
+  if (object->prototype_flags & SWFDEC_AS_VARIABLE_VERSION_7_UP && version < 7)
+    return NULL;
+  // only check 8_UP for version < 6
+  if (object->prototype_flags & SWFDEC_AS_VARIABLE_VERSION_8_UP &&
+      version < 6)
+    return NULL;
+  if (check7) {
+    if (object->prototype_flags & SWFDEC_AS_VARIABLE_VERSION_8_UP && version == 7)
+      return NULL;
+  }
+
+  return object->prototype;
+}
+
 static void
 swfdec_as_object_do_set (SwfdecAsObject *object, const char *variable, 
     const SwfdecAsValue *val, guint flags)
 {
   SwfdecAsVariable *var;
+  SwfdecAsWatch *watch;
 
   if (!swfdec_as_variable_name_is_valid (variable))
     return;
 
-  if (variable == SWFDEC_AS_STR___proto__) {
-    if (SWFDEC_AS_VALUE_IS_OBJECT (val) &&
-	!SWFDEC_IS_MOVIE (SWFDEC_AS_VALUE_GET_OBJECT (val))) {
-      object->prototype = SWFDEC_AS_VALUE_GET_OBJECT (val);
-    } else {
-      object->prototype = NULL;
-    }
-  }
-
   var = swfdec_as_object_hash_lookup (object, variable);
-  if (var == NULL) {
+  if (var == NULL && variable != SWFDEC_AS_STR___proto__) {
     guint i;
-    SwfdecAsObject *proto = object->prototype;
+    SwfdecAsObject *proto;
 
-    for (i = 0; i < 256 && proto; i++) {
+    proto = swfdec_as_object_prototype_for_version (object,
+	object->context->version, FALSE);
+
+    for (i = 0; i < SWFDEC_AS_OBJECT_PROTOTYPE_RECURSION_LIMIT && proto; i++) {
       var = swfdec_as_object_hash_lookup (proto, variable);
       if (var && var->get)
 	break;
-      proto = proto->prototype;
+      proto = swfdec_as_object_prototype_for_version (proto,
+	  proto->context->version, FALSE);
       var = NULL;
     }
-    if (i == 256) {
+    if (i == SWFDEC_AS_OBJECT_PROTOTYPE_RECURSION_LIMIT) {
       swfdec_as_context_abort (object->context, "Prototype recursion limit exceeded");
       return;
     }
@@ -264,6 +352,41 @@ swfdec_as_object_do_set (SwfdecAsObject *object, const char *variable,
   } else {
     if (var->flags & SWFDEC_AS_VARIABLE_CONSTANT)
       return;
+    // remove the flags that could make this variable hidden
+    if (object->context->version == 6) {
+      // version 6, so let's forget SWFDEC_AS_VARIABLE_VERSION_7_UP flag, oops!
+      // we will still set the value though, even if that flag is set
+      var->flags &= ~(SWFDEC_AS_VARIABLE_VERSION_6_UP |
+	  SWFDEC_AS_VARIABLE_VERSION_NOT_6 | SWFDEC_AS_VARIABLE_VERSION_8_UP);
+    } else {
+      var->flags &= ~(SWFDEC_AS_VARIABLE_VERSION_6_UP |
+	  SWFDEC_AS_VARIABLE_VERSION_NOT_6 | SWFDEC_AS_VARIABLE_VERSION_7_UP |
+	  SWFDEC_AS_VARIABLE_VERSION_8_UP);
+    }
+  }
+  if (object->watches) {
+    SwfdecAsValue ret = *val;
+    watch = g_hash_table_lookup (object->watches, variable);
+    /* FIXME: figure out if this limit here is correct. Add a watch in Flash 7 
+     * and set a variable using Flash 6 */
+    if (watch && swfdec_as_watch_can_recurse (watch)) {
+      SwfdecAsValue args[4];
+      SWFDEC_AS_VALUE_SET_STRING (&args[0], variable);
+      args[1] = var->value;
+      args[2] = *val;
+      args[3] = watch->watch_data;
+      swfdec_as_watch_ref (watch);
+      swfdec_as_function_call (watch->watch, object, 4, args, &ret);
+      swfdec_as_context_run (object->context);
+      swfdec_as_watch_unref (watch);
+      var = swfdec_as_object_hash_lookup (object, variable);
+      if (var == NULL)
+	return;
+    }
+
+    var->value = ret;
+  } else {
+    watch = NULL;
   }
   if (var->get) {
     if (var->set) {
@@ -271,8 +394,19 @@ swfdec_as_object_do_set (SwfdecAsObject *object, const char *variable,
       swfdec_as_function_call (var->set, object, 1, val, &tmp);
       swfdec_as_context_run (object->context);
     }
-  } else { 
+  } else if (watch == NULL) {
     var->value = *val;
+  }
+
+  if (variable == SWFDEC_AS_STR___proto__) {
+    if (SWFDEC_AS_VALUE_IS_OBJECT (val) &&
+	!SWFDEC_IS_MOVIE (SWFDEC_AS_VALUE_GET_OBJECT (val))) {
+      object->prototype = SWFDEC_AS_VALUE_GET_OBJECT (val);
+      object->prototype_flags = var->flags;
+    } else {
+      object->prototype = NULL;
+      object->prototype_flags = 0;
+    }
   }
 }
 
@@ -281,8 +415,12 @@ swfdec_as_object_do_set_flags (SwfdecAsObject *object, const char *variable, gui
 {
   SwfdecAsVariable *var = swfdec_as_object_hash_lookup (object, variable);
 
-  if (var)
+  if (var) {
     var->flags = (var->flags & ~mask) | flags;
+
+    if (variable == SWFDEC_AS_STR___proto__)
+      object->prototype_flags = var->flags;
+  }
 }
 
 static void
@@ -305,6 +443,10 @@ swfdec_as_object_do_delete (SwfdecAsObject *object, const char *variable)
   if (var->flags & SWFDEC_AS_VARIABLE_PERMANENT)
     return SWFDEC_AS_DELETE_NOT_DELETED;
 
+  if (variable == SWFDEC_AS_STR___proto__ && object->context->version <= 6) {
+    object->prototype = NULL;
+    object->prototype_flags = 0;
+  }
   swfdec_as_object_free_property (NULL, var, object);
   if (!g_hash_table_remove (object->properties, variable)) {
     g_assert_not_reached ();
@@ -414,7 +556,7 @@ swfdec_as_object_hash_foreach_rename (gpointer key, gpointer value, gpointer dat
  * @func: function determining the new name
  * @data: data to pass to @func
  *
- * Calls @func for each variable of @object. If The function is then supposed 
+ * Calls @func for each variable of @object. The function is then supposed 
  * to return the new name of the variable or %NULL if the variable should be 
  * removed. This is an internal function for array operations.
  **/
@@ -553,6 +695,19 @@ swfdec_as_object_add (SwfdecAsObject *object, SwfdecAsContext *context, gsize si
   }
 }
 
+/* This is a huge hack design-wise, but we can't use watch->watch, 
+ * it might be gone already */
+static gboolean
+swfdec_as_object_steal_watches (gpointer key, gpointer value, gpointer object)
+{
+  SwfdecAsWatch *watch = value;
+
+  g_assert (watch->refcount == 1);
+  watch->watch = (SwfdecAsFunction *) object;
+  swfdec_as_watch_unref (watch);
+  return TRUE;
+}
+
 void
 swfdec_as_object_collect (SwfdecAsObject *object)
 {
@@ -562,6 +717,11 @@ swfdec_as_object_collect (SwfdecAsObject *object)
   g_hash_table_foreach (object->properties, swfdec_as_object_free_property, object);
   g_hash_table_destroy (object->properties);
   object->properties = NULL;
+  if (object->watches) {
+    g_hash_table_foreach_steal (object->watches, swfdec_as_object_steal_watches, object);
+    g_hash_table_destroy (object->watches);
+    object->watches = NULL;
+  }
   if (object->size)
     swfdec_as_context_unuse_mem (object->context, object->size);
   g_object_unref (object);
@@ -659,15 +819,16 @@ swfdec_as_object_get_variable_and_flags (SwfdecAsObject *object,
     pobject = &tmp_pobject;
 
   cur = object;
-  for (i = 0; i < 256 && cur != NULL; i++) {
+  for (i = 0; i <= SWFDEC_AS_OBJECT_PROTOTYPE_RECURSION_LIMIT && cur != NULL; i++) {
     klass = SWFDEC_AS_OBJECT_GET_CLASS (cur);
     if (klass->get (cur, object, variable, value, flags)) {
       *pobject = cur;
       return TRUE;
     }
-    cur = cur->prototype;
+    cur = swfdec_as_object_prototype_for_version (cur, cur->context->version,
+	FALSE);
   }
-  if (i == 256) {
+  if (i > SWFDEC_AS_OBJECT_PROTOTYPE_RECURSION_LIMIT) {
     swfdec_as_context_abort (object->context, "Prototype recursion limit exceeded");
     *flags = 0;
     *pobject = NULL;
@@ -853,6 +1014,28 @@ swfdec_as_object_add_constructor (SwfdecAsObject *object, const char *name, GTyp
   return function;
 }
 
+void
+swfdec_as_object_run_with_security (SwfdecAsObject *object, SwfdecScript *script,
+    SwfdecSecurity *sec)
+{
+  SwfdecAsContext *context;
+  SwfdecAsFrame *frame;
+
+  g_return_if_fail (SWFDEC_IS_AS_OBJECT (object));
+  g_return_if_fail (script != NULL);
+  g_return_if_fail (SWFDEC_IS_SECURITY (sec));
+
+  context = object->context;
+  frame = swfdec_as_frame_new (context, script);
+  if (frame == NULL)
+    return;
+  swfdec_as_frame_set_security (frame, sec);
+  swfdec_as_frame_set_this (frame, object);
+  swfdec_as_frame_preload (frame);
+  swfdec_as_context_run (context);
+  swfdec_as_stack_pop (context);
+}
+
 /**
  * swfdec_as_object_run:
  * @object: a #SwfdecAsObject
@@ -863,20 +1046,14 @@ swfdec_as_object_add_constructor (SwfdecAsObject *object, const char *name, GTyp
 void
 swfdec_as_object_run (SwfdecAsObject *object, SwfdecScript *script)
 {
-  SwfdecAsContext *context;
-  SwfdecAsFrame *frame;
+  SwfdecSecurity *sec;
 
   g_return_if_fail (SWFDEC_IS_AS_OBJECT (object));
   g_return_if_fail (script != NULL);
 
-  context = object->context;
-  frame = swfdec_as_frame_new (context, script);
-  if (frame == NULL)
-    return;
-  swfdec_as_frame_set_this (frame, object);
-  swfdec_as_frame_preload (frame);
-  swfdec_as_context_run (context);
-  swfdec_as_stack_pop (context);
+  sec = swfdec_security_allow_new ();
+  swfdec_as_object_run_with_security (object, script, sec);
+  g_object_unref (sec);
 }
 
 /**
@@ -1006,10 +1183,8 @@ swfdec_as_object_create (SwfdecAsFunction *fun, guint n_args,
       swfdec_as_object_set_variable_and_flags (new, SWFDEC_AS_STR_constructor, 
 	  &val, SWFDEC_AS_VARIABLE_HIDDEN);
     }
-    if (context->version <= 5)
-      SWFDEC_AS_VALUE_SET_UNDEFINED (&val);
     swfdec_as_object_set_variable_and_flags (new, SWFDEC_AS_STR___constructor__, 
-	&val, SWFDEC_AS_VARIABLE_HIDDEN);
+	&val, SWFDEC_AS_VARIABLE_HIDDEN | SWFDEC_AS_VARIABLE_VERSION_6_UP);
   } else {
     /* need to do this, since we must push something to the frame stack */
     new = NULL;
@@ -1061,6 +1236,8 @@ swfdec_as_object_set_constructor (SwfdecAsObject *object, SwfdecAsObject *constr
  * @variable: name of the variable
  * @get: getter function to call when reading the variable
  * @set: setter function to call when writing the variable or %NULL if read-only
+ * @default_flags: flags to use if creating the variable anew - the flags will
+ *                 be ignored if the property already exists.
  *
  * Adds a variable to @object in the same way as the Actionscript code 
  * "object.addProperty()" would do. Accessing the variable will from now on be
@@ -1069,7 +1246,7 @@ swfdec_as_object_set_constructor (SwfdecAsObject *object, SwfdecAsObject *constr
  **/
 void
 swfdec_as_object_add_variable (SwfdecAsObject *object, const char *variable, 
-    SwfdecAsFunction *get, SwfdecAsFunction *set)
+    SwfdecAsFunction *get, SwfdecAsFunction *set, guint default_flags)
 {
   SwfdecAsVariable *var;
 
@@ -1079,8 +1256,8 @@ swfdec_as_object_add_variable (SwfdecAsObject *object, const char *variable,
   g_return_if_fail (set == NULL || SWFDEC_IS_AS_FUNCTION (set));
 
   var = swfdec_as_object_hash_lookup (object, variable);
-  if (var == NULL) 
-    var = swfdec_as_object_hash_create (object, variable, 0);
+  if (var == NULL)
+    var = swfdec_as_object_hash_create (object, variable, default_flags);
   if (var == NULL)
     return;
   var->get = get;
@@ -1089,7 +1266,8 @@ swfdec_as_object_add_variable (SwfdecAsObject *object, const char *variable,
 
 /*** AS CODE ***/
 
-static void
+SWFDEC_AS_NATIVE (101, 2, swfdec_as_object_addProperty)
+void
 swfdec_as_object_addProperty (SwfdecAsContext *cx, SwfdecAsObject *object,
     guint argc, SwfdecAsValue *argv, SwfdecAsValue *retval)
 {
@@ -1113,32 +1291,177 @@ swfdec_as_object_addProperty (SwfdecAsContext *cx, SwfdecAsObject *object,
     return;
   }
 
-  swfdec_as_object_add_variable (object, name, get, set);
+  swfdec_as_object_add_variable (object, name, get, set, 0);
   SWFDEC_AS_VALUE_SET_BOOLEAN (retval, TRUE);
 }
 
-static void
+SWFDEC_AS_NATIVE (101, 5, swfdec_as_object_hasOwnProperty)
+void
 swfdec_as_object_hasOwnProperty (SwfdecAsContext *cx, SwfdecAsObject *object,
     guint argc, SwfdecAsValue *argv, SwfdecAsValue *retval)
 {
+  SwfdecAsVariable *var;
   const char *name;
 
+  SWFDEC_AS_VALUE_SET_BOOLEAN (retval, FALSE);
+
+  // return false even if no params
+  if (argc < 1)
+    return;
+
   name = swfdec_as_value_to_string (object->context, &argv[0]);
-  
-  if (swfdec_as_object_hash_lookup (object, name))
-    SWFDEC_AS_VALUE_SET_BOOLEAN (retval, TRUE);
-  else
-    SWFDEC_AS_VALUE_SET_BOOLEAN (retval, FALSE);
+
+  if (!(var = swfdec_as_object_hash_lookup (object, name)))
+    return;
+
+  /* This functions only checks NOT 6 flag, and checks it on ALL VERSIONS */
+  if (var->flags & SWFDEC_AS_VARIABLE_VERSION_NOT_6)
+    return;
+
+  SWFDEC_AS_VALUE_SET_BOOLEAN (retval, TRUE);
 }
 
-static void
+SWFDEC_AS_NATIVE (101, 7, swfdec_as_object_isPropertyEnumerable)
+void
+swfdec_as_object_isPropertyEnumerable (SwfdecAsContext *cx,
+    SwfdecAsObject *object, guint argc, SwfdecAsValue *argv,
+    SwfdecAsValue *retval)
+{
+  SwfdecAsVariable *var;
+  const char *name;
+
+  SWFDEC_AS_VALUE_SET_BOOLEAN (retval, FALSE);
+
+  // return false even if no params
+  if (argc < 1)
+    return;
+
+  name = swfdec_as_value_to_string (object->context, &argv[0]);
+
+  if (!(var = swfdec_as_object_hash_lookup (object, name)))
+    return;
+
+  if (var->flags & SWFDEC_AS_VARIABLE_HIDDEN)
+    return;
+
+  SWFDEC_AS_VALUE_SET_BOOLEAN (retval, TRUE);
+}
+
+SWFDEC_AS_NATIVE (101, 6, swfdec_as_object_isPrototypeOf)
+void
+swfdec_as_object_isPrototypeOf (SwfdecAsContext *cx,
+    SwfdecAsObject *object, guint argc, SwfdecAsValue *argv,
+    SwfdecAsValue *retval)
+{
+  SwfdecAsObject *class;
+
+  SWFDEC_AS_VALUE_SET_BOOLEAN (retval, FALSE);
+
+  // return false even if no params
+  if (argc < 1)
+    return;
+
+  class = swfdec_as_value_to_object (cx, &argv[0]);
+  if (class == NULL)
+    return;
+
+  while ((class = swfdec_as_object_prototype_for_version (class, cx->version, TRUE)) != NULL) {
+    if (object == class) {
+      SWFDEC_AS_VALUE_SET_BOOLEAN (retval, TRUE);
+      return;
+    }
+  }
+
+  // not found, nothing to do
+}
+
+SWFDEC_AS_NATIVE (101, 0, swfdec_as_object_watch)
+void
+swfdec_as_object_watch (SwfdecAsContext *cx, SwfdecAsObject *object,
+    guint argc, SwfdecAsValue *argv, SwfdecAsValue *retval)
+{
+  SwfdecAsWatch *watch;
+  const char *name;
+
+  SWFDEC_AS_VALUE_SET_BOOLEAN (retval, FALSE);
+
+  if (argc < 2)
+    return;
+
+  name = swfdec_as_value_to_string (cx, &argv[0]);
+
+  if (!SWFDEC_AS_VALUE_IS_OBJECT (&argv[1]))
+    return;
+
+  if (!SWFDEC_IS_AS_FUNCTION (SWFDEC_AS_VALUE_GET_OBJECT (&argv[1])))
+    return;
+
+  if (object->watches == NULL) {
+    object->watches = g_hash_table_new_full (g_direct_hash, g_direct_equal, 
+	NULL, (GDestroyNotify) swfdec_as_watch_unref);
+    watch = NULL;
+  } else {
+    watch = g_hash_table_lookup (object->watches, name);
+  }
+  if (watch == NULL) {
+    watch = swfdec_as_watch_new (SWFDEC_AS_FUNCTION (SWFDEC_AS_VALUE_GET_OBJECT (&argv[1])));
+    if (watch == NULL)
+      return;
+    g_hash_table_insert (object->watches, (char *) name, watch);
+  } else {
+    watch->watch = SWFDEC_AS_FUNCTION (SWFDEC_AS_VALUE_GET_OBJECT (&argv[1]));
+  }
+
+  if (argc >= 3) {
+    watch->watch_data = argv[2];
+  } else {
+    SWFDEC_AS_VALUE_SET_UNDEFINED (&watch->watch_data);
+  }
+
+  SWFDEC_AS_VALUE_SET_BOOLEAN (retval, TRUE);
+}
+
+SWFDEC_AS_NATIVE (101, 1, swfdec_as_object_unwatch)
+void
+swfdec_as_object_unwatch (SwfdecAsContext *cx, SwfdecAsObject *object,
+    guint argc, SwfdecAsValue *argv, SwfdecAsValue *retval)
+{
+  SwfdecAsVariable *var;
+  const char *name;
+
+  SWFDEC_AS_VALUE_SET_BOOLEAN (retval, FALSE);
+
+  if (argc < 1)
+    return;
+
+  name = swfdec_as_value_to_string (cx, &argv[0]);
+
+  // special case: can't unwatch native properties
+  if ((var = swfdec_as_object_hash_lookup (object, name))&& var->get != NULL)
+      return;
+
+  if (object->watches != NULL && 
+      g_hash_table_remove (object->watches, name)) {
+
+    SWFDEC_AS_VALUE_SET_BOOLEAN (retval, TRUE);
+
+    if (g_hash_table_size (object->watches) == 0) {
+      g_hash_table_destroy (object->watches);
+      object->watches = NULL;
+    }
+  }
+}
+
+SWFDEC_AS_NATIVE (101, 3, swfdec_as_object_valueOf)
+void
 swfdec_as_object_valueOf (SwfdecAsContext *cx, SwfdecAsObject *object,
     guint argc, SwfdecAsValue *argv, SwfdecAsValue *retval)
 {
   SWFDEC_AS_VALUE_SET_OBJECT (retval, object);
 }
 
-static void
+SWFDEC_AS_NATIVE (101, 4, swfdec_as_object_toString)
+void
 swfdec_as_object_toString (SwfdecAsContext *cx, SwfdecAsObject *object,
     guint argc, SwfdecAsValue *argv, SwfdecAsValue *retval)
 {
@@ -1146,6 +1469,38 @@ swfdec_as_object_toString (SwfdecAsContext *cx, SwfdecAsObject *object,
     SWFDEC_AS_VALUE_SET_STRING (retval, SWFDEC_AS_STR__type_Function_);
   } else {
     SWFDEC_AS_VALUE_SET_STRING (retval, SWFDEC_AS_STR__object_Object_);
+  }
+}
+
+void
+swfdec_as_object_decode (SwfdecAsObject *object, const char *str)
+{
+  SwfdecAsValue val;
+  char **varlist, *p;
+  guint i;
+
+  str = swfdec_as_string_unescape (object->context, str);
+  if (str == NULL)
+    return;
+
+  varlist = g_strsplit (str, "&", -1);
+
+  for (i = 0; varlist[i] != NULL; i++) {
+    p = strchr (varlist[i], '=');
+    if (p != NULL) {
+      *p++ = '\0';
+      if (*p == '\0')
+	p = NULL;
+    }
+
+    if (p != NULL) {
+      SWFDEC_AS_VALUE_SET_STRING (&val,
+	  swfdec_as_context_get_string (object->context, p));
+    } else {
+      SWFDEC_AS_VALUE_SET_STRING (&val, SWFDEC_AS_STR_EMPTY);
+    }
+    swfdec_as_object_set_variable (object,
+	swfdec_as_context_get_string (object->context, varlist[i]), &val);
   }
 }
 
@@ -1169,27 +1524,16 @@ swfdec_as_object_init_context (SwfdecAsContext *context, guint version)
   swfdec_as_object_set_variable_and_flags (object, SWFDEC_AS_STR_prototype,
       &val, SWFDEC_AS_VARIABLE_HIDDEN | SWFDEC_AS_VARIABLE_PERMANENT |
       SWFDEC_AS_VARIABLE_CONSTANT);
-  if (context->Function_prototype) {
-    /* then finish the function prototype (use this order or 
-     * SWFDEC_AS_VARIABLE_CONSTANT won't let us */
-    swfdec_as_object_set_variable_and_flags (context->Function_prototype,
-	SWFDEC_AS_STR___proto__, &val,
-	SWFDEC_AS_VARIABLE_HIDDEN | SWFDEC_AS_VARIABLE_PERMANENT);
-  }
+
+  /* then finish the function prototype (use this order or 
+   * SWFDEC_AS_VARIABLE_CONSTANT won't let us */
+  swfdec_as_object_set_variable_and_flags (context->Function_prototype,
+      SWFDEC_AS_STR___proto__, &val,
+      SWFDEC_AS_VARIABLE_HIDDEN | SWFDEC_AS_VARIABLE_PERMANENT);
+
   SWFDEC_AS_VALUE_SET_OBJECT (&val, object);
   swfdec_as_object_set_variable_and_flags (proto, SWFDEC_AS_STR_constructor,
       &val, SWFDEC_AS_VARIABLE_HIDDEN | SWFDEC_AS_VARIABLE_PERMANENT);
-
-  if (version > 5) {
-    swfdec_as_object_add_function (proto, SWFDEC_AS_STR_addProperty, 
-	SWFDEC_TYPE_AS_OBJECT, swfdec_as_object_addProperty, 0);
-    swfdec_as_object_add_function (proto, SWFDEC_AS_STR_hasOwnProperty, 
-	SWFDEC_TYPE_AS_OBJECT, swfdec_as_object_hasOwnProperty, 1);
-  }
-  swfdec_as_object_add_function (proto, SWFDEC_AS_STR_valueOf, 
-      SWFDEC_TYPE_AS_OBJECT, swfdec_as_object_valueOf, 0);
-  swfdec_as_object_add_function (proto, SWFDEC_AS_STR_toString, 
-      SWFDEC_TYPE_AS_OBJECT, swfdec_as_object_toString, 0);
 }
 
 /**

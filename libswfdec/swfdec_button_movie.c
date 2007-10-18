@@ -108,7 +108,8 @@ swfdec_button_movie_execute (SwfdecButtonMovie *movie,
   }
   if (movie->button->events)
     swfdec_event_list_execute (movie->button->events, 
-	SWFDEC_AS_OBJECT (SWFDEC_MOVIE (movie)->parent), condition, 0);
+	SWFDEC_AS_OBJECT (SWFDEC_MOVIE (movie)->parent), 
+	SWFDEC_SECURITY (SWFDEC_MOVIE (movie)->resource), condition, 0);
   name = swfdec_button_condition_get_name (condition);
   swfdec_as_object_call (SWFDEC_AS_OBJECT (movie), name, 0, NULL, NULL);
 }
@@ -189,7 +190,7 @@ swfdec_button_movie_change_mouse (SwfdecButtonMovie *movie, gboolean mouse_in, i
   if (sound >= 0 && movie->button->sounds[sound]) {
     SwfdecAudio *audio;
     SWFDEC_LOG ("playing button sound %d", sound);
-    audio = swfdec_audio_event_new (
+    audio = swfdec_audio_event_new_from_chunk (
 	SWFDEC_PLAYER (SWFDEC_AS_OBJECT (movie)->context),
 	movie->button->sounds[sound]);
     if (audio)

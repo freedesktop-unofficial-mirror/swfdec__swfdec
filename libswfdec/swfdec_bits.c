@@ -27,8 +27,8 @@
 #include <zlib.h>
 
 #include "swfdec_bits.h"
+#include "swfdec_color.h"
 #include "swfdec_debug.h"
-#include "swfdec_decoder.h"
 #include "swfdec_rect.h"
 
 
@@ -596,70 +596,6 @@ swfdec_bits_get_rgba (SwfdecBits * bits)
   a = swfdec_bits_get_u8 (bits);
 
   return SWFDEC_COLOR_COMBINE (r, g, b, a);
-}
-
-SwfdecGradient *
-swfdec_bits_get_gradient (SwfdecBits * bits)
-{
-  SwfdecGradient *grad;
-  guint i, n_gradients;
-
-  n_gradients = swfdec_bits_get_u8 (bits);
-  grad = g_malloc (sizeof (SwfdecGradient) +
-      sizeof (SwfdecGradientEntry) * (MAX (n_gradients, 1) - 1));
-  for (i = 0; i < n_gradients && swfdec_bits_left (bits); i++) {
-    grad->array[i].ratio = swfdec_bits_get_u8 (bits);
-    grad->array[i].color = swfdec_bits_get_color (bits);
-  }
-  if (i < n_gradients) {
-    SWFDEC_ERROR ("not enough data for %u gradients, could only read %u",
-	n_gradients, i);
-  }
-  grad->n_gradients = i;
-  return grad;
-}
-
-SwfdecGradient *
-swfdec_bits_get_gradient_rgba (SwfdecBits * bits)
-{
-  SwfdecGradient *grad;
-  guint i, n_gradients;
-
-  n_gradients = swfdec_bits_get_u8 (bits);
-  grad = g_malloc (sizeof (SwfdecGradient) +
-      sizeof (SwfdecGradientEntry) * (n_gradients - 1));
-  for (i = 0; i < n_gradients && swfdec_bits_left (bits); i++) {
-    grad->array[i].ratio = swfdec_bits_get_u8 (bits);
-    grad->array[i].color = swfdec_bits_get_rgba (bits);
-  }
-  if (i < n_gradients) {
-    SWFDEC_ERROR ("not enough data for %u gradients, could only read %u",
-	n_gradients, i);
-  }
-  grad->n_gradients = i;
-  return grad;
-}
-
-SwfdecGradient *
-swfdec_bits_get_morph_gradient (SwfdecBits * bits)
-{
-  SwfdecGradient *grad;
-  guint i, n_gradients;
-
-  n_gradients = swfdec_bits_get_u8 (bits);
-  n_gradients *= 2;
-  grad = g_malloc (sizeof (SwfdecGradient) +
-      sizeof (SwfdecGradientEntry) * (n_gradients - 1));
-  for (i = 0; i < n_gradients && swfdec_bits_left (bits); i++) {
-    grad->array[i].ratio = swfdec_bits_get_u8 (bits);
-    grad->array[i].color = swfdec_bits_get_rgba (bits);
-  }
-  if (i < n_gradients) {
-    SWFDEC_ERROR ("not enough data for %u gradients, could only read %u",
-	n_gradients, i);
-  }
-  grad->n_gradients = i;
-  return grad;
 }
 
 void

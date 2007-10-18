@@ -23,7 +23,7 @@
 
 #include <string.h>
 #include "swfdec_load_object.h"
-#include "swfdec_as_strings.h"
+#include "swfdec_as_internal.h"
 #include "swfdec_debug.h"
 #include "swfdec_loader_internal.h"
 #include "swfdec_loadertarget.h"
@@ -42,7 +42,7 @@ swfdec_load_object_load (SwfdecAsContext *cx, SwfdecAsObject *obj, guint argc,
   }
 
   url = swfdec_as_value_to_string (cx, &argv[0]);
-  swfdec_load_object_new (obj, url);
+  swfdec_load_object_new (obj, url, SWFDEC_LOADER_REQUEST_DEFAULT, NULL);
 
   SWFDEC_AS_VALUE_SET_BOOLEAN (rval, TRUE);
 }

@@ -22,20 +22,28 @@
 
 #include <libswfdec/swfdec_as_object.h>
 #include <libswfdec/swfdec_as_types.h>
+#include <libswfdec/swfdec_security.h>
 
 G_BEGIN_DECLS
 
 /* This header contains all the non-exported symbols that can't go into 
  * exported headers 
  */
-
-/* swfdec_as_array.c */
-void	      	swfdec_as_array_init_context	(SwfdecAsContext *	context,
-					      	 guint			version);
+#define SWFDEC_AS_NATIVE(x, y, func) SWFDEC_AS_CONSTRUCTOR (x, y, func, NULL)
+#define SWFDEC_AS_CONSTRUCTOR(x, y, func, type) void func (SwfdecAsContext *cx, \
+    SwfdecAsObject *object, guint argc, SwfdecAsValue *argv, SwfdecAsValue *ret);
 
 
 void		swfdec_as_function_set_constructor (SwfdecAsFunction *	fun);
+void		swfdec_as_function_set_security	(SwfdecAsFunction *	fun,
+						 SwfdecSecurity *	sec);
 void		swfdec_as_function_init_context (SwfdecAsContext *	context,
+						 guint			version);
+
+/* swfdec_as_context.c */
+void		swfdec_as_context_run_init_script (SwfdecAsContext *	context,
+						 const guint8 *		data,
+						 gsize			length,
 						 guint			version);
 
 /* swfdec_as_object.c */
@@ -53,6 +61,15 @@ void		swfdec_as_object_foreach_rename	(SwfdecAsObject *       object,
 
 void		swfdec_as_object_init_context	(SwfdecAsContext *	context,
 					      	 guint			version);
+void		swfdec_as_object_decode		(SwfdecAsObject *	obj,
+						 const char *		str);
+SwfdecAsObject * swfdec_as_object_prototype_for_version (SwfdecAsObject *object,
+						 guint			version,
+						 gboolean		check7);
+void		swfdec_as_object_run_with_security 
+						(SwfdecAsObject *	object,
+						 SwfdecScript *		script,
+						 SwfdecSecurity *	sec);
 
 
 G_END_DECLS

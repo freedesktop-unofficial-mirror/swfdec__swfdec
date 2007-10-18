@@ -58,8 +58,10 @@ swfdec_url_free
 swfdec_url_get_host
 swfdec_url_get_path
 swfdec_url_get_protocol
+swfdec_url_has_protocol
 swfdec_url_get_query
 swfdec_url_get_url
+swfdec_url_is_local
 swfdec_url_new
 swfdec_url_new_relative
 <SUBSECTION Standard>
@@ -107,10 +109,27 @@ SWFDEC_PLAYER_GET_CLASS
 </SECTION>
 
 <SECTION>
+<FILE>SwfdecSystem</FILE>
+<TITLE>SwfdecSystem</TITLE>
+SwfdecSystem
+swfdec_system_new
+<SUBSECTION Standard>
+SwfdecSystemClass
+SWFDEC_IS_SYSTEM
+SWFDEC_IS_SYSTEM_CLASS
+SWFDEC_SYSTEM
+SWFDEC_SYSTEM_CLASS
+SWFDEC_SYSTEM_GET_CLASS
+SWFDEC_TYPE_SYSTEM
+swfdec_system_get_type
+</SECTION>
+
+<SECTION>
 <FILE>SwfdecBuffer</FILE>
 <TITLE>SwfdecBuffer</TITLE>
 SwfdecBuffer
 SwfdecBufferQueue
+SwfdecBufferFreeFunc
 swfdec_buffer_new
 swfdec_buffer_new_and_alloc
 swfdec_buffer_new_and_alloc0
@@ -119,6 +138,7 @@ swfdec_buffer_new_subbuffer
 swfdec_buffer_new_from_file
 swfdec_buffer_ref
 swfdec_buffer_unref
+swfdec_buffer_get_super
 swfdec_buffer_queue_new
 swfdec_buffer_queue_clear
 swfdec_buffer_queue_ref
@@ -150,6 +170,20 @@ SwfdecMouseCursor
 SwfdecScaleMode
 </SECTION>
 
+<SECTION>
+<FILE>SwfdecRectangle</FILE>
+<TITLE>SwfdecRectangle</TITLE>
+SwfdecRectangle
+swfdec_rectangle_contains
+swfdec_rectangle_contains_point
+swfdec_rectangle_init_empty
+swfdec_rectangle_intersect
+swfdec_rectangle_is_empty
+swfdec_rectangle_union
+<SUBSECTION Standard>
+SWFDEC_TYPE_RECTANGLE
+swfdec_rectangle_get_type
+</SECTION>
 
 <SECTION>
 <FILE>SwfdecGtkPlayer</FILE>
@@ -331,7 +365,16 @@ SWFDEC_TYPE_AS_OBJECT
 SwfdecAsArray
 swfdec_as_array_new
 swfdec_as_array_append
+swfdec_as_array_append_with_flags
+swfdec_as_array_insert
+swfdec_as_array_insert_with_flags
 swfdec_as_array_push
+swfdec_as_array_push_with_flags
+swfdec_as_array_get_length
+swfdec_as_array_set_length
+swfdec_as_array_get_value
+swfdec_as_array_set_value
+swfdec_as_array_remove
 <SUBSECTION Standard>
 swfdec_as_array_get_type
 SwfdecAsArrayClass
@@ -353,6 +396,9 @@ swfdec_as_function_call
 swfdec_as_native_function_new
 swfdec_as_native_function_set_construct_type
 swfdec_as_native_function_set_object_type
+swfdec_as_native_function_check
+swfdec_as_native_function_checkv
+SWFDEC_AS_CHECK
 <SUBSECTION Standard>
 swfdec_as_function_get_type
 SwfdecAsFunctionClass

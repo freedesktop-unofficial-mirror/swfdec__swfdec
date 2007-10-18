@@ -21,12 +21,14 @@
 #include "config.h"
 #endif
 
+#include <errno.h>
 #include <math.h>
 #include <string.h>
 #include <stdlib.h>
 #include <liboil/liboil.h>
 
 #include "swfdec_player_internal.h"
+#include "swfdec_as_frame_internal.h"
 #include "swfdec_as_internal.h"
 #include "swfdec_as_strings.h"
 #include "swfdec_audio_internal.h"
@@ -35,6 +37,7 @@
 #include "swfdec_debug.h"
 #include "swfdec_enums.h"
 #include "swfdec_event.h"
+#include "swfdec_flash_security.h"
 #include "swfdec_initialize.h"
 #include "swfdec_internal.h"
 #include "swfdec_loader_internal.h"
@@ -42,7 +45,8 @@
 #include "swfdec_movie.h"
 #include "swfdec_script_internal.h"
 #include "swfdec_sprite_movie.h"
-#include "swfdec_swf_instance.h"
+#include "swfdec_resource.h"
+#include "swfdec_utils.h"
 
 /*** gtk-doc ***/
 
@@ -650,9 +654,9 @@ swfdec_player_update_scale (SwfdecPlayer *player)
   int width, height;
   double scale_x, scale_y;
 
-  width = player->stage_width >= 0 ? player->stage_width : (int) player->width;
-  height = player->stage_height >= 0 ? player->stage_height : (int) player->height;
-  if (height == 0 || width == 0) {
+  player->stage.width = player->stage_width >= 0 ? player->stage_width : (int) player->width;
+  player->stage.height = player->stage_height >= 0 ? player->stage_height : (int) player->height;
+  if (player->stage.height == 0 || player->stage.width == 0) {
     player->scale_x = 1.0;
     player->scale_y = 1.0;
     player->offset_x = 0;
@@ -663,8 +667,8 @@ swfdec_player_update_scale (SwfdecPlayer *player)
     scale_x = 1.0;
     scale_y = 1.0;
   } else {
-    scale_x = (double) width / player->width;
-    scale_y = (double) height / player->height;
+    scale_x = (double) player->stage.width / player->width;
+    scale_y = (double) player->stage.height / player->height;
   }
   switch (player->scale_mode) {
     case SWFDEC_SCALE_SHOW_ALL:
@@ -686,8 +690,8 @@ swfdec_player_update_scale (SwfdecPlayer *player)
     default:
       g_assert_not_reached ();
   }
-  width = width - ceil (player->width * player->scale_x);
-  height = height - ceil (player->height * player->scale_y);
+  width = player->stage.width - ceil (player->width * player->scale_x);
+  height = player->stage.height - ceil (player->height * player->scale_y);
   if (player->align_flags & SWFDEC_ALIGN_FLAG_LEFT) {
     player->offset_x = 0;
   } else if (player->align_flags & SWFDEC_ALIGN_FLAG_RIGHT) {
@@ -797,14 +801,16 @@ swfdec_player_dispose (GObject *object)
   g_queue_free (player->init_queue);
   g_queue_free (player->construct_queue);
   swfdec_cache_unref (player->cache);
-  if (player->loader) {
-    g_object_unref (player->loader);
-    player->loader = NULL;
+  if (player->resource) {
+    g_object_unref (player->resource);
+    player->resource = NULL;
   }
   if (player->system) {
     g_object_unref (player->system);
     player->system = NULL;
   }
+  g_array_free (player->invalidations, TRUE);
+  player->invalidations = NULL;
 }
 
 static void
@@ -998,19 +1004,11 @@ swfdec_player_emit_signals (SwfdecPlayer *player)
   GList *walk;
 
   /* emit invalidate signal */
-  if (!swfdec_rect_is_empty (&player->invalid)) {
-    double x, y, width, height;
-    /* FIXME: currently we clamp the rectangle to the visible area, it might
-     * be useful to allow out-of-bounds drawing. In that case this needs to be
-     * changed */
-    swfdec_player_global_to_stage (player, &player->invalid.x0, &player->invalid.y0);
-    swfdec_player_global_to_stage (player, &player->invalid.x1, &player->invalid.y1);
-    x = MAX (player->invalid.x0, 0.0);
-    y = MAX (player->invalid.y0, 0.0);
-    width = MIN (player->invalid.x1, player->stage_width) - x;
-    height = MIN (player->invalid.y1, player->stage_height) - y;
-    g_signal_emit (player, signals[INVALIDATE], 0, x, y, width, height);
-    swfdec_rect_init_empty (&player->invalid);
+  if (!swfdec_rectangle_is_empty (&player->invalid_extents)) {
+    g_signal_emit (player, signals[INVALIDATE], 0, &player->invalid_extents,
+	player->invalidations->data, player->invalidations->len);
+    swfdec_rectangle_init_empty (&player->invalid_extents);
+    g_array_set_size (player->invalidations, 0);
   }
 
   /* emit audio-added for all added audio streams */
@@ -1029,6 +1027,7 @@ swfdec_player_do_handle_key (SwfdecPlayer *player, guint keycode, guint characte
 {
   g_assert (keycode < 256);
 
+  swfdec_player_lock (player);
   /* set the correct variables */
   player->last_keycode = keycode;
   player->last_character = character;
@@ -1037,7 +1036,9 @@ swfdec_player_do_handle_key (SwfdecPlayer *player, guint keycode, guint characte
   } else {
     player->key_pressed[keycode / 8] &= ~(1 << keycode % 8);
   }
-  swfdec_player_broadcast (player, SWFDEC_AS_STR_Stage, down ? SWFDEC_AS_STR_onKeyDown : SWFDEC_AS_STR_onKeyUp);
+  swfdec_player_broadcast (player, SWFDEC_AS_STR_Key, down ? SWFDEC_AS_STR_onKeyDown : SWFDEC_AS_STR_onKeyUp);
+  swfdec_player_perform_actions (player);
+  swfdec_player_unlock (player);
 
   return TRUE;
 }
@@ -1121,10 +1122,28 @@ swfdec_player_iterate (SwfdecTimeout *timeout)
 }
 
 static void
+swfdec_player_advance_audio (SwfdecPlayer *player, guint samples)
+{
+  SwfdecAudio *audio;
+  GList *walk;
+
+  if (samples == 0)
+    return;
+
+  /* don't use for loop here, because we need to advance walk before 
+   * removing the audio */
+  walk = player->audio;
+  while (walk) {
+    audio = walk->data;
+    walk = walk->next;
+    if (swfdec_audio_iterate (audio, samples) == 0)
+      swfdec_audio_remove (audio);
+  }
+}
+
+static void
 swfdec_player_do_advance (SwfdecPlayer *player, gulong msecs, guint audio_samples)
 {
-  GList *walk;
-  SwfdecAudio *audio;
   SwfdecTimeout *timeout;
   SwfdecTick target_time;
   guint frames_now;
@@ -1133,16 +1152,6 @@ swfdec_player_do_advance (SwfdecPlayer *player, gulong msecs, guint audio_sample
   target_time = player->time + SWFDEC_MSECS_TO_TICKS (msecs);
   SWFDEC_DEBUG ("advancing %lu msecs (%u audio frames)", msecs, audio_samples);
 
-  player->audio_skip = audio_samples;
-  /* iterate all playing sounds */
-  walk = player->audio;
-  while (walk) {
-    audio = walk->data;
-    walk = walk->next;
-    if (swfdec_audio_iterate (audio, audio_samples) == 0)
-      swfdec_audio_remove (audio);
-  }
-
   for (timeout = player->timeouts ? player->timeouts->data : NULL;
        timeout && timeout->timestamp <= target_time; 
        timeout = player->timeouts ? player->timeouts->data : NULL) {
@@ -1150,7 +1159,8 @@ swfdec_player_do_advance (SwfdecPlayer *player, gulong msecs, guint audio_sample
     frames_now = SWFDEC_TICKS_TO_SAMPLES (timeout->timestamp) -
       SWFDEC_TICKS_TO_SAMPLES (player->time);
     player->time = timeout->timestamp;
-    player->audio_skip -= frames_now;
+    swfdec_player_advance_audio (player, frames_now);
+    audio_samples -= frames_now;
     SWFDEC_LOG ("activating timeout %p now (timeout is %"G_GUINT64_FORMAT", target time is %"G_GUINT64_FORMAT,
 	timeout, timeout->timestamp, target_time);
     timeout->callback (timeout);
@@ -1160,9 +1170,10 @@ swfdec_player_do_advance (SwfdecPlayer *player, gulong msecs, guint audio_sample
     frames_now = SWFDEC_TICKS_TO_SAMPLES (target_time) -
       SWFDEC_TICKS_TO_SAMPLES (player->time);
     player->time = target_time;
-    player->audio_skip -= frames_now;
+    swfdec_player_advance_audio (player, frames_now);
+    audio_samples -= frames_now;
   }
-  g_assert (player->audio_skip == 0);
+  g_assert (audio_samples == 0);
   
   swfdec_player_unlock (player);
 }
@@ -1171,32 +1182,22 @@ void
 swfdec_player_perform_actions (SwfdecPlayer *player)
 {
   GList *walk;
-  SwfdecRect old_inval;
-  double x, y;
 
   g_return_if_fail (SWFDEC_IS_PLAYER (player));
 
-  swfdec_rect_init_empty (&old_inval);
-  do {
+  while (swfdec_player_do_action (player));
+  for (walk = player->roots; walk; walk = walk->next) {
+    swfdec_movie_update (walk->data);
+  }
+  /* update the state of the mouse when stuff below it moved */
+  if (swfdec_rectangle_contains_point (&player->invalid_extents, player->mouse_x, player->mouse_y)) {
+    SWFDEC_INFO ("=== NEED TO UPDATE mouse post-iteration ===");
+    swfdec_player_update_mouse_position (player);
     while (swfdec_player_do_action (player));
     for (walk = player->roots; walk; walk = walk->next) {
       swfdec_movie_update (walk->data);
     }
-    /* update the state of the mouse when stuff below it moved */
-    x = player->mouse_x;
-    y = player->mouse_y;
-    swfdec_player_stage_to_global (player, &x, &y);
-    if (swfdec_rect_contains (&player->invalid, x, y)) {
-      SWFDEC_INFO ("=== NEED TO UPDATE mouse post-iteration ===");
-      swfdec_player_update_mouse_position (player);
-      for (walk = player->roots; walk; walk = walk->next) {
-	swfdec_movie_update (walk->data);
-      }
-    }
-    swfdec_rect_union (&old_inval, &old_inval, &player->invalid);
-    swfdec_rect_init_empty (&player->invalid);
-  } while (swfdec_ring_buffer_get_n_elements (player->actions) > 0);
-  player->invalid = old_inval;
+  }
 }
 
 /* used for breakpoints */
@@ -1204,7 +1205,7 @@ void
 swfdec_player_lock_soft (SwfdecPlayer *player)
 {
   g_return_if_fail (SWFDEC_IS_PLAYER (player));
-  g_assert (swfdec_rect_is_empty (&player->invalid));
+  g_assert (swfdec_rectangle_is_empty (&player->invalid_extents));
 
   g_object_freeze_notify (G_OBJECT (player));
   SWFDEC_DEBUG ("LOCKED");
@@ -1235,10 +1236,15 @@ swfdec_player_unlock_soft (SwfdecPlayer *player)
 void
 swfdec_player_unlock (SwfdecPlayer *player)
 {
+  SwfdecAsContext *context;
+
   g_return_if_fail (SWFDEC_IS_PLAYER (player));
   g_assert (swfdec_ring_buffer_get_n_elements (player->actions) == 0);
+  context = SWFDEC_AS_CONTEXT (player);
+  g_return_if_fail (context->state != SWFDEC_AS_CONTEXT_INTERRUPTED);
 
-  swfdec_as_context_maybe_gc (SWFDEC_AS_CONTEXT (player));
+  if (context->state == SWFDEC_AS_CONTEXT_RUNNING)
+    swfdec_as_context_maybe_gc (SWFDEC_AS_CONTEXT (player));
   swfdec_player_unlock_soft (player);
   g_object_unref (player);
 }
@@ -1327,18 +1333,21 @@ swfdec_player_class_init (SwfdecPlayerClass *klass)
   /**
    * SwfdecPlayer::invalidate:
    * @player: the #SwfdecPlayer affected
-   * @x: x coordinate of invalid region
-   * @y: y coordinate of invalid region
-   * @width: width of invalid region
-   * @height: height of invalid region
+   * @extents: the smallest rectangle enclosing the full region of changes
+   * @rectangles: a number of smaller rectangles for fine-grained control over 
+   *              changes
+   * @n_rectangles: number of rectangles in @rectangles
    *
    * This signal is emitted whenever graphical elements inside the player have 
-   * changed. The coordinates describe the smallest rectangle that includes all
-   * changes.
+   * changed. It provides two ways to look at the changes: By looking at the
+   * @extents parameter, it provides a simple way to get a single rectangle that
+   * encloses all changes. By looking at the @rectangles array, you can get
+   * finer control over changes which is very useful if your rendering system 
+   * provides a way to handle regions.
    */
   signals[INVALIDATE] = g_signal_new ("invalidate", G_TYPE_FROM_CLASS (klass),
-      G_SIGNAL_RUN_LAST, 0, NULL, NULL, swfdec_marshal_VOID__DOUBLE_DOUBLE_DOUBLE_DOUBLE,
-      G_TYPE_NONE, 4, G_TYPE_DOUBLE, G_TYPE_DOUBLE, G_TYPE_DOUBLE, G_TYPE_DOUBLE);
+      G_SIGNAL_RUN_LAST, 0, NULL, NULL, swfdec_marshal_VOID__BOXED_POINTER_UINT,
+      G_TYPE_NONE, 3, SWFDEC_TYPE_RECTANGLE, G_TYPE_POINTER, G_TYPE_UINT);
   /**
    * SwfdecPlayer::advance:
    * @player: the #SwfdecPlayer affected
@@ -1412,9 +1421,9 @@ swfdec_player_class_init (SwfdecPlayerClass *klass)
   /**
    * SwfdecPlayer::fscommand:
    * @player: the #SwfdecPlayer affected
-   * @command: the command to execute
-   * @paramter: parameter to pass to the command. The parameter depends on the 
-   *            function.
+   * @command: the command to execute. This is a lower case string.
+   * @parameter: parameter to pass to the command. The parameter depends on the 
+   *             function.
    *
    * This signal is emited whenever a Flash script command (also known as 
    * fscommand) is encountered. This method is ued by the Flash file to
@@ -1442,8 +1451,12 @@ swfdec_player_class_init (SwfdecPlayerClass *klass)
   /**
    * SwfdecPlayer::launch:
    * @player: the #SwfdecPlayer affected
+   * @request: the type of request
    * @url: URL to open
    * @target: target to load the URL into
+   * @data: optional data to pass on with the request. Will be of mime type
+   *        application/x-www-form-urlencoded. Can be %NULL indicating no data
+   *        should be passed.
    *
    * Emitted whenever the @player encounters an URL that should be loaded into 
    * a target the Flash player does not recognize. In most cases this happens 
@@ -1452,8 +1465,9 @@ swfdec_player_class_init (SwfdecPlayerClass *klass)
    * The effect of calling any swfdec functions on the emitting @player is undefined.
    */
   signals[LAUNCH] = g_signal_new ("launch", G_TYPE_FROM_CLASS (klass),
-      G_SIGNAL_RUN_LAST, 0, NULL, NULL, swfdec_marshal_VOID__STRING_STRING,
-      G_TYPE_NONE, 2, G_TYPE_STRING, G_TYPE_STRING);
+      G_SIGNAL_RUN_LAST, 0, NULL, NULL, swfdec_marshal_VOID__ENUM_STRING_STRING_BOXED,
+      G_TYPE_NONE, 4, SWFDEC_TYPE_LOADER_REQUEST, G_TYPE_STRING, G_TYPE_STRING, 
+      SWFDEC_TYPE_BUFFER);
 
   context_class->mark = swfdec_player_mark;
   context_class->get_time = swfdec_player_get_time;
@@ -1474,6 +1488,7 @@ swfdec_player_init (SwfdecPlayer *player)
   player->cache = swfdec_cache_new (50 * 1024 * 1024); /* 100 MB */
   player->bgcolor = SWFDEC_COLOR_COMBINE (0xFF, 0xFF, 0xFF, 0xFF);
 
+  player->invalidations = g_array_new (FALSE, FALSE, sizeof (SwfdecRectangle));
   player->mouse_visible = TRUE;
   player->mouse_cursor = SWFDEC_MOUSE_CURSOR_NORMAL;
   player->iterate_timeout.callback = swfdec_player_iterate;
@@ -1493,34 +1508,124 @@ swfdec_player_stop_all_sounds (SwfdecPlayer *player)
   }
 }
 
+void
+swfdec_player_stop_sounds (SwfdecPlayer *player, SwfdecAudioRemoveFunc func, gpointer data)
+{
+  GList *walk;
+
+  g_return_if_fail (SWFDEC_IS_PLAYER (player));
+  g_return_if_fail (func);
+
+  walk = player->audio;
+  while (walk) {
+    SwfdecAudio *audio = walk->data;
+    walk = walk->next;
+    if (func (audio, data))
+      swfdec_audio_remove (audio);
+  }
+}
+
 /* rect is in global coordinates */
 void
 swfdec_player_invalidate (SwfdecPlayer *player, const SwfdecRect *rect)
 {
+  SwfdecRectangle r;
+  SwfdecRect tmp;
+  guint i;
+
   if (swfdec_rect_is_empty (rect)) {
     g_assert_not_reached ();
     return;
   }
 
-  swfdec_rect_union (&player->invalid, &player->invalid, rect);
-  SWFDEC_DEBUG ("toplevel invalidation of %g %g  %g %g - invalid region now %g %g  %g %g",
+  tmp = *rect;
+  swfdec_player_global_to_stage (player, &tmp.x0, &tmp.y0);
+  swfdec_player_global_to_stage (player, &tmp.x1, &tmp.y1);
+  swfdec_rectangle_init_rect (&r, &tmp);
+  /* FIXME: currently we clamp the rectangle to the visible area, it might
+   * be useful to allow out-of-bounds drawing. In that case this needs to be
+   * changed */
+  swfdec_rectangle_intersect (&r, &r, &player->stage);
+  if (swfdec_rectangle_is_empty (&r))
+    return;
+
+  /* FIXME: get region code into swfdec? */
+  for (i = 0; i < player->invalidations->len; i++) {
+    SwfdecRectangle *cur = &g_array_index (player->invalidations, SwfdecRectangle, i);
+    if (swfdec_rectangle_contains (cur, &r))
+      break;
+    if (swfdec_rectangle_contains (&r, cur)) {
+      *cur = r;
+      swfdec_rectangle_union (&player->invalid_extents, &player->invalid_extents, &r);
+    }
+  }
+  if (i == player->invalidations->len) {
+    g_array_append_val (player->invalidations, r);
+    swfdec_rectangle_union (&player->invalid_extents, &player->invalid_extents, &r);
+  }
+  SWFDEC_DEBUG ("toplevel invalidation of %g %g  %g %g - invalid region now %d %d  %d %d (%u subregions)",
       rect->x0, rect->y0, rect->x1, rect->y1,
-      player->invalid.x0, player->invalid.y0, player->invalid.x1, player->invalid.y1);
+      player->invalid_extents.x, player->invalid_extents.y, 
+      player->invalid_extents.x + player->invalid_extents.width,
+      player->invalid_extents.y + player->invalid_extents.height,
+      player->invalidations->len);
 }
 
-SwfdecMovie *
-swfdec_player_add_level_from_loader (SwfdecPlayer *player, guint depth,
-    SwfdecLoader *loader, const char *variables)
+/**
+ * swfdec_player_get_level:
+ * @player: a #SwfdecPlayer
+ * @name: name of the level to request
+ * @create: resource to create the movie with if it doesn't exist
+ *
+ * This function is used to look up root movies in the given @player. The 
+ * algorithm used is like this: First, check that @name actually references a
+ * root level movie. If it does not, return %NULL. If the movie for the given 
+ * level already exists, return it. If it does not, create it when @create was 
+ * set to %TRUE and return the newly created movie. Otherwise return %NULL.
+ *
+ * Returns: the #SwfdecMovie referenced by the given @name or %NULL if no such
+ *          movie exists. Note that if a new movie is created, it will not be
+ *          fully initialized (yes, this function sucks).
+ **/
+SwfdecSpriteMovie *
+swfdec_player_get_level (SwfdecPlayer *player, const char *name, SwfdecResource *create)
 {
-  SwfdecMovie *movie;
-  const char *name;
+  SwfdecSpriteMovie *movie;
+  GList *walk;
+  const char *s;
+  char *end;
+  int depth;
+  gulong l;
 
-  swfdec_player_remove_level (player, depth);
-  name = swfdec_as_context_give_string (SWFDEC_AS_CONTEXT (player), g_strdup_printf ("_level%u", depth));
-  movie = swfdec_movie_new (player, depth - 16384, NULL, NULL, name);
-  movie->name = SWFDEC_AS_STR_EMPTY;
-  swfdec_swf_instance_new (SWFDEC_SPRITE_MOVIE (movie), loader, variables);
-  g_object_unref (loader);
+  g_return_val_if_fail (SWFDEC_IS_PLAYER (player), NULL);
+  g_return_val_if_fail (name != NULL, NULL);
+
+  /* check name starts with "_level" */
+  if (swfdec_strncmp (SWFDEC_AS_CONTEXT (player)->version, name, "_level", 6) != 0)
+    return NULL;
+  name += 6;
+  /* extract depth from rest string (or fail if it's not a depth) */
+  errno = 0;
+  l = strtoul (name, &end, 10);
+  if (errno != 0 || *end != 0 || l > G_MAXINT)
+    return NULL;
+  depth = l - 16384;
+  /* find movie */
+  for (walk = player->roots; walk; walk = walk->next) {
+    SwfdecMovie *cur = walk->data;
+    if (cur->depth < depth)
+      continue;
+    if (cur->depth == depth)
+      return SWFDEC_SPRITE_MOVIE (cur);
+    break;
+  }
+  /* bail if create isn't set*/
+  if (create == NULL)
+    return NULL;
+  /* create new root movie */
+  s = swfdec_as_context_give_string (SWFDEC_AS_CONTEXT (player), g_strdup_printf ("_level%lu", l));
+  movie = SWFDEC_SPRITE_MOVIE (swfdec_movie_new (player, depth, NULL, create, NULL, s));
+  SWFDEC_MOVIE (movie)->name = SWFDEC_AS_STR_EMPTY;
   return movie;
 }
 
@@ -1549,28 +1654,100 @@ swfdec_player_remove_level (SwfdecPlayer *player, guint depth)
 }
 
 SwfdecLoader *
-swfdec_player_load (SwfdecPlayer *player, const char *url)
+swfdec_player_load (SwfdecPlayer *player, const char *url, 
+    SwfdecLoaderRequest request, SwfdecBuffer *buffer)
 {
+  SwfdecAsContext *cx;
+  SwfdecSecurity *sec;
+  SwfdecURL *full;
+
   g_return_val_if_fail (SWFDEC_IS_PLAYER (player), NULL);
   g_return_val_if_fail (url != NULL, NULL);
 
-  g_assert (player->loader);
-  return swfdec_loader_load (player->loader, url, SWFDEC_LOADER_REQUEST_DEFAULT, NULL, 0);
+  g_assert (player->resource);
+  /* create absolute url first */
+  full = swfdec_url_new_relative (swfdec_loader_get_url (player->resource->loader), url);
+  /* figure out the right security object (FIXME: let the person loading it provide it?) */
+  cx = SWFDEC_AS_CONTEXT (player);
+  if (cx->frame) {
+    sec = cx->frame->security;
+  } else {
+    g_warning ("swfdec_player_load() should only be called from scripts");
+    sec = SWFDEC_SECURITY (player->resource);
+  }
+  if (!swfdec_security_allow_url (sec, full)) {
+    SWFDEC_ERROR ("not allowing access to %s", url);
+    return NULL;
+  }
+
+  if (buffer) {
+    return swfdec_loader_load (player->resource->loader, url, request, 
+	(const char *) buffer->data, buffer->length);
+  } else {
+    return swfdec_loader_load (player->resource->loader, url, request, NULL, 0);
+  }
+}
+
+static gboolean
+is_ascii (const char *s)
+{
+  while (*s) {
+    if (*s & 0x80)
+      return FALSE;
+    s++;
+  }
+  return TRUE;
+}
+
+/**
+ * swfdec_player_fscommand:
+ * @player: a #SwfdecPlayer
+ * @command: the command to parse
+ * @value: the value passed to the command
+ *
+ * Checks if @command is an FSCommand and if so, emits the 
+ * SwfdecPlayer::fscommand signal. 
+ *
+ * Returns: %TRUE if an fscommand was found and the signal emitted, %FALSE 
+ *          otherwise.
+ **/
+gboolean
+swfdec_player_fscommand (SwfdecPlayer *player, const char *command, const char *value)
+{
+  char *real_command;
+
+  g_return_val_if_fail (SWFDEC_IS_PLAYER (player), FALSE);
+  g_return_val_if_fail (command != NULL, FALSE);
+  g_return_val_if_fail (value != NULL, FALSE);
+
+  if (g_ascii_strncasecmp (command, "FSCommand:", 10) != 0)
+    return FALSE;
+
+  command += 10;
+  if (!is_ascii (command)) {
+    SWFDEC_ERROR ("command \"%s\" are not ascii, skipping fscommand", command);
+    return TRUE;
+  }
+  real_command = g_ascii_strdown (command, -1);
+  g_signal_emit (player, signals[FSCOMMAND], 0, real_command, value);
+  g_free (real_command);
+  return TRUE;
 }
 
 void
-swfdec_player_launch (SwfdecPlayer *player, const char *url, const char *target)
+swfdec_player_launch (SwfdecPlayer *player, SwfdecLoaderRequest request, const char *url, 
+    const char *target, SwfdecBuffer *data)
 {
   g_return_if_fail (SWFDEC_IS_PLAYER (player));
   g_return_if_fail (url != NULL);
   g_return_if_fail (target != NULL);
 
-  if (g_str_has_prefix (url, "FSCommand:")) {
+  if (!g_ascii_strncasecmp (url, "FSCommand:", strlen ("FSCommand:"))) {
     const char *command = url + strlen ("FSCommand:");
     g_signal_emit (player, signals[FSCOMMAND], 0, command, target);
     return;
   }
-  g_signal_emit (player, signals[LAUNCH], 0, url, target);
+  g_signal_emit (player, signals[LAUNCH], 0, request, url, target, data);
 }
 
 /**
@@ -1601,22 +1778,14 @@ swfdec_player_initialize (SwfdecPlayer *player, guint version,
   /* FIXME: have a better way to do this */
   if (context->state == SWFDEC_AS_CONTEXT_RUNNING) {
     context->state = SWFDEC_AS_CONTEXT_NEW;
-    swfdec_player_init_global (player, version);
     swfdec_sprite_movie_init_context (player, version);
     swfdec_video_movie_init_context (player, version);
-    swfdec_movie_color_init_context (player, version);
     swfdec_net_connection_init_context (player, version);
     swfdec_net_stream_init_context (player, version);
-    swfdec_xml_init_context (player, version);
-    if (version > 4) {
-      SwfdecBits bits;
-      SwfdecScript *script;
-      swfdec_bits_init_data (&bits, swfdec_initialize, sizeof (swfdec_initialize));
-      script = swfdec_script_new_from_bits (&bits, "init", version);
-      g_assert (script);
-      swfdec_as_object_run (context->global, script);
-      swfdec_script_unref (script);
-    }
+
+    swfdec_as_context_run_init_script (context, swfdec_initialize, 
+	sizeof (swfdec_initialize), 8);
+
     if (context->state == SWFDEC_AS_CONTEXT_NEW) {
       context->state = SWFDEC_AS_CONTEXT_RUNNING;
       swfdec_as_object_set_constructor (player->roots->data, player->MovieClip);
@@ -1626,8 +1795,8 @@ swfdec_player_initialize (SwfdecPlayer *player, guint version,
   player->rate = rate;
   player->width = width;
   player->height = height;
-  player->internal_width = player->stage_width >=0 ? (guint) player->stage_width : player->width;
-  player->internal_height = player->stage_height >=0 ? (guint) player->stage_height : player->height;
+  player->internal_width = player->stage_width >= 0 ? (guint) player->stage_width : player->width;
+  player->internal_height = player->stage_height >= 0 ? (guint) player->stage_height : player->height;
   player->initialized = TRUE;
   if (rate) {
     player->iterate_timeout.timestamp = player->time;
@@ -1743,13 +1912,15 @@ void
 swfdec_player_set_loader_with_variables (SwfdecPlayer *player, SwfdecLoader *loader,
     const char *variables)
 {
+  SwfdecMovie *movie;
+
   g_return_if_fail (SWFDEC_IS_PLAYER (player));
-  g_return_if_fail (player->loader == NULL);
+  g_return_if_fail (player->resource == NULL);
   g_return_if_fail (SWFDEC_IS_LOADER (loader));
 
-  player->loader = loader;
-  g_object_ref (loader);
-  swfdec_player_add_level_from_loader (player, 0, loader, variables);
+  player->resource = swfdec_resource_new (loader, variables);
+  movie = swfdec_movie_new (player, -16384, NULL, player->resource, NULL, SWFDEC_AS_STR__level0);
+  movie->name = SWFDEC_AS_STR_EMPTY;
 }
 
 /**
@@ -1942,7 +2113,7 @@ swfdec_player_render (SwfdecPlayer *player, cairo_t *cr,
   cairo_paint (cr);
 
   for (walk = player->roots; walk; walk = walk->next) {
-    swfdec_movie_render (walk->data, cr, &trans, &real, TRUE);
+    swfdec_movie_render (walk->data, cr, &trans, &real);
   }
   SWFDEC_INFO ("=== %p: END RENDER ===", player);
   cairo_restore (cr);

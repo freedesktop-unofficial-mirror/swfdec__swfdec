@@ -31,40 +31,35 @@ G_BEGIN_DECLS
 
 /* audio codecs */
 
-SwfdecAudioDecoder *	swfdec_audio_decoder_adpcm_new		(SwfdecAudioFormat	type, 
-								 gboolean		width,
-								 SwfdecAudioOut		format);
+SwfdecAudioDecoder *	swfdec_audio_decoder_adpcm_new		(SwfdecAudioCodec	type, 
+								 SwfdecAudioFormat	format);
 #ifdef HAVE_MAD
-SwfdecAudioDecoder *	swfdec_audio_decoder_mad_new		(SwfdecAudioFormat	type, 
-								 gboolean		width,
-								 SwfdecAudioOut		format);
+SwfdecAudioDecoder *	swfdec_audio_decoder_mad_new		(SwfdecAudioCodec	type, 
+								 SwfdecAudioFormat	format);
 #endif
 #ifdef HAVE_FFMPEG
-SwfdecAudioDecoder *	swfdec_audio_decoder_ffmpeg_new		(SwfdecAudioFormat	type, 
-								 gboolean		width,
-								 SwfdecAudioOut		format);
+SwfdecAudioDecoder *	swfdec_audio_decoder_ffmpeg_new		(SwfdecAudioCodec	type, 
+								 SwfdecAudioFormat	format);
 #endif
 #ifdef HAVE_GST
-SwfdecAudioDecoder *	swfdec_audio_decoder_gst_new		(SwfdecAudioFormat	type, 
-								 gboolean		width,
-								 SwfdecAudioOut		format);
+SwfdecAudioDecoder *	swfdec_audio_decoder_gst_new		(SwfdecAudioCodec	type, 
+								 SwfdecAudioFormat	format);
 #endif
 
 /* video codecs */
 
-SwfdecVideoDecoder *	swfdec_video_decoder_screen_new		(SwfdecVideoFormat	format);
+SwfdecVideoDecoder *	swfdec_video_decoder_screen_new		(SwfdecVideoCodec	format);
+SwfdecVideoDecoder *	swfdec_video_decoder_vp6_alpha_new    	(SwfdecVideoCodec	format);
 #ifdef HAVE_FFMPEG
-SwfdecVideoDecoder *	swfdec_video_decoder_ffmpeg_new		(SwfdecVideoFormat	format);
+SwfdecVideoDecoder *	swfdec_video_decoder_ffmpeg_new		(SwfdecVideoCodec	format);
 #endif
 #ifdef HAVE_GST
-SwfdecVideoDecoder *	swfdec_video_decoder_gst_new		(SwfdecVideoFormat	format);
+SwfdecVideoDecoder *	swfdec_video_decoder_gst_new		(SwfdecVideoCodec	format);
 #endif
 
 /* AS engine setup code */
 
-void			swfdec_player_init_global		(SwfdecPlayer *		player,
-								 guint			version);
-void			swfdec_movie_color_init_context		(SwfdecPlayer *		player,
+void			swfdec_player_preinit_global		(SwfdecAsContext *	context,
 								 guint			version);
 void			swfdec_net_connection_init_context	(SwfdecPlayer *		player,
 								 guint			version);
@@ -73,8 +68,6 @@ void			swfdec_net_stream_init_context		(SwfdecPlayer *		player,
 void			swfdec_sprite_movie_init_context	(SwfdecPlayer *		player,
 								 guint			version);
 void			swfdec_video_movie_init_context		(SwfdecPlayer *		player,
-								 guint			version);
-void			swfdec_xml_init_context			(SwfdecPlayer *		player,
 								 guint			version);
 
 G_END_DECLS

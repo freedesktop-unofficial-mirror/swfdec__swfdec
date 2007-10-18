@@ -1,5 +1,5 @@
 AC_PREREQ([2.58])
-AC_INIT(swfdec,0.5.2.1)
+AC_INIT(swfdec,0.5.3.1)
 
 [nano=$(echo $PACKAGE_VERSION | sed 's/[0-9]\.[0-9]\.[0-9][0-9]*\.*//')]
 if test x"$nano" = x1 ; then
@@ -33,7 +33,7 @@ else
 fi
 AC_DEFINE_UNQUOTED(SWFDEC_LEVEL_DEFAULT, $DEFAULT_DEBUG_LEVEL, [Default debug level used])
 
-SWFDEC_LIBVERSION="2:0:0"
+SWFDEC_LIBVERSION="3:0:0"
 AC_SUBST(SWFDEC_LIBVERSION)
 AM_PROG_LIBTOOL
 
@@ -53,6 +53,7 @@ AC_PROG_CC
 AM_PROG_CC_STDC
 AM_PROG_CC_C_O
 AM_PROG_AS
+AC_PROG_AWK
 
 AC_HEADER_STDC([])
 
@@ -71,7 +72,7 @@ AC_ARG_WITH(pkg-config-path,
 dnl Check for essential libraries first:
 dnl ====================================
 
-GLIB_VER=2.4
+GLIB_VER=2.10
 PKG_CHECK_MODULES(GLIB, glib-2.0 >= $GLIB_VER gobject-2.0 >= $GLIB_VER,
 		HAVE_GLIB=yes, HAVE_GLIB=no)
 if test "$HAVE_GLIB" = "no"; then
@@ -249,7 +250,7 @@ AM_CONDITIONAL(HAVE_GST, [test "x$HAVE_GST" = xyes])
 
 AC_ARG_ENABLE(soup,
 	AS_HELP_STRING([--enable-soup],
-			[enable libaoup HTTP support for swfdec-gtk (default=yes)])],
+			[enable libsoup HTTP support for swfdec-gtk (default=yes)])],
 	enable_libsoup=$enableval,
 	enable_libsoup="yes")
 
@@ -332,7 +333,6 @@ vivified/dock/Makefile
 vivified/ui/Makefile
 swfdec.pc
 swfdec-gtk.pc
-swfdec.spec
 )
 
 AC_OUTPUT

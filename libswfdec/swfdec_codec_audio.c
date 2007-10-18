@@ -84,19 +84,19 @@ swfdec_audio_decoder_uncompressed_free (SwfdecAudioDecoder *decoder)
 }
 
 static SwfdecAudioDecoder *
-swfdec_audio_decoder_uncompressed_new (SwfdecAudioFormat type, gboolean width, SwfdecAudioOut format)
+swfdec_audio_decoder_uncompressed_new (SwfdecAudioCodec type, SwfdecAudioFormat format)
 {
   SwfdecAudioDecoderUncompressed *dec;
 
-  if (format != SWFDEC_AUDIO_FORMAT_UNDEFINED &&
-      format != SWFDEC_AUDIO_FORMAT_UNCOMPRESSED)
+  if (type != SWFDEC_AUDIO_CODEC_UNDEFINED &&
+      type != SWFDEC_AUDIO_CODEC_UNCOMPRESSED)
     return NULL;
-  if (format == SWFDEC_AUDIO_FORMAT_UNDEFINED) {
+  if (type == SWFDEC_AUDIO_CODEC_UNDEFINED) {
     SWFDEC_WARNING ("endianness of audio unknown, assuming little endian");
   }
   dec = g_new (SwfdecAudioDecoderUncompressed, 1);
-  dec->decoder.out_format = format;
-  if (width)
+  dec->decoder.format = format;
+  if (swfdec_audio_format_is_16bit (format))
     dec->decoder.push = swfdec_audio_decoder_uncompressed_decode_16bit;
   else
     dec->decoder.push = swfdec_audio_decoder_uncompressed_decode_8bit;
@@ -109,9 +109,38 @@ swfdec_audio_decoder_uncompressed_new (SwfdecAudioFormat type, gboolean width, S
 
 /*** PUBLIC API ***/
 
+static SwfdecAudioDecoder *
+swfdec_audio_decoder_builtin_new (SwfdecAudioCodec codec, SwfdecAudioFormat format)
+{
+  SwfdecAudioDecoder *ret;
+
+  ret = swfdec_audio_decoder_uncompressed_new (codec, format);
+  if (ret == NULL)
+    ret = swfdec_audio_decoder_adpcm_new (codec, format);
+
+  return ret;
+}
+
+struct {
+  const char *		name;
+  SwfdecAudioDecoder *	(* func) (SwfdecAudioCodec, SwfdecAudioFormat);
+} audio_codecs[] = {
+  { "builtin",	swfdec_audio_decoder_builtin_new },
+#ifdef HAVE_MAD
+  { "mad",	swfdec_audio_decoder_mad_new },
+#endif
+#ifdef HAVE_GST
+  { "gst",	swfdec_audio_decoder_gst_new },
+#endif
+#ifdef HAVE_FFMPEG
+  { "ffmpeg",	swfdec_audio_decoder_ffmpeg_new },
+#endif
+  { NULL, }
+};
+
 /**
  * swfdec_audio_decoder_new:
- * @format: #SwfdecAudioFormat to decode
+ * @format: #SwfdecAudioCodec to decode
  *
  * Creates a decoder suitable for decoding @format. If no decoder is available
  * for the given for mat, %NULL is returned.
@@ -119,33 +148,49 @@ swfdec_audio_decoder_uncompressed_new (SwfdecAudioFormat type, gboolean width, S
  * Returns: a new decoder or %NULL
  **/
 SwfdecAudioDecoder *
-swfdec_audio_decoder_new (SwfdecAudioFormat format, gboolean width, SwfdecAudioOut data_format)
+swfdec_audio_decoder_new (SwfdecAudioCodec codec, SwfdecAudioFormat format)
 {
   SwfdecAudioDecoder *ret;
+  const char *list;
 
-  ret = swfdec_audio_decoder_uncompressed_new (format, width, data_format);
-  if (ret == NULL)
-    ret = swfdec_audio_decoder_adpcm_new (format, width, data_format);
-#ifdef HAVE_MAD
-  if (ret == NULL)
-    ret = swfdec_audio_decoder_mad_new (format, width, data_format);
-#endif
-#ifdef HAVE_FFMPEG
-  if (ret == NULL)
-    ret = swfdec_audio_decoder_ffmpeg_new (format, width, data_format);
-#endif
-#ifdef HAVE_GST
-  if (ret == NULL)
-    ret = swfdec_audio_decoder_gst_new (format, width, data_format);
-#endif
+  g_return_val_if_fail (SWFDEC_IS_AUDIO_FORMAT (format), NULL);
+
+  list = g_getenv ("SWFDEC_CODEC_AUDIO");
+  if (list == NULL)
+    list = g_getenv ("SWFDEC_CODEC");
+  if (list == NULL) {
+    guint i;
+    ret = NULL;
+    for (i = 0; audio_codecs[i].name != NULL; i++) {
+      ret = audio_codecs[i].func (codec, format);
+      if (ret)
+	break;
+    }
+  } else {
+    char **split = g_strsplit (list, ":", -1);
+    guint i, j;
+    ret = NULL;
+    SWFDEC_LOG ("codecs limited to \"%s\"", list);
+    for (i = 0; split[i] != NULL && ret == NULL; i++) {
+      for (j = 0; audio_codecs[j].name != NULL; j++) {
+	if (g_ascii_strcasecmp (audio_codecs[j].name, split[i]) != 0)
+	  continue;
+	ret = audio_codecs[j].func (codec, format);
+	if (ret)
+	  break;
+      }
+    }
+    g_strfreev (split);
+  }
+
   if (ret) {
-    ret->format = format;
-    g_return_val_if_fail (ret->out_format != 0, NULL);
+    ret->codec = codec;
+    g_return_val_if_fail (SWFDEC_IS_AUDIO_FORMAT (ret->format), NULL);
     g_return_val_if_fail (ret->push, NULL);
     g_return_val_if_fail (ret->pull, NULL);
     g_return_val_if_fail (ret->free, NULL);
   } else {
-    SWFDEC_ERROR ("no suitable decoder for audio format %u", format);
+    SWFDEC_ERROR ("no suitable decoder for audio codec %u", codec);
     return NULL;
   }
   return ret;
@@ -175,12 +220,12 @@ swfdec_audio_decoder_free (SwfdecAudioDecoder *decoder)
  *
  * Returns: the format of the decoded data
  **/
-SwfdecAudioOut
+SwfdecAudioFormat
 swfdec_audio_decoder_get_format	(SwfdecAudioDecoder *decoder)
 {
   g_return_val_if_fail (decoder != NULL, 0);
 
-  return decoder->out_format;
+  return decoder->format;
 }
 
 /**

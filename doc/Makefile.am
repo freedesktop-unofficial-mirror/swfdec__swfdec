@@ -3,10 +3,6 @@
 # We require automake 1.6 at least.
 AUTOMAKE_OPTIONS = 1.6
 
-# This works around a bug in gtk-doc. See http://bugzilla.gnome.org/show_bug.cgi?id=156643
-tmpl/*.sgml:
-	@true
-
 # This is a blank Makefile.am for using gtk-doc.
 # Copy this to your project's API docs directory and modify the variables to
 # suit your project. See the GTK+ Makefiles in gtk+/docs/reference for examples
@@ -56,6 +52,7 @@ IGNORE_HFILES= \
 	jpeg \
 	swfdec_amf.h \
 	swfdec_as_boolean.h \
+	swfdec_as_date.h \
 	swfdec_as_frame_internal.h \
 	swfdec_as_internal.h \
 	swfdec_as_interpret.h \
@@ -86,11 +83,14 @@ IGNORE_HFILES= \
 	swfdec_debug.h \
 	swfdec_debugger.h \
 	swfdec_decoder.h \
-	swfdec_edittext.h \
-	swfdec_edittext_movie.h \
+	swfdec_draw.h \
+	swfdec_text_field.h \
+	swfdec_text_field_movie.h \
 	swfdec_enums.h \
 	swfdec_event.h \
+	swfdec_filter.h \
 	swfdec_flv_decoder.h \
+	swfdec_flash_security.h \
 	swfdec_font.h \
 	swfdec_graphic.h \
 	swfdec_graphic_movie.h \
@@ -108,6 +108,7 @@ IGNORE_HFILES= \
 	swfdec_movie.h \
 	swfdec_net_connection.h \
 	swfdec_net_stream.h \
+	swfdec_path.h \
 	swfdec_pattern.h \
 	swfdec_player_internal.h \
 	swfdec_rect.h \
@@ -116,21 +117,27 @@ IGNORE_HFILES= \
 	swfdec_root_sprite.h \
 	swfdec_script.h \
 	swfdec_script_internal.h \
-	swfdec_scriptable.h \
+	swfdec_security.h \
+	swfdec_security_allow.h \
 	swfdec_shape.h \
+	swfdec_shape_parser.h \
 	swfdec_sound.h \
+	swfdec_sound_object.h \
 	swfdec_sprite.h \
 	swfdec_sprite_movie.h \
 	swfdec_stroke.h \
+	swfdec_style_sheet.h \
 	swfdec_swf_decoder.h \
 	swfdec_swf_instance.h \
 	swfdec_tag.h \
 	swfdec_text.h \
+	swfdec_text_format.h \
 	swfdec_types.h \
 	swfdec_utils.h \
 	swfdec_video.h \
 	swfdec_video_movie.h \
-	swfdec_xml.h
+	swfdec_xml.h \
+	swfdec_xml_node.h
 
 if WITH_GTK
 EXTRA_HFILES = \
@@ -172,4 +179,4 @@ include $(top_srcdir)/gtk-doc.make
 EXTRA_DIST += 
 
 # Comment this out if you want your docs-status tested during 'make check'
-TESTS = $(GTKDOC_CHECK)
+#TESTS = $(GTKDOC_CHECK)

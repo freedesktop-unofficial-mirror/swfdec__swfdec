@@ -30,7 +30,7 @@
 #include "swfdec_as_string.h"
 #include "swfdec_as_strings.h"
 #include "swfdec_as_super.h"
-#include "swfdec_as_with.h"
+#include "swfdec_as_internal.h"
 #include "swfdec_debug.h"
 
 #include <errno.h>
@@ -41,7 +41,8 @@
 #include "swfdec_player_internal.h"
 #include "swfdec_sprite.h"
 #include "swfdec_sprite_movie.h"
-#include "swfdec_swf_instance.h"
+#include "swfdec_resource.h"
+#include "swfdec_text_field_movie.h" // for typeof
 
 /* Define this to get SWFDEC_WARN'd about missing properties of objects.
  * This can be useful to find out about unimplemented native properties,
@@ -211,8 +212,8 @@ static void
 swfdec_script_skip_actions (SwfdecAsContext *cx, guint jump)
 {
   SwfdecScript *script = cx->frame->script;
-  guint8 *pc = cx->frame->pc;
-  guint8 *endpc = script->buffer->data + script->buffer->length;
+  const guint8 *pc = cx->frame->pc;
+  const guint8 *endpc = script->buffer->data + script->buffer->length;
 
   /* jump instructions */
   do {
@@ -267,25 +268,26 @@ swfdec_action_wait_for_frame2 (SwfdecAsContext *cx, guint action, const guint8 *
 static void
 swfdec_action_wait_for_frame (SwfdecAsContext *cx, guint action, const guint8 *data, guint len)
 {
-  SwfdecSpriteMovie *movie;
+  SwfdecMovie *movie;
+  SwfdecResource *resource;
   guint frame, jump, loaded;
 
   if (len != 3) {
     SWFDEC_ERROR ("WaitForFrame action length invalid (is %u, should be 3", len);
     return;
   }
-  if (!SWFDEC_IS_SPRITE_MOVIE (cx->frame->target)) {
+  if (!SWFDEC_IS_MOVIE (cx->frame->target)) {
     SWFDEC_ERROR ("no movie for WaitForFrame");
     return;
   }
 
-  movie = SWFDEC_SPRITE_MOVIE (cx->frame->target);
+  movie = SWFDEC_MOVIE (cx->frame->target);
   frame = data[0] || (data[1] << 8);
   jump = data[2];
-  if (SWFDEC_MOVIE (movie)->swf->movie == movie) {
-    SwfdecDecoder *dec = SWFDEC_MOVIE (movie)->swf->decoder;
+  resource = swfdec_movie_get_own_resource (movie);
+  if (resource) {
+    SwfdecDecoder *dec = resource->decoder;
     loaded = dec->frames_loaded;
-    g_assert (loaded <= movie->n_frames);
     if (loaded == dec->frames_total)
       loaded = G_MAXUINT;
   } else {
@@ -365,7 +367,7 @@ swfdec_action_push (SwfdecAsContext *cx, guint action, const guint8 *data, guint
 	    swfdec_bits_get_double (&bits));
 	break;
       case 7: /* 32bit int */
-	SWFDEC_AS_VALUE_SET_NUMBER (swfdec_as_stack_push (cx), 
+	SWFDEC_AS_VALUE_SET_INT (swfdec_as_stack_push (cx), 
 	    (int) swfdec_bits_get_u32 (&bits));
 	break;
       case 8: /* 8bit ConstantPool address */
@@ -409,46 +411,281 @@ swfdec_action_push (SwfdecAsContext *cx, guint action, const guint8 *data, guint
   }
 }
 
+/* NB: name must be GC'd */
+static SwfdecAsObject *
+super_special_movie_lookup_magic (SwfdecAsContext *cx, SwfdecAsObject *o, const char *name)
+{
+  SwfdecAsValue val;
+
+  if (o == NULL) {
+    o = swfdec_as_frame_get_variable (cx->frame, name, NULL);
+    if (o == NULL)
+      return NULL;
+  }
+  if (SWFDEC_IS_MOVIE (o)) {
+    SwfdecMovie *ret = swfdec_movie_get_by_name (SWFDEC_MOVIE (o), name);
+    if (ret)
+      return SWFDEC_AS_OBJECT (ret);
+  }
+  if (!swfdec_as_object_get_variable (o, name, &val))
+    return NULL;
+  if (!SWFDEC_AS_VALUE_IS_OBJECT (&val))
+    return NULL;
+  return SWFDEC_AS_VALUE_GET_OBJECT (&val);
+}
+
+static SwfdecAsObject *
+swfdec_action_get_movie_by_slash_path (SwfdecAsContext *cx, const char *path)
+{
+  SwfdecAsObject *o;
+
+  o = cx->frame->target;
+  if (!SWFDEC_IS_MOVIE (o))
+    return NULL;
+  if (*path == '/') {
+    o = SWFDEC_AS_OBJECT (swfdec_movie_get_root (SWFDEC_MOVIE (o)));
+    path++;
+  }
+  while (*path) {
+    char *slash = strchr (path, '/');
+    const char *name;
+    if (slash) {
+      if (slash == path)
+	return NULL;
+      name = swfdec_as_context_give_string (cx, g_strndup (path, slash - path));
+      path = slash + 1;
+    } else {
+      name = swfdec_as_context_get_string (cx, path);
+      path += strlen (path);
+    }
+    o = super_special_movie_lookup_magic (cx, o, name);
+    if (!SWFDEC_IS_MOVIE (o))
+      return NULL;
+  }
+  return o;
+}
+
+SwfdecAsObject *
+swfdec_action_lookup_object (SwfdecAsContext *cx, SwfdecAsObject *o, const char *path, const char *end)
+{
+  gboolean dot_allowed = TRUE;
+  const char *start;
+
+  if (path == end) {
+    if (o == NULL)
+      o = cx->frame->target;
+    if (SWFDEC_IS_MOVIE (o))
+      return o;
+    else
+      return NULL;
+  }
+
+  if (path[0] == '/') {
+    o = cx->frame->target;
+    if (!SWFDEC_IS_MOVIE (o))
+      return NULL;
+    o = SWFDEC_AS_OBJECT (swfdec_movie_get_root (SWFDEC_MOVIE (o)));
+    path++;
+    dot_allowed = FALSE;
+  }
+  while (path < end) {
+    for (start = path; path < end; path++) {
+      if (dot_allowed && path[0] == '.') {
+	if (end - path >= 2 && path[1] == '.') {
+	  dot_allowed = FALSE;
+	  continue;
+	}
+      } else if (path[0] == ':') {
+	if (path[1] == '/')
+	  continue;
+	if (path == start) {
+	  start++;
+	  continue;
+	}
+      } else if (path[0] == '/') {
+	dot_allowed = FALSE;
+      } else if (path - start < 127) {
+	continue;
+      }
+
+      break;
+    }
+
+    /* parse variable */
+    if (start[0] == '.' && start[1] == '.' && start + 2 == path) {
+      if (o == NULL) {
+	GSList *walk;
+	for (walk = cx->frame->scope_chain; walk; walk = walk->next) {
+	  if (SWFDEC_IS_MOVIE (walk->data)) {
+	    o = walk->data;
+	    break;
+	  }
+	}
+	if (o == NULL)
+	  o = cx->frame->target;
+      }
+      /* ".." goes back to parent */
+      if (!SWFDEC_IS_MOVIE (o))
+	return NULL;
+      o = SWFDEC_AS_OBJECT (SWFDEC_MOVIE (o)->parent);
+      if (o == NULL)
+	return NULL;
+    } else {
+      o = super_special_movie_lookup_magic (cx, o, 
+	      swfdec_as_context_give_string (cx, g_strndup (start, path - start)));
+      if (o == NULL)
+	return NULL;
+    }
+    if (path - start < 127)
+      path++;
+  }
+
+  return o;
+}
+
+/* FIXME: this function belongs into swfdec_movie.c */
+SwfdecMovie *
+swfdec_player_get_movie_from_value (SwfdecPlayer *player, SwfdecAsValue *val)
+{
+  SwfdecAsContext *cx;
+  const char *s;
+
+  g_return_val_if_fail (SWFDEC_IS_PLAYER (player), NULL);
+  g_return_val_if_fail (SWFDEC_IS_AS_VALUE (val), NULL);
+
+  cx = SWFDEC_AS_CONTEXT (player);
+  s = swfdec_as_value_to_string (cx, val);
+  return swfdec_player_get_movie_from_string (player, s);
+}
+
+SwfdecMovie *
+swfdec_player_get_movie_from_string (SwfdecPlayer *player, const char *s)
+{
+  SwfdecAsObject *ret;
+
+  g_return_val_if_fail (SWFDEC_IS_PLAYER (player), NULL);
+  g_return_val_if_fail (s != NULL, NULL);
+
+  ret = swfdec_action_lookup_object (SWFDEC_AS_CONTEXT (player), NULL, s, s + strlen (s));
+  if (!SWFDEC_IS_MOVIE (ret)) {
+    SWFDEC_WARNING ("\"%s\" does not reference a movie", s);
+    return NULL;
+  }
+  return SWFDEC_MOVIE (ret);
+}
+
+/**
+ * swfdec_action_get_movie_by_path:
+ * @cx: a #SwfdecAsContext
+ * @path: the path to look up
+ * @object: pointer that takes the object that was looked up. The object may be 
+ *          %NULL.
+ * @variable: pointer that takes variable part of the path. The variable will 
+ *            be either %NULL or a non-gc'ed variable name.
+ *
+ * Looks up a Flash4-compatible path using "/", ":" and "." style syntax.
+ *
+ * Returns: The #SwfdecMovie that was looked up or %NULL if the path does not 
+ *          specify a valid movie.
+ **/
+static gboolean
+swfdec_action_get_movie_by_path (SwfdecAsContext *cx, const char *path, 
+    SwfdecAsObject **object, const char **variable)
+{
+  SwfdecAsObject *movie;
+  char *end, *s;
+
+  g_assert (path != NULL);
+  g_assert (object != NULL); 
+  g_assert (variable != NULL);
+  g_assert (cx->frame != NULL);
+
+  /* find dot or colon */
+  end = strpbrk (path, ".:");
+
+  /* if no dot or colon, look up slash-path */
+  if (end == NULL) {
+    /* shortcut for the general case */
+    if (strchr (path, '/') != NULL) {
+      movie = swfdec_action_get_movie_by_slash_path (cx, path);
+      if (movie) {
+	*object = movie;
+	*variable = NULL;
+	return TRUE;
+      }
+    }
+
+    *object = NULL;
+    *variable = path;
+    return TRUE;
+  }
+  /* find last dot or colon */
+  while ((s = strpbrk (end + 1, ".:")) != NULL)
+    end = s;
+
+  /* variable to use is the part after the last dot or colon */
+  *variable = end + 1;
+  /* look up object for start of path */
+  if (path == end)
+    movie = NULL;
+  else
+    movie = swfdec_action_lookup_object (cx, NULL, path, end);
+  if (movie) {
+    *object = movie;
+    return TRUE;
+  } else {
+    *variable = NULL;
+    return FALSE;
+  }
+}
+
 static void
 swfdec_action_get_variable (SwfdecAsContext *cx, guint action, const guint8 *data, guint len)
 {
+  SwfdecAsValue *val;
   const char *s;
+  SwfdecAsObject *object;
 
-  s = swfdec_as_value_to_string (cx, swfdec_as_stack_peek (cx, 1));
-  swfdec_as_context_eval (cx, NULL, s, swfdec_as_stack_peek (cx, 1));
+  val = swfdec_as_stack_peek (cx, 1);
+  s = swfdec_as_value_to_string (cx, val);
+  if (swfdec_action_get_movie_by_path (cx, s, &object, &s)) {
+    if (object) {
+      if (s) {
+	swfdec_as_object_get_variable (object, swfdec_as_context_get_string (cx, s), val);
+      } else {
+	SWFDEC_AS_VALUE_SET_OBJECT (val, object);
+      }
+    } else {
+      swfdec_as_frame_get_variable (cx->frame, swfdec_as_context_get_string (cx, s), val);
+    }
+  } else {
+    SWFDEC_AS_VALUE_SET_UNDEFINED (val);
 #ifdef SWFDEC_WARN_MISSING_PROPERTIES
-  if (SWFDEC_AS_VALUE_IS_UNDEFINED (swfdec_as_stack_peek (cx, 1))) {
     SWFDEC_WARNING ("no variable named %s", s);
-  }
 #endif
+  }
 }
 
 static void
 swfdec_action_set_variable (SwfdecAsContext *cx, guint action, const guint8 *data, guint len)
 {
-  const char *s;
+  const char *s, *rest;
+  SwfdecAsObject *object;
 
   s = swfdec_as_value_to_string (cx, swfdec_as_stack_peek (cx, 2));
-  swfdec_as_context_eval_set (cx, NULL, s, swfdec_as_stack_peek (cx, 1));
-  swfdec_as_stack_pop_n (cx, 2);
-}
-
-static const char *
-swfdec_as_interpret_eval (SwfdecAsContext *cx, SwfdecAsObject *obj, 
-    SwfdecAsValue *val)
-{
-  if (SWFDEC_AS_VALUE_IS_STRING (val)) {
-    const char *s = SWFDEC_AS_VALUE_GET_STRING (val);
-    if (s != SWFDEC_AS_STR_EMPTY) {
-      swfdec_as_context_eval (cx, obj, s, val);
-      return s;
+  if (swfdec_action_get_movie_by_path (cx, s, &object, &rest)) {
+    if (object && rest) {
+      swfdec_as_object_set_variable (object, swfdec_as_context_get_string (cx, rest), 
+	  swfdec_as_stack_peek (cx, 1));
+    } else {
+      if (object)
+	rest = s;
+      else
+	rest = swfdec_as_context_get_string (cx, rest);
+      swfdec_as_frame_set_variable (cx->frame, rest, swfdec_as_stack_peek (cx, 1));
     }
-  } 
-  if (obj != NULL)
-    SWFDEC_AS_VALUE_SET_OBJECT (val, obj);
-  else
-    SWFDEC_AS_VALUE_SET_UNDEFINED (val);
-  return SWFDEC_AS_STR_EMPTY;
+  }
+  swfdec_as_stack_pop_n (cx, 2);
 }
 
 /* FIXME: this sucks */
@@ -461,58 +698,59 @@ extern struct {
 static void
 swfdec_action_get_property (SwfdecAsContext *cx, guint action, const guint8 *data, guint len)
 {
-  SwfdecAsValue *val;
-  SwfdecAsObject *obj;
+  SwfdecMovie *movie;
   guint id;
 
-  id = swfdec_as_value_to_integer (cx, swfdec_as_stack_pop (cx));
-  if (id > (cx->version > 4 ? 21 : 18)) {
-    SWFDEC_WARNING ("trying to SetProperty %u, not allowed", id);
-    goto out;
-  }
-  val = swfdec_as_stack_peek (cx, 1);
-  swfdec_as_interpret_eval (cx, NULL, val);
-  if (SWFDEC_AS_VALUE_IS_UNDEFINED (val)) {
-    obj = cx->frame->target;
-  } else if (SWFDEC_AS_VALUE_IS_OBJECT (val)) {
-    obj = SWFDEC_AS_VALUE_GET_OBJECT (val);
+  id = swfdec_as_value_to_integer (cx, swfdec_as_stack_peek (cx, 1));
+  if (!SWFDEC_IS_PLAYER (cx)) {
+    SWFDEC_INFO ("tried using GetProperty in a non-SwfdecPlayer context");
+    goto error;
   } else {
-    SWFDEC_WARNING ("not an object, can't GetProperty");
-    goto out;
+    movie = swfdec_player_get_movie_from_value (SWFDEC_PLAYER (cx),
+	swfdec_as_stack_peek (cx, 2));
+    if (movie == NULL)
+      goto error;
   }
-  swfdec_as_object_get_variable (obj, swfdec_movieclip_props[id].name,
-      swfdec_as_stack_peek (cx, 1));
+  if (id > (cx->version > 4 ? 21 : 18)) {
+    SWFDEC_WARNING ("trying to SetProperty %u, doesn't exist", id);
+    goto error;
+  }
+  swfdec_as_object_get_variable (SWFDEC_AS_OBJECT (movie), swfdec_movieclip_props[id].name,
+      swfdec_as_stack_peek (cx, 2));
+  swfdec_as_stack_pop (cx);
   return;
 
-out:
+error :
+  swfdec_as_stack_pop (cx);
   SWFDEC_AS_VALUE_SET_UNDEFINED (swfdec_as_stack_peek (cx, 1));
 }
 
 static void
 swfdec_action_set_property (SwfdecAsContext *cx, guint action, const guint8 *data, guint len)
 {
-  SwfdecAsValue *val;
-  SwfdecAsObject *obj;
+  SwfdecMovie *movie;
   guint id;
 
   id = swfdec_as_value_to_integer (cx, swfdec_as_stack_peek (cx, 2));
-  if (id > (cx->version > 4 ? 21 : 18)) {
-    SWFDEC_WARNING ("trying to SetProperty %u, not allowed", id);
-    goto out;
-  }
-  val = swfdec_as_stack_peek (cx, 3);
-  swfdec_as_interpret_eval (cx, NULL, val);
-  if (SWFDEC_AS_VALUE_IS_UNDEFINED (val)) {
-    obj = cx->frame->target;
-  } else if (SWFDEC_AS_VALUE_IS_OBJECT (val)) {
-    obj = SWFDEC_AS_VALUE_GET_OBJECT (val);
+  if (!SWFDEC_IS_PLAYER (cx)) {
+    SWFDEC_INFO ("tried using GetProperty in a non-SwfdecPlayer context");
+    goto error;
   } else {
-    SWFDEC_WARNING ("not an object, can't get SetProperty");
-    goto out;
+    movie = swfdec_player_get_movie_from_value (SWFDEC_PLAYER (cx),
+	swfdec_as_stack_peek (cx, 3));
+    if (movie == NULL)
+      goto error;
   }
-  swfdec_as_object_set_variable (obj, swfdec_movieclip_props[id].name,
+  if (id > (cx->version > 4 ? 21 : 18)) {
+    SWFDEC_WARNING ("trying to SetProperty %u, doesn't exist", id);
+    goto error;
+  }
+  swfdec_as_object_set_variable (SWFDEC_AS_OBJECT (movie), swfdec_movieclip_props[id].name,
       swfdec_as_stack_peek (cx, 1));
-out:
+  swfdec_as_stack_pop_n (cx, 3);
+  return;
+
+error :
   swfdec_as_stack_pop_n (cx, 3);
 }
 
@@ -617,16 +855,15 @@ swfdec_action_call_function (SwfdecAsContext *cx, guint action, const guint8 *da
   name = swfdec_as_value_to_string (cx, swfdec_as_stack_peek (cx, 1));
   thisp = swfdec_as_stack_peek (cx, 2);
   fun = swfdec_as_stack_peek (cx, 1);
-  obj = swfdec_as_frame_find_variable (frame, name);
+  obj = swfdec_as_frame_get_variable (frame, name, fun);
   if (obj) {
-    swfdec_as_object_get_variable (obj, name, fun);
     SWFDEC_AS_VALUE_SET_OBJECT (thisp, obj);
   } else {
     SWFDEC_AS_VALUE_SET_NULL (thisp);
     SWFDEC_AS_VALUE_SET_UNDEFINED (fun);
   }
   if (!swfdec_action_call (cx, n_args)) {
-    SWFDEC_ERROR ("no function named %s", name);
+    SWFDEC_WARNING ("no function named %s", name);
   }
 }
 
@@ -676,11 +913,12 @@ swfdec_action_call_method (SwfdecAsContext *cx, guint action, const guint8 *data
 	  swfdec_as_object_get_variable_and_flags (frame->thisp, 
 	    name, NULL, NULL, &super->object) && 
 	  super->object == frame->thisp) {
+	// FIXME: Do we need to check prototype_flags here?
 	super->object = super->object->prototype;
       }
     }
   } else {
-    SWFDEC_ERROR ("no function named %s on object %s", name ? name : "unknown", obj ? G_OBJECT_TYPE_NAME(obj) : "unknown");
+    SWFDEC_WARNING ("no function named %s on object %s", name ? name : "unknown", obj ? G_OBJECT_TYPE_NAME(obj) : "unknown");
   }
 }
 
@@ -907,11 +1145,21 @@ swfdec_action_get_url (SwfdecAsContext *cx, guint action, const guint8 *data, gu
   if (swfdec_bits_left (&bits)) {
     SWFDEC_WARNING ("leftover bytes in GetURL action");
   }
-  if (SWFDEC_IS_MOVIE (cx->frame->target))
-    swfdec_movie_load (SWFDEC_MOVIE (cx->frame->target), url, target, 
-	SWFDEC_LOADER_REQUEST_DEFAULT, NULL, 0);
-  else
-    SWFDEC_WARNING ("no movie to load");
+  if (!SWFDEC_IS_PLAYER (cx)) {
+    SWFDEC_ERROR ("GetURL without a SwfdecPlayer");
+  } else if (swfdec_player_fscommand (SWFDEC_PLAYER (cx), url, target)) {
+    /* nothing to do here */
+  } else {
+    SwfdecSecurity *sec = cx->frame->security;
+    SwfdecSpriteMovie *movie = swfdec_player_get_level (SWFDEC_PLAYER (cx), target, 
+	SWFDEC_IS_RESOURCE (sec) ? SWFDEC_RESOURCE (sec) : NULL);
+    if (movie) {
+      swfdec_sprite_movie_load (movie, url, SWFDEC_LOADER_REQUEST_DEFAULT, NULL);
+    } else {
+      swfdec_player_launch (SWFDEC_PLAYER (cx), SWFDEC_LOADER_REQUEST_DEFAULT, 
+	  url, target, NULL);
+    }
+  }
   g_free (url);
   g_free (target);
 }
@@ -920,29 +1168,56 @@ static void
 swfdec_action_get_url2 (SwfdecAsContext *cx, guint action, const guint8 *data, guint len)
 {
   const char *target, *url;
-  guint method;
+  guint method, internal, variables;
 
   if (len != 1) {
     SWFDEC_ERROR ("GetURL2 requires 1 byte of data, not %u", len);
     return;
   }
-  target = swfdec_as_value_to_string (cx, swfdec_as_stack_peek (cx, 1));
-  url = swfdec_as_value_to_string (cx, swfdec_as_stack_peek (cx, 2));
-  method = data[0] >> 6;
+
+  method = data[0] & 3;
   if (method == 3) {
     SWFDEC_ERROR ("GetURL method 3 invalid");
     method = 0;
   }
-  if (data[0] & 2) {
-    SWFDEC_FIXME ("implement LoadTarget");
+  internal = data[0] & 64;
+  variables = data[0] & 128;
+  if (method == 1 || method == 2) {
+    SWFDEC_FIXME ("encode variables");
   }
-  if (data[0] & 1) {
-    SWFDEC_FIXME ("implement LoadVariables");
+
+  target = swfdec_as_value_to_string (cx, swfdec_as_stack_peek (cx, 1));
+  url = swfdec_as_value_to_string (cx, swfdec_as_stack_peek (cx, 2));
+
+  if (!SWFDEC_IS_PLAYER (cx)) {
+    SWFDEC_ERROR ("GetURL2 action requires a SwfdecPlayer");
+  } else if (swfdec_player_fscommand (SWFDEC_PLAYER (cx), url, target)) {
+    /* nothing to do here */
+  } else if (internal || variables) {
+    SwfdecSecurity *sec = cx->frame->security;
+    SwfdecSpriteMovie *movie;
+    
+    /* FIXME: This code looks wrong - figure out how levels are handled */
+    movie = swfdec_player_get_level (SWFDEC_PLAYER (cx), target, 
+	(SWFDEC_IS_RESOURCE (sec) && !variables) ? SWFDEC_RESOURCE (sec) : NULL);
+    if (movie == NULL) {
+      movie = (SwfdecSpriteMovie *) swfdec_player_get_movie_from_string (
+	SWFDEC_PLAYER (cx), target);
+      if (!SWFDEC_IS_SPRITE_MOVIE (movie))
+	movie = NULL;
+    }
+    if (movie == NULL) {
+      /* swfdec_player_get_movie_from_value() should have warned already */
+    } else if (variables) {
+      swfdec_movie_load_variables (SWFDEC_MOVIE (movie), url, method, NULL);
+    } else {
+      swfdec_sprite_movie_load (movie, url, method, NULL);
+    }
+  } else {
+    /* load an external file */
+    swfdec_player_launch (SWFDEC_PLAYER (cx), method, url, target, NULL);
   }
-  if (SWFDEC_IS_MOVIE (cx->frame->target))
-    swfdec_movie_load (SWFDEC_MOVIE (cx->frame->target), url, target, method, NULL, 0);
-  else
-    SWFDEC_WARNING ("no movie to load");
+
   swfdec_as_stack_pop_n (cx, 2);
 }
 
@@ -961,7 +1236,9 @@ swfdec_action_string_add (SwfdecAsContext *cx, guint action, const guint8 *data,
 static void
 swfdec_action_push_duplicate (SwfdecAsContext *cx, guint action, const guint8 *data, guint len)
 {
-  *swfdec_as_stack_push (cx) = *swfdec_as_stack_peek (cx, 1);
+  SwfdecAsValue *val = swfdec_as_stack_peek (cx, 1);
+
+  *swfdec_as_stack_push (cx) = *val;
 }
 
 static void
@@ -1004,6 +1281,33 @@ swfdec_action_old_compare (SwfdecAsContext *cx, guint action, const guint8 *data
   } else {
     SWFDEC_AS_VALUE_SET_BOOLEAN (swfdec_as_stack_peek (cx, 1), cond);
   }
+}
+
+static void
+swfdec_action_string_extract (SwfdecAsContext *cx, guint action, const guint8 *data, guint len)
+{
+  int start, n, left;
+  const char *s;
+
+  n = swfdec_as_value_to_integer (cx, swfdec_as_stack_peek (cx, 1));
+  start = swfdec_as_value_to_integer (cx, swfdec_as_stack_peek (cx, 2));
+  s = swfdec_as_value_to_string (cx, swfdec_as_stack_peek (cx, 3));
+  swfdec_as_stack_pop_n (cx, 2);
+  left = g_utf8_strlen (s, -1);
+  if (start > left) {
+    SWFDEC_AS_VALUE_SET_STRING (swfdec_as_stack_peek (cx, 1), SWFDEC_AS_STR_EMPTY);
+    return;
+  } else if (start < 2) {
+    start = 0;
+  } else {
+    start--;
+  }
+  left -= start;
+  if (n < 0 || n > left)
+    n = left;
+
+  SWFDEC_AS_VALUE_SET_STRING (swfdec_as_stack_peek (cx, 1),
+      swfdec_as_str_sub (cx, s, start, n));
 }
 
 static void
@@ -1266,37 +1570,42 @@ swfdec_action_strict_equals (SwfdecAsContext *cx, guint action, const guint8 *da
 }
 
 static void
+swfdec_action_do_set_target (SwfdecAsContext *cx, const char *target, const char *end)
+{
+  swfdec_as_frame_set_target (cx->frame, NULL);
+
+  if (target != end) {
+    SwfdecAsObject *o = swfdec_action_lookup_object (cx, NULL, target, end);
+    if (o == NULL) {
+      SWFDEC_WARNING ("target \"%s\" is not an object", target);
+    } else if (!SWFDEC_IS_MOVIE (o)) {
+      SWFDEC_FIXME ("target \"%s\" is not a movie, something weird is supposed to happen now", target);
+      o = NULL;
+    }
+    swfdec_as_frame_set_target (cx->frame, o);
+  }
+}
+
+static void
 swfdec_action_set_target (SwfdecAsContext *cx, guint action, const guint8 *data, guint len)
 {
-  if (!memchr (data, 0, len)) {
+  char *end;
+
+  end = memchr (data, 0, len);
+  if (end == NULL) {
     SWFDEC_ERROR ("SetTarget action does not specify a string");
     return;
   }
-  if (*data == '\0') {
-    swfdec_as_frame_set_target (cx->frame, NULL);
-  } else {
-    SwfdecAsValue target;
-    swfdec_as_context_eval (cx, NULL, (const char *) data, &target);
-    if (!SWFDEC_AS_VALUE_IS_OBJECT (&target)) {
-      SWFDEC_WARNING ("target is not an object");
-      return;
-    } 
-    /* FIXME: allow non-movieclips as targets? */
-    swfdec_as_frame_set_target (cx->frame, SWFDEC_AS_VALUE_GET_OBJECT (&target));
-  }
+  swfdec_action_do_set_target (cx, (const char *) data, end);
 }
 
 static void
 swfdec_action_set_target2 (SwfdecAsContext *cx, guint action, const guint8 *data, guint len)
 {
-  SwfdecAsValue *val;
-  val = swfdec_as_stack_peek (cx, 1);
-  if (!SWFDEC_AS_VALUE_IS_OBJECT (val)) {
-    SWFDEC_WARNING ("target is not an object");
-  } else {
-    /* FIXME: allow non-movieclips as targets? */
-    swfdec_as_frame_set_target (cx->frame, SWFDEC_AS_VALUE_GET_OBJECT (val));
-  }
+  const char *s;
+
+  s = swfdec_as_value_to_string (cx, swfdec_as_stack_peek (cx, 1));
+  swfdec_action_do_set_target (cx, s, s + strlen (s));
   swfdec_as_stack_pop (cx);
 }
 
@@ -1309,9 +1618,6 @@ swfdec_action_start_drag (SwfdecAsContext *cx, guint action, const guint8 *data,
   guint stack_size = 3;
 
   swfdec_as_stack_ensure_size (cx, 3);
-  if (swfdec_as_interpret_eval (cx, NULL, swfdec_as_stack_peek (cx, 1)) == SWFDEC_AS_STR_EMPTY) {
-    SWFDEC_AS_VALUE_SET_OBJECT (swfdec_as_stack_peek (cx, 1), cx->frame->target);
-  }
   center = swfdec_as_value_to_boolean (cx, swfdec_as_stack_peek (cx, 2));
   if (swfdec_as_value_to_number (cx, swfdec_as_stack_peek (cx, 3))) {
     swfdec_as_stack_ensure_size (cx, 7);
@@ -1323,11 +1629,15 @@ swfdec_action_start_drag (SwfdecAsContext *cx, guint action, const guint8 *data,
     stack_size = 7;
     rectp = &rect;
   }
-  if (SWFDEC_AS_VALUE_IS_OBJECT (swfdec_as_stack_peek (cx, 1)) &&
-      SWFDEC_IS_MOVIE (movie = (SwfdecMovie *) SWFDEC_AS_VALUE_GET_OBJECT (swfdec_as_stack_peek (cx, 1)))) {
-    swfdec_player_set_drag_movie (SWFDEC_PLAYER (cx), movie, center, &rect);
+  if (!SWFDEC_IS_PLAYER (cx)) {
+    SWFDEC_ERROR ("called startDrag on a non-SwfdecPlayer");
   } else {
-    SWFDEC_ERROR ("startDrag on something not a Movie");
+    movie = swfdec_player_get_movie_from_value (SWFDEC_PLAYER (cx), swfdec_as_stack_peek (cx, 1));
+    if (movie != NULL) {
+      swfdec_player_set_drag_movie (SWFDEC_PLAYER (cx), movie, center, rectp);
+    } else {
+      SWFDEC_ERROR ("startDrag on something not a Movie");
+    }
   }
   swfdec_as_stack_pop_n (cx, stack_size);
 }
@@ -1356,16 +1666,15 @@ swfdec_action_new_object (SwfdecAsContext *cx, guint action, const guint8 *data,
   SwfdecAsValue *constructor;
   SwfdecAsFunction *fun;
   guint n_args;
-  const char *name;
 
   swfdec_as_stack_ensure_size (cx, 2);
+  swfdec_action_get_variable (cx, action, data, len);
   constructor = swfdec_as_stack_peek (cx, 1);
-  name = swfdec_as_interpret_eval (cx, NULL, constructor);
   n_args = swfdec_as_value_to_integer (cx, swfdec_as_stack_peek (cx, 2));
   n_args = MIN (swfdec_as_stack_get_size (cx) - 2, n_args);
   if (!SWFDEC_AS_VALUE_IS_OBJECT (constructor) ||
       !SWFDEC_IS_AS_FUNCTION (fun = (SwfdecAsFunction *) SWFDEC_AS_VALUE_GET_OBJECT (constructor))) {
-    SWFDEC_WARNING ("%s is not a constructor", name);
+    SWFDEC_WARNING ("not a constructor");
     goto fail;
   }
 
@@ -1567,15 +1876,17 @@ swfdec_action_define_function (SwfdecAsContext *cx, guint action,
   /* see function-scope tests */
   if (cx->version > 5) {
     /* FIXME: or original target? */
-    fun = swfdec_as_script_function_new (frame->scope ? frame->scope : SWFDEC_AS_SCOPE (frame), frame->target, script);
+    fun = swfdec_as_script_function_new (frame->original_target, frame->scope_chain, script);
   } else {
-    SwfdecAsScope *scope = frame->scope ? frame->scope : SWFDEC_AS_SCOPE (frame);
-    while (scope->next)
-      scope = scope->next;
-    fun = swfdec_as_script_function_new (scope, frame->target, script);
+    fun = swfdec_as_script_function_new (frame->original_target, NULL, script);
   }
   if (fun == NULL)
     return;
+  /* This is a hack that should only trigger for functions defined in the init scripts.
+   * It is supposed to ensure that those functions inherit their target when being 
+   * called instead of when being defined */
+  if (!SWFDEC_IS_MOVIE (frame->original_target))
+    SWFDEC_AS_SCRIPT_FUNCTION (fun)->target = NULL;
   /* attach the function */
   if (*function_name == '\0') {
     swfdec_as_stack_ensure_free (cx, 1);
@@ -1666,11 +1977,10 @@ swfdec_action_target_path (SwfdecAsContext *cx, guint action, const guint8 *data
 
   if (!SWFDEC_AS_VALUE_IS_OBJECT (val) ||
       !SWFDEC_IS_MOVIE (movie = (SwfdecMovie *) SWFDEC_AS_VALUE_GET_OBJECT (val))) {
-    SWFDEC_FIXME ("What's the TargetPath for non-movies?");
     SWFDEC_AS_VALUE_SET_UNDEFINED (val);
     return;
   }
-  s = swfdec_movie_get_path (movie);
+  s = swfdec_movie_get_path (movie, TRUE);
   SWFDEC_AS_VALUE_SET_STRING (val, swfdec_as_context_give_string (cx, s));
 }
 
@@ -1826,7 +2136,11 @@ swfdec_action_type_of (SwfdecAsContext *cx, guint action, const guint8 *data, gu
       {
 	SwfdecAsObject *obj = SWFDEC_AS_VALUE_GET_OBJECT (val);
 	if (SWFDEC_IS_MOVIE (obj)) {
-	  type = SWFDEC_AS_STR_movieclip;
+	  if (SWFDEC_IS_TEXT_FIELD_MOVIE (obj)) {
+	    type = SWFDEC_AS_STR_object;
+	  } else {
+	    type = SWFDEC_AS_STR_movieclip;
+	  }
 	} else if (SWFDEC_IS_AS_FUNCTION (obj)) {
 	  type = SWFDEC_AS_STR_function;
 	} else {
@@ -1884,8 +2198,10 @@ swfdec_action_extends (SwfdecAsContext *cx, guint action, const guint8 *data, gu
     return;
   swfdec_as_object_get_variable (super, SWFDEC_AS_STR_prototype, &proto);
   swfdec_as_object_set_variable (prototype, SWFDEC_AS_STR___proto__, &proto);
-  swfdec_as_object_set_variable_and_flags (prototype, SWFDEC_AS_STR___constructor__,
-      superclass, SWFDEC_AS_VARIABLE_HIDDEN);
+  if (cx->version > 5) {
+    swfdec_as_object_set_variable_and_flags (prototype, SWFDEC_AS_STR___constructor__,
+	superclass, SWFDEC_AS_VARIABLE_HIDDEN);
+  }
   SWFDEC_AS_VALUE_SET_OBJECT (&proto, prototype);
   swfdec_as_object_set_variable (SWFDEC_AS_VALUE_GET_OBJECT (subclass),
       SWFDEC_AS_STR_prototype, &proto);
@@ -1894,35 +2210,46 @@ fail:
 }
 
 static gboolean
-swfdec_action_do_enumerate (SwfdecAsObject *object, const char *variable,
-    SwfdecAsValue *value, guint flags, gpointer cxp)
+swfdec_action_enumerate_foreach (SwfdecAsObject *object, const char *variable,
+    SwfdecAsValue *value, guint flags, gpointer listp)
 {
-  SwfdecAsContext *cx = cxp;
+  GSList **list = listp;
 
   if (flags & SWFDEC_AS_VARIABLE_HIDDEN)
     return TRUE;
-  swfdec_as_stack_ensure_free (cx, 1);
-  SWFDEC_AS_VALUE_SET_STRING (swfdec_as_stack_push (cx), variable);
+
+  *list = g_slist_remove (*list, variable);
+  *list = g_slist_prepend (*list, (gpointer) variable);
   return TRUE;
 }
 
 static void
-swfdec_action_enumerate (SwfdecAsContext *cx, guint action, const guint8 *data, guint len)
+swfdec_action_do_enumerate (SwfdecAsContext *cx, SwfdecAsObject *object)
 {
-  SwfdecAsValue *val;
-  SwfdecAsObject *obj;
-
-  val = swfdec_as_stack_peek (cx, 1);
-
-  swfdec_as_interpret_eval (cx, NULL, val);
-  if (!SWFDEC_AS_VALUE_IS_OBJECT (val)) {
-    SWFDEC_ERROR ("Enumerate not pointing to an object");
-    SWFDEC_AS_VALUE_SET_NULL (val);
+  guint i;
+  GSList *walk, *list = NULL;
+  
+  for (i = 0; i < 256 && object; i++) {
+    swfdec_as_object_foreach (object, swfdec_action_enumerate_foreach, &list);
+    object = swfdec_as_object_prototype_for_version (object, cx->version, TRUE);
+  }
+  if (i == 256) {
+    swfdec_as_context_abort (object->context, "Prototype recursion limit exceeded");
+    g_slist_free (list);
     return;
   }
-  obj = SWFDEC_AS_VALUE_GET_OBJECT (val);
-  SWFDEC_AS_VALUE_SET_NULL (val);
-  swfdec_as_object_foreach (obj, swfdec_action_do_enumerate, cx);
+  list = g_slist_reverse (list);
+  i = 0;
+  for (walk = list; walk; walk = walk->next) {
+    /* 8 is an arbitrary value */
+    if (i % 8 == 0) {
+      swfdec_as_stack_ensure_free (cx, 8);
+      i = 0;
+    }
+    i++;
+    SWFDEC_AS_VALUE_SET_STRING (swfdec_as_stack_push (cx), walk->data);
+  }
+  g_slist_free (list);
 }
 
 static void
@@ -1933,13 +2260,21 @@ swfdec_action_enumerate2 (SwfdecAsContext *cx, guint action, const guint8 *data,
 
   val = swfdec_as_stack_peek (cx, 1);
   if (!SWFDEC_AS_VALUE_IS_OBJECT (val)) {
-    SWFDEC_ERROR ("Enumerate2 called without an object");
-    SWFDEC_AS_VALUE_SET_NULL (val);
+    SWFDEC_WARNING ("Enumerate called without an object");
+    SWFDEC_AS_VALUE_SET_UNDEFINED (val);
     return;
   }
   obj = SWFDEC_AS_VALUE_GET_OBJECT (val);
-  SWFDEC_AS_VALUE_SET_NULL (val);
-  swfdec_as_object_foreach (obj, swfdec_action_do_enumerate, cx);
+  SWFDEC_AS_VALUE_SET_UNDEFINED (val);
+  swfdec_action_do_enumerate (cx, obj);
+}
+
+static void
+swfdec_action_enumerate (SwfdecAsContext *cx, guint action, const guint8 *data, guint len)
+{
+  /* FIXME: make this proper functions */
+  swfdec_action_get_variable (cx, action, data, len);
+  swfdec_action_enumerate2 (cx, action, data, len);
 }
 
 static void
@@ -2057,6 +2392,14 @@ swfdec_action_mb_ascii_to_char_5 (SwfdecAsContext *cx, guint action, const guint
 }
 
 static void
+swfdec_action_pop_with (SwfdecAsFrame *frame, gpointer with_object)
+{
+  g_assert (frame->scope_chain->data == with_object);
+  frame->scope_chain = g_slist_delete_link (frame->scope_chain, frame->scope_chain);
+  swfdec_as_frame_pop_block (frame);
+}
+
+static void
 swfdec_action_with (SwfdecAsContext *cx, guint action, const guint8 *data, guint len)
 {
   SwfdecAsObject *object;
@@ -2073,7 +2416,9 @@ swfdec_action_with (SwfdecAsContext *cx, guint action, const guint8 *data, guint
     SWFDEC_INFO ("With called without an object, skipping");
     cx->frame->pc = (guint8 *) data + len + offset;
   } else {
-    swfdec_as_with_new (object, data + len, offset);
+    cx->frame->scope_chain = g_slist_prepend (cx->frame->scope_chain, object);
+    swfdec_as_frame_push_block (cx->frame, data + len, data + len + offset,
+	swfdec_action_pop_with, object, NULL);
   }
   swfdec_as_stack_pop (cx);
 }
@@ -2081,31 +2426,20 @@ swfdec_action_with (SwfdecAsContext *cx, guint action, const guint8 *data, guint
 static void
 swfdec_action_remove_sprite (SwfdecAsContext *cx, guint action, const guint8 *data, guint len)
 {
-  SwfdecAsValue *val = swfdec_as_stack_peek (cx, 1);
-  SwfdecAsObject *sprite;
-  SwfdecMovie *movie;
-
-  if (SWFDEC_AS_VALUE_IS_STRING (val)) {
-    const char *name = SWFDEC_AS_VALUE_GET_STRING (val);
-
-    swfdec_as_context_eval (cx, NULL, name, val);
-  }
-  if (SWFDEC_AS_VALUE_IS_OBJECT (val)) {
-    sprite = SWFDEC_AS_VALUE_GET_OBJECT (val);
+  if (!SWFDEC_IS_MOVIE (cx->frame->target)) {
+    SWFDEC_FIXME ("target is not a movie in RemoveSprite");
+  } else if (!SWFDEC_IS_PLAYER (cx)) {
+    SWFDEC_INFO ("tried using RemoveSprite in a non-SwfdecPlayer context");
   } else {
-    SWFDEC_FIXME ("unknown type in RemoveSprite");
-    goto fail;
+    SwfdecMovie *movie = swfdec_player_get_movie_from_value (SWFDEC_PLAYER (cx),
+	swfdec_as_stack_peek (cx, 1));
+    if (movie && swfdec_depth_classify (movie->depth) == SWFDEC_DEPTH_CLASS_DYNAMIC) {
+      SWFDEC_LOG ("removing clip %s", movie->name);
+      swfdec_movie_remove (movie);
+    } else {
+      SWFDEC_INFO ("cannot remove movie");
+    }
   }
-  if (!SWFDEC_IS_MOVIE (sprite)) {
-    SWFDEC_FIXME ("cannot remove non movieclip objects");
-    goto fail;
-  }
-  movie = SWFDEC_MOVIE (sprite);
-  if (swfdec_depth_classify (movie->depth) == SWFDEC_DEPTH_CLASS_DYNAMIC) {
-    SWFDEC_LOG ("removing clip %s", movie->name);
-    swfdec_movie_remove (movie);
-  }
-fail:
   swfdec_as_stack_pop (cx);
 }
 
@@ -2113,33 +2447,33 @@ static void
 swfdec_action_clone_sprite (SwfdecAsContext *cx, guint action, const guint8 *data, guint len)
 {
   SwfdecMovie *movie, *new_movie;
-  SwfdecAsObject *obj;
   const char *new_name;
   int depth;
 
   depth = swfdec_as_value_to_integer (cx, swfdec_as_stack_peek (cx, 1)) - 16384;
   new_name = swfdec_as_value_to_string (cx, swfdec_as_stack_peek (cx, 2));
-  if (SWFDEC_AS_VALUE_IS_STRING (swfdec_as_stack_peek (cx, 3))) {
-    const char *name;
-    name = swfdec_as_value_to_string (cx, swfdec_as_stack_peek (cx, 3));
-    swfdec_as_context_eval (cx, NULL, name, swfdec_as_stack_peek (cx, 3));
-  }
-  obj = swfdec_as_value_to_object (cx, swfdec_as_stack_peek (cx, 3));
-  if (!SWFDEC_IS_MOVIE(obj)) {
-    SWFDEC_ERROR ("Object is not an SwfdecMovie object");
-    swfdec_as_stack_pop_n (cx, 3);
-    return;
-  }
-  movie = SWFDEC_MOVIE(obj);
-  new_movie = swfdec_movie_duplicate (movie, new_name, depth);
-  if (new_movie) {
-    SWFDEC_LOG ("duplicated %s as %s to depth %u", movie->name, new_movie->name, new_movie->depth);
-    if (SWFDEC_IS_SPRITE_MOVIE (new_movie)) {
-      g_queue_push_tail (SWFDEC_PLAYER (cx)->init_queue, new_movie);
-      swfdec_movie_queue_script (new_movie, SWFDEC_EVENT_LOAD);
-      swfdec_movie_run_construct (new_movie);
+  if (!SWFDEC_IS_MOVIE (cx->frame->target)) {
+    SWFDEC_FIXME ("target is not a movie in CloneSprite");
+  } else if (!SWFDEC_IS_PLAYER (cx)) {
+    SWFDEC_INFO ("tried using CloneSprite in a non-SwfdecPlayer context");
+  } else {
+    movie = swfdec_player_get_movie_from_value (SWFDEC_PLAYER (cx), 
+	swfdec_as_stack_peek (cx, 3));
+    if (movie == NULL) {
+      SWFDEC_ERROR ("Object is not an SwfdecMovie object");
+      swfdec_as_stack_pop_n (cx, 3);
+      return;
     }
-    swfdec_movie_initialize (new_movie);
+    new_movie = swfdec_movie_duplicate (movie, new_name, depth);
+    if (new_movie) {
+      SWFDEC_LOG ("duplicated %s as %s to depth %u", movie->name, new_movie->name, new_movie->depth);
+      if (SWFDEC_IS_SPRITE_MOVIE (new_movie)) {
+	g_queue_push_tail (SWFDEC_PLAYER (cx)->init_queue, new_movie);
+	swfdec_movie_queue_script (new_movie, SWFDEC_EVENT_LOAD);
+	swfdec_movie_run_construct (new_movie);
+      }
+      swfdec_movie_initialize (new_movie);
+    }
   }
   swfdec_as_stack_pop_n (cx, 3);
 }
@@ -2472,7 +2806,7 @@ const SwfdecActionSpec swfdec_as_actions[256] = {
   [SWFDEC_AS_ACTION_NOT] = { "Not", NULL, 1, 1, { NULL, swfdec_action_not_4, swfdec_action_not_5, swfdec_action_not_5, swfdec_action_not_5 } },
   [SWFDEC_AS_ACTION_STRING_EQUALS] = { "StringEquals", NULL, 2, 1, { NULL, swfdec_action_string_compare, swfdec_action_string_compare, swfdec_action_string_compare, swfdec_action_string_compare } },
   [SWFDEC_AS_ACTION_STRING_LENGTH] = { "StringLength", NULL, 1, 1, { NULL, swfdec_action_string_length, swfdec_action_string_length, swfdec_action_string_length, swfdec_action_string_length } },
-  [SWFDEC_AS_ACTION_STRING_EXTRACT] = { "StringExtract", NULL },
+  [SWFDEC_AS_ACTION_STRING_EXTRACT] = { "StringExtract", NULL, 3, 1, { NULL, swfdec_action_string_extract, swfdec_action_string_extract, swfdec_action_string_extract, swfdec_action_string_extract } },
   [SWFDEC_AS_ACTION_POP] = { "Pop", NULL, 1, 0, { NULL, swfdec_action_pop, swfdec_action_pop, swfdec_action_pop, swfdec_action_pop } },
   [SWFDEC_AS_ACTION_TO_INTEGER] = { "ToInteger", NULL, 1, 1, { NULL, swfdec_action_to_integer, swfdec_action_to_integer, swfdec_action_to_integer, swfdec_action_to_integer } },
   [SWFDEC_AS_ACTION_GET_VARIABLE] = { "GetVariable", NULL, 1, 1, { NULL, swfdec_action_get_variable, swfdec_action_get_variable, swfdec_action_get_variable, swfdec_action_get_variable } },
@@ -2497,7 +2831,7 @@ const SwfdecActionSpec swfdec_as_actions[256] = {
   [SWFDEC_AS_ACTION_CHAR_TO_ASCII] = { "CharToAscii", NULL, 1, 1, { NULL, swfdec_action_char_to_ascii_5, swfdec_action_char_to_ascii_5, swfdec_action_char_to_ascii, swfdec_action_char_to_ascii } },
   [SWFDEC_AS_ACTION_ASCII_TO_CHAR] = { "AsciiToChar", NULL, 1, 1, { NULL, swfdec_action_ascii_to_char_5, swfdec_action_ascii_to_char_5, swfdec_action_ascii_to_char, swfdec_action_ascii_to_char } },
   [SWFDEC_AS_ACTION_GET_TIME] = { "GetTime", NULL, 0, 1, { NULL, swfdec_action_get_time, swfdec_action_get_time, swfdec_action_get_time, swfdec_action_get_time } },
-  [SWFDEC_AS_ACTION_MB_STRING_EXTRACT] = { "MBStringExtract", NULL },
+  [SWFDEC_AS_ACTION_MB_STRING_EXTRACT] = { "MBStringExtract", NULL, 3, 1, { NULL, swfdec_action_string_extract, swfdec_action_string_extract, swfdec_action_string_extract, swfdec_action_string_extract } },
   [SWFDEC_AS_ACTION_MB_CHAR_TO_ASCII] = { "MBCharToAscii", NULL },
   [SWFDEC_AS_ACTION_MB_ASCII_TO_CHAR] = { "MBAsciiToChar", NULL, 1, 1, { NULL, swfdec_action_mb_ascii_to_char_5, swfdec_action_mb_ascii_to_char_5, swfdec_action_ascii_to_char, swfdec_action_ascii_to_char }  },
   /* version 5 */

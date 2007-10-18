@@ -22,6 +22,7 @@
 #endif
 
 #include "swfdec.h"
+#include "swfdec_as_internal.h"
 #include "swfdec_as_string.h"
 #include "swfdec_as_strings.h"
 #include "swfdec_codec_audio.h"
@@ -58,7 +59,8 @@ swfdec_system_has_embedded_video (SwfdecPlayer *player, SwfdecAsValue *ret)
 static void
 swfdec_system_has_mp3 (SwfdecPlayer *player, SwfdecAsValue *ret)
 {
-  SwfdecAudioDecoder *dec = swfdec_audio_decoder_new (SWFDEC_AUDIO_FORMAT_MP3, TRUE, SWFDEC_AUDIO_OUT_STEREO_44100);
+  SwfdecAudioDecoder *dec = swfdec_audio_decoder_new (SWFDEC_AUDIO_CODEC_MP3, 
+      swfdec_audio_format_new (44100, 2, TRUE));
 
   if (dec) {
     SWFDEC_AS_VALUE_SET_BOOLEAN (ret, TRUE);
@@ -263,7 +265,11 @@ swfdec_system_query (SwfdecAsContext *cx, SwfdecAsObject *object,
     if (queries[i].name == SWFDEC_AS_STR_screenResolutionY) {
       g_string_append_printf (server, "x%d", (int) SWFDEC_AS_VALUE_GET_NUMBER (&val));
     } else if (queries[i].name == SWFDEC_AS_STR_pixelAspectRatio) {
-      g_string_append_printf (server, "&AR=%.1f", SWFDEC_AS_VALUE_GET_NUMBER (&val));
+      char buffer[10];
+      g_ascii_formatd (buffer, sizeof (buffer), "%.1f",
+	  SWFDEC_AS_VALUE_GET_NUMBER (&val));
+      g_string_append (server, "&AR=");
+      g_string_append (server, buffer);
     } else if (queries[i].name == SWFDEC_AS_STR_manufacturer) {
       char *s = swfdec_as_string_escape (cx, player->system->server_manufacturer);
       g_string_append_printf (server, "&M=%s", s);

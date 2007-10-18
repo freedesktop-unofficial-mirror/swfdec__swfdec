@@ -49,10 +49,35 @@ GType		swfdec_as_array_get_type	(void);
 SwfdecAsObject *swfdec_as_array_new		(SwfdecAsContext *	context);
 
 #define		swfdec_as_array_push(array,value) \
-  swfdec_as_array_append ((array), 1, (value))
-void		swfdec_as_array_append		(SwfdecAsArray *	array,
+  swfdec_as_array_append_with_flags ((array), 1, (value), 0)
+#define		swfdec_as_array_push_with_flags(array,value,flags) \
+  swfdec_as_array_append_with_flags ((array), 1, (value), (flags))
+#define		swfdec_as_array_append(array,n,values) \
+  swfdec_as_array_append_with_flags ((array), (n), (values), 0)
+void		swfdec_as_array_append_with_flags (SwfdecAsArray *	array,
 						 guint			n,
-						 const SwfdecAsValue *	values);
+						 const SwfdecAsValue *	values,
+						 SwfdecAsVariableFlag	flags);
+void		swfdec_as_array_insert		(SwfdecAsArray *	array,
+						 gint32			idx,
+						 SwfdecAsValue *	value);
+#define		swfdec_as_array_insert(array,idx,value) \
+  swfdec_as_array_insert_with_flags ((array), (idx), (value), 0)
+void		swfdec_as_array_insert_with_flags (SwfdecAsArray *	array,
+						 gint32			idx,
+						 const SwfdecAsValue *	value,
+						 SwfdecAsVariableFlag	flags);
+gint32		swfdec_as_array_get_length	(SwfdecAsArray *	array);
+void		swfdec_as_array_set_length	(SwfdecAsArray *	array,
+						 gint32			length);
+void		swfdec_as_array_get_value	(SwfdecAsArray *	array,
+						 gint32			idx,
+						 SwfdecAsValue *	value);
+void		swfdec_as_array_set_value	(SwfdecAsArray *	array,
+						 gint32			idx,
+						 SwfdecAsValue *	value);
+void		swfdec_as_array_remove		(SwfdecAsArray *	array,
+						 gint32			idx);
 
 
 G_END_DECLS

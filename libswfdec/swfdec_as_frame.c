@@ -29,6 +29,7 @@
 #include "swfdec_as_strings.h"
 #include "swfdec_as_super.h"
 #include "swfdec_debug.h"
+#include "swfdec_security_allow.h"
 
 /**
  * SECTION:SwfdecAsFrame
@@ -81,6 +82,8 @@ swfdec_as_stack_iterator_init_arguments (SwfdecAsStackIterator *iter, SwfdecAsFr
   g_return_val_if_fail (SWFDEC_IS_AS_FRAME (frame), NULL);
 
   if (frame->argc == 0) {
+    iter->i = iter->n = 0;
+    iter->stack = NULL;
     iter->current = NULL;
     return NULL;
   }
@@ -195,8 +198,71 @@ swfdec_as_stack_iterator_next (SwfdecAsStackIterator *iter)
   return iter->current;
 }
 
+/*** BLOCK HANDLING ***/
 
-G_DEFINE_TYPE (SwfdecAsFrame, swfdec_as_frame, SWFDEC_TYPE_AS_SCOPE)
+typedef struct {
+  const guint8 *		start;	/* start of block */
+  const guint8 *		end;	/* end of block (hitting this address will exit the block) */
+  SwfdecAsFrameBlockFunc	func;	/* function to call when block is exited */
+  gpointer			data;	/* data to pass to function */
+  GDestroyNotify		destroy;/* destroy function called for data */
+} SwfdecAsFrameBlock;
+
+void
+swfdec_as_frame_push_block (SwfdecAsFrame *frame, const guint8 *start, 
+    const guint8 *end, SwfdecAsFrameBlockFunc func, gpointer data, GDestroyNotify destroy)
+{
+  SwfdecAsFrameBlock block = { start, end, func, data, destroy };
+
+  g_return_if_fail (SWFDEC_IS_AS_FRAME (frame));
+  g_return_if_fail (start <= end);
+  g_return_if_fail (start >= frame->block_start);
+  g_return_if_fail (end <= frame->block_end);
+  g_return_if_fail (func != NULL);
+
+  frame->block_start = start;
+  frame->block_end = end;
+  g_array_append_val (frame->blocks, block);
+}
+
+void
+swfdec_as_frame_pop_block (SwfdecAsFrame *frame)
+{
+  SwfdecAsFrameBlock *block;
+
+  g_assert (frame->blocks->len > 0);
+
+  block = &g_array_index (frame->blocks, SwfdecAsFrameBlock, frame->blocks->len - 1);
+  if (block->destroy) {
+    block->destroy (block->data);
+  }
+  g_array_set_size (frame->blocks, frame->blocks->len - 1);
+  if (frame->blocks->len) {
+    block--;
+    frame->block_start = block->start;
+    frame->block_end = block->end;
+  } else {
+    frame->block_start = frame->script->buffer->data;
+    frame->block_end = frame->script->buffer->data + frame->script->buffer->length;
+  }
+}
+
+void
+swfdec_as_frame_check_block (SwfdecAsFrame *frame)
+{
+  SwfdecAsFrameBlock *block;
+
+  g_return_if_fail (SWFDEC_IS_AS_FRAME (frame));
+  if (frame->blocks->len == 0)
+    return;
+
+  block = &g_array_index (frame->blocks, SwfdecAsFrameBlock, frame->blocks->len - 1);
+  block->func (frame, block->data);
+}
+
+/*** FRAME ***/
+
+G_DEFINE_TYPE (SwfdecAsFrame, swfdec_as_frame, SWFDEC_TYPE_AS_OBJECT)
 
 static void
 swfdec_as_frame_dispose (GObject *object)
@@ -204,9 +270,9 @@ swfdec_as_frame_dispose (GObject *object)
   SwfdecAsFrame *frame = SWFDEC_AS_FRAME (object);
 
   g_slice_free1 (sizeof (SwfdecAsValue) * frame->n_registers, frame->registers);
-  if (frame->script) {
-    swfdec_script_unref (frame->script);
-    frame->script = NULL;
+  if (frame->security) {
+    g_object_unref (frame->security);
+    frame->security = NULL;
   }
   if (frame->constant_pool) {
     swfdec_constant_pool_free (frame->constant_pool);
@@ -215,6 +281,14 @@ swfdec_as_frame_dispose (GObject *object)
   if (frame->constant_pool_buffer) {
     swfdec_buffer_unref (frame->constant_pool_buffer);
     frame->constant_pool_buffer = NULL;
+  }
+  while (frame->blocks->len > 0)
+    swfdec_as_frame_pop_block (frame);
+  g_array_free (frame->blocks, TRUE);
+  g_slist_free (frame->scope_chain);
+  if (frame->script) {
+    swfdec_script_unref (frame->script);
+    frame->script = NULL;
   }
 
   G_OBJECT_CLASS (swfdec_as_frame_parent_class)->dispose (object);
@@ -228,8 +302,7 @@ swfdec_as_frame_mark (SwfdecAsObject *object)
 
   if (frame->next)
     swfdec_as_object_mark (SWFDEC_AS_OBJECT (frame->next));
-  if (frame->scope)
-    swfdec_as_object_mark (SWFDEC_AS_OBJECT (frame->scope));
+  g_slist_foreach (frame->scope_chain, (GFunc) swfdec_as_object_mark, NULL);
   if (frame->thisp)
     swfdec_as_object_mark (frame->thisp);
   if (frame->super)
@@ -297,6 +370,8 @@ static void
 swfdec_as_frame_init (SwfdecAsFrame *frame)
 {
   frame->function_name = "unnamed";
+  frame->blocks = g_array_new (FALSE, FALSE, sizeof (SwfdecAsFrameBlock));
+  frame->block_end = (gpointer) -1;
 }
 
 static void
@@ -304,6 +379,11 @@ swfdec_as_frame_load (SwfdecAsFrame *frame)
 {
   SwfdecAsContext *context = SWFDEC_AS_OBJECT (frame)->context;
 
+  if (context->frame) {
+    frame->security = g_object_ref (context->frame->security);
+  } else {
+    frame->security = swfdec_security_allow_new ();
+  }
   frame->stack_begin = context->cur;
   context->base = frame->stack_begin;
   frame->next = context->frame;
@@ -328,8 +408,8 @@ swfdec_as_frame_new (SwfdecAsContext *context, SwfdecScript *script)
   frame->script = swfdec_script_ref (script);
   frame->function_name = script->name;
   SWFDEC_DEBUG ("new frame for function %s", frame->function_name);
-  frame->pc = script->buffer->data;
-  frame->scope = SWFDEC_AS_SCOPE (frame);
+  frame->pc = script->main;
+  frame->scope_chain = g_slist_prepend (frame->scope_chain, frame);
   frame->n_registers = script->n_registers;
   frame->registers = g_slice_alloc0 (sizeof (SwfdecAsValue) * frame->n_registers);
   if (script->constant_pool) {
@@ -468,79 +548,86 @@ swfdec_as_frame_set_this (SwfdecAsFrame *frame, SwfdecAsObject *thisp)
 }
 
 /**
- * swfdec_as_frame_find_variable:
+ * swfdec_as_frame_get_variable_and_flags:
  * @frame: a #SwfdecAsFrame
- * @variable: name of the variable to find
+ * @variable: name of the variable
+ * @value: pointer to take value of the variable or %NULL
+ * @flags: pointer to take flags or %NULL
+ * @pobject: pointer to take the actual object that held the variable or %NULL
  *
- * Finds the given variable in the current scope chain. Returns the first 
- * object in the scope chain that contains this variable in its prototype 
- * chain. If you want to know the explicit object that contains the variable,
- * you have to call swfdec_as_object_get_variable_and_flags() on the result.
- * If no such variable exist in the scope chain, %NULL is returned.
- * <note>The returned object might be an internal object. You probably do not
- * want to expose it to scripts. Call swfdec_as_object_resolve () on the
- * returned value to be sure of not having an internal object.</note>
+ * Walks the scope chain of @frame trying to resolve the given @variable and if
+ * found, returns its value and flags. Note that there might be a difference 
+ * between @pobject and the returned object, since the returned object will be
+ * part of the scope chain while @pobject will contain the actual property. It
+ * will be a prototype of the returned object though.
  *
- * Returns: the object that contains @variable or %NULL if none.
+ * Returns: Object in scope chain that contained the variable.
  **/
 SwfdecAsObject *
-swfdec_as_frame_find_variable (SwfdecAsFrame *frame, const char *variable)
+swfdec_as_frame_get_variable_and_flags (SwfdecAsFrame *frame, const char *variable,
+    SwfdecAsValue *value, guint *flags, SwfdecAsObject **pobject)
 {
-  SwfdecAsScope *cur;
-  guint i;
-  SwfdecAsValue val;
+  GSList *walk;
 
   g_return_val_if_fail (SWFDEC_IS_AS_FRAME (frame), NULL);
   g_return_val_if_fail (variable != NULL, NULL);
 
-  cur = frame->scope;
-  for (i = 0; i < 256; i++) {
-    if (swfdec_as_object_get_variable (SWFDEC_AS_OBJECT (cur), variable, &val))
-      return SWFDEC_AS_OBJECT (cur);
-    if (cur->next == NULL)
-      break;
-    cur = cur->next;
+  for (walk = frame->scope_chain; walk; walk = walk->next) {
+    if (swfdec_as_object_get_variable_and_flags (walk->data, variable, value, 
+	  flags, pobject))
+      return walk->data;
   }
-  if (i == 256) {
-    swfdec_as_context_abort (SWFDEC_AS_OBJECT (frame)->context, "Scope recursion limit exceeded");
-    return NULL;
-  }
-  g_assert (SWFDEC_IS_AS_FRAME (cur));
   /* we've walked the scope chain down. Now look in the special objects. */
   /* 1) the target */
-  if (swfdec_as_object_get_variable (frame->target, variable, &val))
+  if (swfdec_as_object_get_variable_and_flags (frame->target, variable, value, 
+	flags, pobject))
     return frame->target;
   /* 2) the global object */
-  if (swfdec_as_object_get_variable (SWFDEC_AS_OBJECT (frame)->context->global, variable, &val))
+  if (swfdec_as_object_get_variable_and_flags (
+	SWFDEC_AS_OBJECT (frame)->context->global, variable, value, flags, pobject))
     return SWFDEC_AS_OBJECT (frame)->context->global;
 
   return NULL;
 }
 
+void
+swfdec_as_frame_set_variable_and_flags (SwfdecAsFrame *frame, const char *variable,
+    const SwfdecAsValue *value, guint default_flags)
+{
+  SwfdecAsObject *pobject, *set;
+  GSList *walk;
+
+  g_return_if_fail (SWFDEC_IS_AS_FRAME (frame));
+  g_return_if_fail (variable != NULL);
+
+  set = NULL;
+  for (walk = frame->scope_chain; walk; walk = walk->next) {
+    if (swfdec_as_object_get_variable_and_flags (walk->data, variable, NULL, NULL, &pobject) &&
+	pobject == walk->data) {
+      set = walk->data;
+      break;
+    }
+  }
+  if (set == NULL)
+    set = frame->target;
+
+  swfdec_as_object_set_variable_and_flags (set, variable, value, default_flags);
+}
+
 SwfdecAsDeleteReturn
 swfdec_as_frame_delete_variable (SwfdecAsFrame *frame, const char *variable)
 {
-  SwfdecAsScope *cur;
-  guint i;
+  GSList *walk;
   SwfdecAsDeleteReturn ret;
 
   g_return_val_if_fail (SWFDEC_IS_AS_FRAME (frame), FALSE);
   g_return_val_if_fail (variable != NULL, FALSE);
 
-  cur = frame->scope;
-  for (i = 0; i < 256; i++) {
-    ret = swfdec_as_object_delete_variable (SWFDEC_AS_OBJECT (cur), variable);
+  for (walk = frame->scope_chain; walk; walk = walk->next) {
+    ret = swfdec_as_object_delete_variable (walk->data, variable);
     if (ret)
       return ret;
-    if (cur->next == NULL)
-      break;
-    cur = cur->next;
   }
-  if (i == 256) {
-    swfdec_as_context_abort (SWFDEC_AS_OBJECT (frame)->context, "Scope recursion limit exceeded");
-    return FALSE;
-  }
-  g_assert (SWFDEC_IS_AS_FRAME (cur));
   /* we've walked the scope chain down. Now look in the special objects. */
   /* 1) the target set via SetTarget */
   ret = swfdec_as_object_delete_variable (frame->target, variable);
@@ -674,31 +761,23 @@ swfdec_as_frame_preload (SwfdecAsFrame *frame)
     }
   }
   if (script->flags & SWFDEC_SCRIPT_PRELOAD_ROOT && current_reg < script->n_registers) {
-    SwfdecAsObject *obj;
-    
-    obj = swfdec_as_frame_find_variable (frame, SWFDEC_AS_STR__root);
-    if (obj) {
-      swfdec_as_object_get_variable (obj, SWFDEC_AS_STR__root, &frame->registers[current_reg]);
-    } else {
+    if (!swfdec_as_frame_get_variable (frame, SWFDEC_AS_STR__root, &frame->registers[current_reg])) {
       SWFDEC_WARNING ("no root to preload");
-      SWFDEC_AS_VALUE_SET_UNDEFINED (&frame->registers[current_reg++]);
     }
+    current_reg++;
   }
   if (script->flags & SWFDEC_SCRIPT_PRELOAD_PARENT && current_reg < script->n_registers) {
-    SwfdecAsObject *obj;
-    
-    obj = swfdec_as_frame_find_variable (frame, SWFDEC_AS_STR__parent);
-    if (obj) {
-      swfdec_as_object_get_variable (obj, SWFDEC_AS_STR__parent, &frame->registers[current_reg++]);
-    } else {
-      SWFDEC_WARNING ("no parent to preload");
-      SWFDEC_AS_VALUE_SET_UNDEFINED (&frame->registers[current_reg++]);
+    if (!swfdec_as_frame_get_variable (frame, SWFDEC_AS_STR__parent, &frame->registers[current_reg])) {
+      SWFDEC_WARNING ("no root to preload");
     }
     current_reg++;
   }
   if (script->flags & SWFDEC_SCRIPT_PRELOAD_GLOBAL && current_reg < script->n_registers) {
     SWFDEC_AS_VALUE_SET_OBJECT (&frame->registers[current_reg++], context->global);
   }
+  /* set block boundaries */
+  frame->block_start = frame->script->buffer->data;
+  frame->block_end = frame->script->buffer->data + frame->script->buffer->length;
 
 out:
   if (context->debugger) {
@@ -706,33 +785,6 @@ out:
 
     if (klass->enter_frame)
       klass->enter_frame (context->debugger, context, frame);
-  }
-}
-
-/**
- * swfdec_as_frame_check_scope:
- * @frame: a #SwfdecAsFrame
- *
- * Checks that the current scope of the given @frame is still correct.
- * If it is not, the current scope is popped and the next one is used.
- * If the
- **/
-void
-swfdec_as_frame_check_scope (SwfdecAsFrame *frame)
-{
-  SwfdecAsScope *frame_scope;
-
-  g_return_if_fail (SWFDEC_IS_AS_FRAME (frame));
-
-  frame_scope = SWFDEC_AS_SCOPE (frame);
-  while (frame->scope != frame_scope) {
-    SwfdecAsScope *cur = frame->scope;
-
-    if (frame->pc >= cur->startpc && 
-	frame->pc < cur->endpc)
-      break;
-    
-    frame->scope = cur->next;
   }
 }
 
@@ -804,3 +856,30 @@ swfdec_as_frame_get_this (SwfdecAsFrame *frame)
 
   return frame->thisp;
 }
+
+/**
+ * swfdec_as_frame_set_security:
+ * @frame: the frame to be executed
+ * @guard: the security guarding this frame
+ *
+ * Checks that @guard allows executing the frame. The frame's security will
+ * be set to what @guard returns. By default, a frame has the security of
+ * its parent frame. If it's the first frame, it's allowed everything.
+ **/
+void
+swfdec_as_frame_set_security (SwfdecAsFrame *frame, SwfdecSecurity *guard)
+{
+  SwfdecSecurity *old;
+
+  g_return_if_fail (SWFDEC_IS_AS_FRAME (frame));
+  g_return_if_fail (SWFDEC_IS_SECURITY (guard));
+
+  /* execution is not allowed anyway */
+  if (frame->security == NULL)
+    return;
+
+  old = frame->security;
+  frame->security = swfdec_security_allow (guard, old);
+  g_object_unref (old);
+}
+

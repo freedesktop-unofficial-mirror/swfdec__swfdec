@@ -77,103 +77,30 @@ function new_empty_object () {
   return hash;
 }
 
-#if __SWF_VERSION__ >= 6
-function hasOwnProperty (o, prop)
+function hasOwnProperty_inner (o, prop)
 {
   if (o.hasOwnProperty != undefined)
     return o.hasOwnProperty (prop);
 
-  o.hasOwnProperty = _global.Object.prototype.hasOwnProperty;
+  o.hasOwnProperty = ASnative (101, 5);
   var result = o.hasOwnProperty (prop);
   delete o.hasOwnProperty;
   return result;
 }
-#else
-// this gets the same result as the above, with following limitations:
-// - if there is a child __proto__[prop] with value that can't be changed, no
-//   test can be done and false is returned
-// - native properties that have value undefined by default get overwritten by
-//   __proto__[prop]'s value (atleast in version 6 and 7) so their existance
-//   won't be detected by this function
+
 function hasOwnProperty (o, prop)
 {
-  if (o.__proto__ == undefined)
-  {
-    o.__proto__ = new_empty_object ();
-
-    o.__proto__[prop] = "safdlojasfljsaiofhiwjhefa";
-    if (o[prop] != o.__proto__[prop]) {
-      result = true;
-    } else {
-      result = false;
-    }
-
-    o.__proto__ = "to-be-deleted";
-    delete o.__proto__;
-    if (o.__proto__ != undefined) {
-      trace ("ERROR: Couldn't delete temporary __proto__");
-      o.__proto__ = undefined;
-    }
-
-    return result;
+  var result = hasOwnProperty_inner (o, prop);
+#if __SWF_VERSION__ != 6
+  if (result == false) {
+    ASSetPropFlags (o, prop, 0, 256);
+    result = hasOwnProperty_inner (o, prop);
+    if (result)
+      ASSetPropFlags (o, prop, 256);
   }
-
-  if (hasOwnProperty (o.__proto__, prop))
-  {
-    var constant = false;
-    var old = o.__proto__[prop];
-
-    o.__proto__[prop] = "safdlojasfljsaiofhiwjhefa";
-    if (o.__proto__[prop] != "safdlojasfljsaiofhiwjhefa") {
-      constant = true;
-      ASSetPropFlags (o.__proto__, prop, 0, 4);
-      o.__proto__[prop] = "safdlojasfljsaiofhiwjhefa";
-      if (o.__proto__[prop] != "safdlojasfljsaiofhiwjhefa") {
-	if (o[prop] != o.__proto__[prop]) {
-	  return true;
-	} else {
-	  trace ("ERROR: can't test property '" + prop +
-	      "', __proto__ has superconstant version");
-	  return false;
-	}
-      }
-    }
-
-    if (o[prop] != o.__proto__[prop]) {
-      result = true;
-    } else {
-      result = false;
-    }
-
-    o.__proto__[prop] = old;
-    if (o.__proto__[prop] != old)
-      trace ("Error: Couldn't set __proto__[\"" + prop +
-	  "\"] back to old value");
-    if (constant)
-      ASSetPropFlags (o.__proto__, prop, 4);
-
-    return result;
-  }
-  else
-  {
-    o.__proto__[prop] = "safdlojasfljsaiofhiwjhefa";
-
-    if (o[prop] != o.__proto__[prop]) {
-      result = true;
-    } else {
-      result = false;
-    }
-
-    ASSetPropFlags (o, prop, 0, 4);
-    o.__proto__[prop] = "to-be-deleted";
-    delete o.__proto__[prop];
-    if (o.__proto__[prop] != undefined)
-      trace ("ERROR: Couldn't delete temporary __proto__[\"" + prop + "\"]");
-
-    return result;
-  }
-}
 #endif
+  return result;
+}
 
 function new_info () {
   return new_empty_object ();
@@ -197,11 +124,6 @@ function is_blaclisted (o, prop)
 
   if (o == _global.Microphone && prop == "names")
     return true;
-
-#if __SWF_VERSION__ < 6
-  if (prop == "__proto__" && o[prop] == undefined)
-    return true;
-#endif
 
   return false;
 }
@@ -253,6 +175,40 @@ function trace_properties_recurse (o, prefix, identifier, level)
   if (all.length == 0) {
     trace (indentation + "no children");
     return nextSecretId;
+  }
+
+#if __SWF_VERSION__ != 6
+  for (var i = 0; i < all.length; i++)
+  {
+    var prop = all[i];
+
+    // try changing value
+    if (!hasOwnProperty_inner(o, prop) && hasOwnProperty(o, prop))
+    {
+      set_info (info, prop, "not6", true);
+    }
+    else
+    {
+      set_info (info, prop, "not6", false);
+    }
+  }
+#endif
+
+  for (var i = 0; i < all.length; i++)
+  {
+    var prop = all[i];
+
+    if (typeof (o[prop]) == "undefined") {
+      ASSetPropFlags (o, prop, 0, 5248);
+      if (typeof (o[prop]) != "undefined") {
+	set_info (info, prop, "newer", true);
+	// don't set the flags back
+      } else {
+	set_info (info, prop, "newer", false);
+      }
+    } else {
+      set_info (info, prop, "newer", false);
+    }
   }
 
   for (var i = 0; i < all.length; i++)
@@ -329,6 +285,12 @@ function trace_properties_recurse (o, prefix, identifier, level)
     } else if (get_info (info, prop, "constant") == true) {
       flags += "c";
     }
+    if (get_info (info, prop, "not6") == true) {
+      flags += "6";
+    }
+    if (get_info (info, prop, "newer") == true) {
+      flags += "n";
+    }
     if (flags != "")
       flags = " (" + flags + ")";
 
@@ -391,7 +353,14 @@ function generate_names (o, prefix, identifier)
   ASSetPropFlags (o, nothidden, 0, 1);
 
   for (var i = 0; i < all.length; i++) {
+    var newer = false;
     var prop = all[i];
+
+    if (typeof (o[prop]) == "undefined") {
+      ASSetPropFlags (o, prop, 0, 5248);
+      if (typeof (o[prop]) != "undefined")
+	newer = true;
+    }
 
     if (typeof (o[prop]) == "object" || typeof (o[prop]) == "function") {
       if (hasOwnProperty (o[prop], "mySecretId")) {
@@ -401,15 +370,29 @@ function generate_names (o, prefix, identifier)
 	  identifier + "." + prop;
       }
     }
+
+    if (newer == true)
+      ASSetPropFlags (o, prop, 5248);
   }
 
   for (var i = 0; i < all.length; i++) {
     var prop = all[i];
 
     if (prop != null) {
+      var newer = false;
+
+      if (typeof (o[prop]) == "undefined") {
+	ASSetPropFlags (o, prop, 0, 5248);
+	if (typeof (o[prop]) != "undefined")
+	  newer = true;
+      }
+
       if (typeof (o[prop]) == "object" || typeof (o[prop]) == "function")
 	generate_names (o[prop], prefix + (prefix != "" ? "." : "") +
 	    identifier, prop);
+
+      if (newer == true)
+	ASSetPropFlags (o, prop, 5248);
     }
   }
 }
@@ -418,12 +401,18 @@ function trace_properties (o, prefix, identifier)
 {
   _global["mySecretId"] = "_global";
   _global.Object["mySecretId"] = "_global.Object";
+  _global.Function["mySecretId"] = "_global.Function";
+  _global.Function.prototype["mySecretId"] = "_global.Function.prototype";
+  _global.XMLNode["mySecretId"] = "_global.XMLNode";
   generate_names (_global.Object, "_global", "Object");
+  generate_names (_global.Function, "_global", "Function");
+  generate_names (_global.Function.prototype, "_global", "Function.prototype");
+  generate_names (_global.XMLNode, "_global", "XMLNode");
   generate_names (_global, "", "_global");
 
   if (typeof (o) == "object" || typeof (o) == "function")
   {
-    if (o["mySecretId"] == undefined) {
+    if (!o.hasOwnProperty ("mySecretId")) {
       o["mySecretId"] = prefix + (prefix != "" ? "." : "") + identifier;
       generate_names (o, prefix, identifier);
     }

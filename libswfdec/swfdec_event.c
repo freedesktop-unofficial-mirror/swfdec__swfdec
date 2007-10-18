@@ -118,6 +118,7 @@ SwfdecEventList *
 swfdec_event_list_copy (SwfdecEventList *list)
 {
   g_return_val_if_fail (list != NULL, NULL);
+  g_return_val_if_fail (list->refcount > 0, NULL);
 
   list->refcount++;
 
@@ -130,6 +131,7 @@ swfdec_event_list_free (SwfdecEventList *list)
   guint i;
 
   g_return_if_fail (list != NULL);
+  g_return_if_fail (list->refcount > 0);
 
   list->refcount--;
   if (list->refcount > 0)
@@ -210,21 +212,26 @@ swfdec_event_list_parse (SwfdecEventList *list, SwfdecBits *bits, int version,
 
 void
 swfdec_event_list_execute (SwfdecEventList *list, SwfdecAsObject *object, 
-    guint condition, guint8 key)
+    SwfdecSecurity *sec, guint condition, guint8 key)
 {
   guint i;
 
   g_return_if_fail (list != NULL);
   g_return_if_fail (SWFDEC_IS_AS_OBJECT (object));
+  g_return_if_fail (SWFDEC_IS_SECURITY (sec));
 
+  /* FIXME: Do we execute all events if the event list is gone already? */
+  /* need to ref here because followup code could free all references to the list */
+  list = swfdec_event_list_copy (list);
   for (i = 0; i < list->events->len; i++) {
     SwfdecEvent *event = &g_array_index (list->events, SwfdecEvent, i);
     if ((event->conditions & condition) &&
 	event->key == key) {
       SWFDEC_LOG ("executing script for event %u on scriptable %p", condition, object);
-      swfdec_as_object_run (object, event->script);
+      swfdec_as_object_run_with_security (object, event->script, sec);
     }
   }
+  swfdec_event_list_free (list);
 }
 
 gboolean

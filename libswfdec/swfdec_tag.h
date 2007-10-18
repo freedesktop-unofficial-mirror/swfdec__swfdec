@@ -92,9 +92,11 @@ typedef enum {
   SWFDEC_TAG_DEFINEMORPHSHAPE2    = 84
 } SwfdecTag;
 
-/* FIXME: put this somewhere sane */
-#include "swfdec_bits.h"
-void	swfdec_filters_parse	(SwfdecBits *	bits);
-
+typedef enum {
+  /* tag is allowe inside DefineSprite */
+  SWFDEC_TAG_DEFINE_SPRITE = (1 << 0),
+  /* tag must be first tag */
+  SWFDEC_TAG_FIRST_ONLY = (1 << 1)
+} SwfdecTagFlag;
 
 #endif

@@ -41,23 +41,39 @@
 #include <libswfdec/swfdec_sprite.h>
 #include <libswfdec/swfdec_sprite_movie.h>
 #include <libswfdec/swfdec_swf_decoder.h>
-#include <libswfdec/swfdec_swf_instance.h>
+#include <libswfdec/swfdec_resource.h>
 
 static SwfdecBuffer *
-encode_wav (SwfdecBuffer *buffer)
+encode_wav (SwfdecBuffer *buffer, SwfdecAudioFormat format)
 {
   SwfdecBuffer *wav = swfdec_buffer_new_and_alloc (buffer->length + 44);
   unsigned char *data;
   guint i;
 
   data = wav->data;
+  /* FIXME: too much magic in this memmove */
   memmove (data, "RIFF----WAVEfmt \020\0\0\0"
-		 "\001\0\002\0D\254\0\0\020\261\002\0\004\0\020\0data", 40);
-  *(gint32 *) &data[4] = GUINT32_TO_LE (buffer->length + 36);
-  *(gint32 *) &data[40] = GUINT32_TO_LE (buffer->length);
+		 "\001\0ccRRRRbbbbAAbbdata", 40);
+  *(guint32 *) &data[4] = GUINT32_TO_LE (buffer->length + 36);
+  *(guint16 *) &data[22] = GUINT16_TO_LE (swfdec_audio_format_get_channels (format));
+  *(guint32 *) &data[24] = GUINT32_TO_LE (swfdec_audio_format_get_rate (format));
+  /* bits per sample */
+  i = swfdec_audio_format_is_16bit (format) ? 2 : 1;
+  *(guint16 *) &data[34] = GUINT16_TO_LE (i * 8);
+  /* block align */
+  i *= swfdec_audio_format_get_channels (format);
+  *(guint16 *) &data[32] = GUINT16_TO_LE (i);
+  /* bytes per second */
+  i *= swfdec_audio_format_get_rate (format);
+  *(guint32 *) &data[28] = GUINT32_TO_LE (i);
+  *(guint32 *) &data[40] = GUINT32_TO_LE (buffer->length);
   data += 44;
-  for (i = 0; i < buffer->length; i += 2) {
-    *(gint16 *) (data + i) = GINT16_TO_LE (*(gint16* )(buffer->data + i));
+  if (swfdec_audio_format_is_16bit (format)) {
+    for (i = 0; i < buffer->length; i += 2) {
+      *(gint16 *) (data + i) = GINT16_TO_LE (*(gint16* )(buffer->data + i));
+    }
+  } else {
+    memcpy (data, buffer->data, buffer->length);
   }
   return wav;
 }
@@ -66,13 +82,16 @@ static gboolean
 export_sound (SwfdecSound *sound, const char *filename)
 {
   GError *error = NULL;
-  SwfdecBuffer *wav;
+  SwfdecBuffer *wav, *buffer;
+  SwfdecAudioFormat format;
 
-  if (sound->decoded == NULL) {
-    g_printerr ("not a sound event. For extraction of streams extract the sprite.\n");
+  /* try to render the sound, that should decode it. */
+  buffer = swfdec_sound_get_decoded (sound, &format);
+  if (buffer == NULL) {
+    g_printerr ("Couldn't decode sound. For extraction of streams extract the sprite.\n");
     return FALSE;
   }
-  wav = encode_wav (sound->decoded);
+  wav = encode_wav (buffer, format);
   if (!g_file_set_contents (filename, (char *) wav->data, 
 	wav->length, &error)) {
     g_printerr ("Couldn't save sound to file \"%s\": %s\n", filename, error->message);
@@ -129,7 +148,7 @@ export_sprite_sound (SwfdecSprite *sprite, const char *filename)
   }
   buffer = swfdec_buffer_queue_pull (queue, depth);
   swfdec_buffer_queue_unref (queue);
-  wav = encode_wav (buffer);
+  wav = encode_wav (buffer, swfdec_audio_format_new (44100, 2, TRUE));
   swfdec_buffer_unref (buffer);
   if (!g_file_set_contents (filename, (char *) wav->data, 
 	wav->length, &error)) {
@@ -201,8 +220,8 @@ export_graphic (SwfdecGraphic *graphic, const char *filename)
   cr = cairo_create (surface);
   cairo_translate (cr, - floor (graphic->extents.x0 / SWFDEC_TWIPS_SCALE_FACTOR),
     - floor (graphic->extents.y0 / SWFDEC_TWIPS_SCALE_FACTOR));
-  cairo_scale (cr, 1 / SWFDEC_TWIPS_SCALE_FACTOR, 1 / SWFDEC_TWIPS_SCALE_FACTOR);
-  swfdec_graphic_render (graphic, cr, &trans, &graphic->extents, TRUE);
+  cairo_scale (cr, 1.0 / SWFDEC_TWIPS_SCALE_FACTOR, 1.0 / SWFDEC_TWIPS_SCALE_FACTOR);
+  swfdec_graphic_render (graphic, cr, &trans, &graphic->extents);
   cairo_show_page (cr);
   cairo_destroy (cr);
   return surface_destroy_for_type (surface, filename);
@@ -251,11 +270,11 @@ main (int argc, char *argv[])
   id = strtol (argv[2], NULL, 0);
   if (id >= 0) {
     character = swfdec_swf_decoder_get_character (
-	SWFDEC_SWF_DECODER (SWFDEC_MOVIE (player->roots->data)->swf->decoder),
+	SWFDEC_SWF_DECODER (SWFDEC_MOVIE (player->roots->data)->resource->decoder),
 	id);
   } else {
     character = SWFDEC_CHARACTER (SWFDEC_SWF_DECODER (
-	  SWFDEC_MOVIE (player->roots->data)->swf->decoder)->main_sprite);
+	  SWFDEC_MOVIE (player->roots->data)->resource->decoder)->main_sprite);
   }
   if (SWFDEC_IS_SPRITE (character)) {
     if (!export_sprite_sound (SWFDEC_SPRITE (character), argv[3]))

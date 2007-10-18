@@ -80,6 +80,8 @@ swfdec_video_input_iterate (SwfdecVideoMovieInput *input_)
     return;
 
   surface = swfdec_video_decoder_decode (input->decoder, buffer);
+  if (surface == NULL)
+    return;
   swfdec_video_movie_new_image (input->movie, surface);
   cairo_surface_destroy (surface);
 }
@@ -225,7 +227,7 @@ tag_func_video_frame (SwfdecSwfDecoder *s, guint unused_tag)
   /* it seems flash video saves keyframe + format in every frame - 
    * at least libflv + ming does that and Flash Player plays it.
    */
-  if (video->format == SWFDEC_VIDEO_FORMAT_SCREEN) {
+  if (video->format == SWFDEC_VIDEO_CODEC_SCREEN) {
 #if 0
     keyframe = swfdec_bits_get_bits (&s->b, 4);
     format = swfdec_bits_get_bits (&s->b, 4);

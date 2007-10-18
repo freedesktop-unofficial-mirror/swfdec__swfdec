@@ -59,6 +59,15 @@
  * swfdec_buffer_new_from_file() without the need for a different API.
  */
 
+/**
+ * SwfdecBufferFreeFunc:
+ * @data: The data to free
+ * @priv: The private data registered for passing to this function
+ *
+ * This is the function prototype for the function that is called for freeing
+ * the memory pointed to by a buffer. See swfdec_buffer_new() for an example.
+ */
+
 GType
 swfdec_buffer_get_type (void)
 {
@@ -80,7 +89,8 @@ swfdec_buffer_get_type (void)
  * <informalexample><programlisting>SwfdecBuffer *buffer = swfdec_buffer_new ();
  * buffer->data = mydata;
  * buffer->length = mydata_length;
- * buffer->free = mydata_freefunc;</programlisting></informalexample>
+ * buffer->free = mydata_freefunc;
+ * buffer->priv = mydata_private;</programlisting></informalexample>
  *
  * Returns: a new #SwfdecBuffer referencing nothing.
  **/
@@ -92,12 +102,6 @@ swfdec_buffer_new (void)
   buffer = g_new0 (SwfdecBuffer, 1);
   buffer->ref_count = 1;
   return buffer;
-}
-
-static void
-swfdec_buffer_free_mem (SwfdecBuffer * buffer, void *priv)
-{
-  g_free (buffer->data);
 }
 
 /**
@@ -116,7 +120,7 @@ swfdec_buffer_new_and_alloc (guint size)
 
   buffer->data = g_malloc (size);
   buffer->length = size;
-  buffer->free = swfdec_buffer_free_mem;
+  buffer->free = (SwfdecBufferFreeFunc) g_free;
 
   return buffer;
 }
@@ -137,7 +141,7 @@ swfdec_buffer_new_and_alloc0 (guint size)
 
   buffer->data = g_malloc0 (size);
   buffer->length = size;
-  buffer->free = swfdec_buffer_free_mem;
+  buffer->free = (SwfdecBufferFreeFunc) g_free;
 
   return buffer;
 }
@@ -162,15 +166,15 @@ swfdec_buffer_new_for_data (unsigned char *data, guint size)
   buffer = swfdec_buffer_new ();
   buffer->data = data;
   buffer->length = size;
-  buffer->free = swfdec_buffer_free_mem;
+  buffer->free = (SwfdecBufferFreeFunc) g_free;
 
   return buffer;
 }
 
 static void
-swfdec_buffer_free_subbuffer (SwfdecBuffer * buffer, void *priv)
+swfdec_buffer_free_subbuffer (unsigned char *data, gpointer priv)
 {
-  swfdec_buffer_unref (buffer->parent);
+  swfdec_buffer_unref (priv);
 }
 
 /**
@@ -194,14 +198,7 @@ swfdec_buffer_new_subbuffer (SwfdecBuffer * buffer, guint offset, guint length)
 
   subbuffer = swfdec_buffer_new ();
 
-  if (buffer->parent) {
-    swfdec_buffer_ref (buffer->parent);
-    subbuffer->parent = buffer->parent;
-  } else {
-    swfdec_buffer_ref (buffer);
-    subbuffer->parent = buffer;
-  }
-  g_assert (subbuffer->parent->parent == NULL);
+  subbuffer->priv = swfdec_buffer_ref (swfdec_buffer_get_super (buffer));
   subbuffer->data = buffer->data + offset;
   subbuffer->length = length;
   subbuffer->free = swfdec_buffer_free_subbuffer;
@@ -209,8 +206,31 @@ swfdec_buffer_new_subbuffer (SwfdecBuffer * buffer, guint offset, guint length)
   return subbuffer;
 }
 
+/**
+ * swfdec_buffer_get_super:
+ * @buffer: a #SwfdecBuffer
+ *
+ * Returns the largest buffer that contains the memory pointed to by @buffer.
+ * This will either be the passed @buffer itself, or if the buffer was created
+ * via swfdec_buffer_new_subbuffer(), the buffer used for that.
+ *
+ * Returns: The largest @buffer available that contains the memory pointed to 
+ *          by @buffer.
+ **/
+SwfdecBuffer *
+swfdec_buffer_get_super (SwfdecBuffer *buffer)
+{
+  g_return_val_if_fail (buffer != NULL, NULL);
+
+  if (buffer->free == swfdec_buffer_free_subbuffer)
+    buffer = buffer->priv;
+
+  g_assert (buffer->free != swfdec_buffer_free_subbuffer);
+  return buffer;
+}
+
 static void
-swfdec_buffer_free_mapped (SwfdecBuffer * buffer, void *priv)
+swfdec_buffer_free_mapped (unsigned char *data, gpointer priv)
 {
   g_mapped_file_free (priv);
 }
@@ -282,7 +302,7 @@ swfdec_buffer_unref (SwfdecBuffer * buffer)
   buffer->ref_count--;
   if (buffer->ref_count == 0) {
     if (buffer->free)
-      buffer->free (buffer, buffer->priv);
+      buffer->free (buffer->data, buffer->priv);
     g_free (buffer);
   }
 }

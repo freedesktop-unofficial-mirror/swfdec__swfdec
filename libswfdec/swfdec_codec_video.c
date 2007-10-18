@@ -21,40 +21,87 @@
 #include "config.h"
 #endif
 
+#include <liboil/liboil.h>
 #include "swfdec_codec_video.h"
+#include "swfdec_color.h"
 #include "swfdec_debug.h"
 #include "swfdec_internal.h"
 
+static SwfdecVideoDecoder *
+swfdec_video_decoder_builtin_new (SwfdecVideoCodec codec)
+{
+  SwfdecVideoDecoder *ret;
+
+  ret = swfdec_video_decoder_screen_new (codec);
+  if (ret == NULL)
+    ret = swfdec_video_decoder_vp6_alpha_new (codec);
+
+  return ret;
+}
+
+struct {
+  const char *		name;
+  SwfdecVideoDecoder *	(* func) (SwfdecVideoCodec);
+} video_codecs[] = {
+  { "builtin",	swfdec_video_decoder_builtin_new },
+#ifdef HAVE_FFMPEG
+  { "ffmpeg",	swfdec_video_decoder_ffmpeg_new },
+#endif
+#ifdef HAVE_GST
+  { "gst",	swfdec_video_decoder_gst_new },
+#endif
+  { NULL, }
+};
+
 /**
  * swfdec_video_decoder_new:
- * @format: #SwfdecVideoFormat to create the #SwfdecVideoDecoder for
+ * @codec: #SwfdecVideoCodec to create the #SwfdecVideoDecoder for
  *
- * Creates a new decoder to decode videos of type @format. If no suitable
+ * Creates a new decoder to decode videos of type @codec. If no suitable
  * decoder could be created, %NULL is returned.
  *
  * Returns:
  **/
 SwfdecVideoDecoder *
-swfdec_video_decoder_new (SwfdecVideoFormat format)
+swfdec_video_decoder_new (SwfdecVideoCodec codec)
 {
   SwfdecVideoDecoder *ret;
+  const char *list;
 
-  ret = swfdec_video_decoder_screen_new (format);
-#ifdef HAVE_FFMPEG
-  if (ret == NULL)
-    ret = swfdec_video_decoder_ffmpeg_new (format);
-#endif
-#ifdef HAVE_GST
-  if (ret == NULL)
-    ret = swfdec_video_decoder_gst_new (format);
-#endif
+  list = g_getenv ("SWFDEC_CODEC_VIDEO");
+  if (list == NULL)
+    list = g_getenv ("SWFDEC_CODEC");
+  if (list == NULL) {
+    guint i;
+    ret = NULL;
+    for (i = 0; video_codecs[i].name != NULL; i++) {
+      ret = video_codecs[i].func (codec);
+      if (ret)
+	break;
+    }
+  } else {
+    char **split = g_strsplit (list, ":", -1);
+    guint i, j;
+    ret = NULL;
+    SWFDEC_LOG ("codecs limited to \"%s\"", list);
+    for (i = 0; split[i] != NULL && ret == NULL; i++) {
+      for (j = 0; video_codecs[j].name != NULL; j++) {
+	if (g_ascii_strcasecmp (video_codecs[j].name, split[i]) != 0)
+	  continue;
+	ret = video_codecs[j].func (codec);
+	if (ret)
+	  break;
+      }
+    }
+    g_strfreev (split);
+  }
 
   if (ret != NULL) {
-    ret->format = format;
+    ret->codec = codec;
     g_return_val_if_fail (ret->decode, ret);
     g_return_val_if_fail (ret->free, ret);
   } else {
-    SWFDEC_WARNING ("no decoder found for codec %u", (guint) format);
+    SWFDEC_WARNING ("no decoder found for codec %u", (guint) codec);
   }
   return ret;
 }
@@ -73,6 +120,122 @@ swfdec_video_decoder_free (SwfdecVideoDecoder *decoder)
   decoder->free (decoder);
 }
 
+#define oil_argb(a,r,g,b) (((a) << 24) | ((r) << 16) | ((g) << 8) | b)
+static gint16 jfif_matrix[24] = {
+  0,      0,      -8192,   -8192,
+  16384,  0,      0,       0,
+  0,      16384,  16384,   16384,
+  0,      0,      -5638,   29032,
+  0,      22970,  -11700,  0,
+  0, 0, 0, 0
+};
+
+static void
+yuv_mux (guint32 *dest, const guint8 *src_y, const guint8 *src_u, const guint8 *src_v,
+    int n)
+{
+  int i;
+  for (i = 0; i < n; i++) {
+    dest[i] = oil_argb(255, src_y[i], src_u[i], src_v[i]);
+  }
+}
+
+static void
+upsample (guint8 *d, guint8 *s, int n)
+{
+  int i;
+
+  d[0] = s[0];
+
+  for (i = 0; i < n-3; i+=2) {
+    d[i + 1] = (3*s[i/2] + s[i/2+1] + 2)>>2;
+    d[i + 2] = (s[i/2] + 3*s[i/2+1] + 2)>>2;
+  }
+
+  if (n&1) {
+    i = n-3;
+    d[n-2] = s[n/2];
+    d[n-1] = s[n/2];
+  } else {
+    d[n-1] = s[n/2-1];
+  }
+}
+
+static guint8 *
+swfdec_video_i420_to_rgb (SwfdecVideoImage *image)
+{
+  guint32 *tmp;
+  guint8 *tmp_u;
+  guint8 *tmp_v;
+  guint8 *tmp1;
+  guint32 *argb_image;
+  const guint8 *yp, *up, *vp;
+  guint32 *argbp;
+  int j;
+  guint halfwidth;
+  int halfheight;
+
+  halfwidth = (image->width + 1)>>1;
+  tmp = g_malloc (4 * image->width * image->height);
+  tmp_u = g_malloc (image->width);
+  tmp_v = g_malloc (image->width);
+  tmp1 = g_malloc (halfwidth);
+  argb_image = g_malloc (4 * image->width * image->height);
+
+  yp = image->plane[0];
+  up = image->plane[1];
+  vp = image->plane[2];
+  argbp = argb_image;
+  halfheight = (image->height+1)>>1;
+  for(j=0;(guint)j<image->height;j++){
+    guint32 weight = 192 - 128*(j&1);
+
+    oil_merge_linear_u8(tmp1,
+        up + image->rowstride[1] * CLAMP((j-1)/2,0,halfheight-1),
+        up + image->rowstride[1] * CLAMP((j+1)/2,0,halfheight-1),
+        &weight, halfwidth);
+    upsample (tmp_u, tmp1, image->width);
+    oil_merge_linear_u8(tmp1,
+        vp + image->rowstride[2] * CLAMP((j-1)/2,0,halfheight-1),
+        vp + image->rowstride[2] * CLAMP((j+1)/2,0,halfheight-1),
+        &weight, halfwidth);
+    upsample (tmp_v, tmp1, image->width);
+
+    yuv_mux (tmp, yp, tmp_u, tmp_v, image->width);
+    oil_colorspace_argb(argbp, tmp, jfif_matrix, image->width);
+    yp += image->rowstride[0];
+    argbp += image->width;
+  }
+  g_free(tmp);
+  g_free(tmp_u);
+  g_free(tmp_v);
+  g_free(tmp1);
+  return (unsigned char *)argb_image;
+}
+
+/* FIXME: use liboil for this */
+static void
+swfdec_video_codec_apply_mask (guint8 *data, guint rowstride, const guint8 *mask,
+    guint mask_rowstride, guint width, guint height)
+{
+  const guint8 *in;
+  guint8 *out;
+  guint x, y;
+
+  data += SWFDEC_COLOR_INDEX_ALPHA;
+  for (y = 0; y < height; y++) {
+    in = mask;
+    out = data;
+    for (x = 0; x < width; x++) {
+      *out = *in;
+      out += 4;
+      in++;
+    }
+    mask += mask_rowstride;
+    data += rowstride;
+  }
+}
+
 /**
  * swfdec_video_decoder_decode:
  * @decoder: a #SwfdecVideoDecoder
@@ -85,53 +248,69 @@ swfdec_video_decoder_free (SwfdecVideoDecoder *decoder)
 cairo_surface_t *
 swfdec_video_decoder_decode (SwfdecVideoDecoder *decoder, SwfdecBuffer *buffer)
 {
+  SwfdecVideoImage image;
   static const cairo_user_data_key_t key;
   cairo_surface_t *surface;
-  guint width, height, rowstride;
+  guint8 *data;
+  guint rowstride;
 
   g_return_val_if_fail (decoder != NULL, NULL);
   g_return_val_if_fail (buffer != NULL, NULL);
 
-  if (decoder->format == SWFDEC_VIDEO_FORMAT_VP6) {
-    guint wsub, hsub;
-    SwfdecBuffer *tmp;
-    wsub = *buffer->data;
-    hsub = wsub & 0xF;
-    wsub >>= 4;
-    tmp = swfdec_buffer_new_subbuffer (buffer, 1, buffer->length - 1);
-    buffer = decoder->decode (decoder, tmp, &width, &height, &rowstride);
-    swfdec_buffer_unref (tmp);
-    if (wsub >= width || hsub >= height) {
-      SWFDEC_ERROR ("size subtraction too big");
-      if (buffer)
-	swfdec_buffer_unref (buffer);
-      return NULL;
-    }
-    width -= wsub;
-    height -= hsub;
-  } else {
-    buffer = decoder->decode (decoder, buffer, &width, &height, &rowstride);
-  }
-  if (buffer == NULL) {
+  if (!decoder->decode (decoder, buffer, &image)) {
     SWFDEC_ERROR ("failed to decode video");
     return NULL;
   }
-  if (width == 0 || height == 0 || rowstride < width * 4) {
-    SWFDEC_ERROR ("invalid image size");
-    swfdec_buffer_unref (buffer);
-    return NULL;
+  g_assert (image.width != 0 && image.height != 0);
+  /* FIXME: use cairo for all of this when cairo accelerates it */
+  if (swfdec_video_codec_get_format (decoder->codec) == SWFDEC_VIDEO_FORMAT_I420) {
+    data = swfdec_video_i420_to_rgb (&image);
+    if (data == NULL) {
+      SWFDEC_ERROR ("I420 => RGB conversion failed");
+      return NULL;
+    }
+    rowstride = image.width * 4;
+  } else {
+    rowstride = image.rowstride[0];
+    data = g_memdup (image.plane[0], rowstride * image.height);
   }
-  surface = cairo_image_surface_create_for_data (buffer->data, CAIRO_FORMAT_RGB24,
-      width, height, rowstride);
+  if (image.mask) {
+    swfdec_video_codec_apply_mask (data, image.width * 4, image.mask, 
+	image.mask_rowstride, image.width, image.height);
+  }
+  surface = cairo_image_surface_create_for_data (data, 
+      image.mask ? CAIRO_FORMAT_ARGB32 : CAIRO_FORMAT_RGB24,
+      image.width, image.height, rowstride);
   if (cairo_surface_status (surface)) {
     SWFDEC_ERROR ("failed to create surface: %s", 
 	cairo_status_to_string (cairo_surface_status (surface)));
     cairo_surface_destroy (surface);
-    swfdec_buffer_unref (buffer);
     return NULL;
   }
-  cairo_surface_set_user_data (surface, &key, buffer, 
-      (cairo_destroy_func_t) swfdec_buffer_unref);
+  cairo_surface_set_user_data (surface, &key, data, 
+      (cairo_destroy_func_t) g_free);
   return surface;
+}
+
+/**
+ * swfdec_video_codec_get_format:
+ * @codec: codec to check
+ *
+ * Returns the output format used for this codec. Video codecs must use these
+ * codecs when decoding video.
+ *
+ * Returns: the output format to use for this format
+ **/
+SwfdecVideoFormat
+swfdec_video_codec_get_format (SwfdecVideoCodec codec)
+{
+  switch (codec) {
+    case SWFDEC_VIDEO_CODEC_H263:
+    case SWFDEC_VIDEO_CODEC_VP6:
+    case SWFDEC_VIDEO_CODEC_VP6_ALPHA:
+      return SWFDEC_VIDEO_FORMAT_I420;
+    default:
+      return SWFDEC_VIDEO_FORMAT_RGBA;
+  }
 }
 
