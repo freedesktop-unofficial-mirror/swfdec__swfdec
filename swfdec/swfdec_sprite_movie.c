@@ -24,6 +24,7 @@
 #include <strings.h>
 
 #include "swfdec_sprite_movie.h"
+#include "swfdec_abc_file.h"
 #include "swfdec_as_internal.h"
 #include "swfdec_as_strings.h"
 #include "swfdec_audio_swf_stream.h"
@@ -488,6 +489,27 @@ swfdec_sprite_movie_perform_one_action (SwfdecSpriteMovie *movie, guint tag, Swf
 	} else {
 	  SWFDEC_ERROR ("Failed to locate script for InitAction of Sprite %u", id);
 	}
+      }
+      return TRUE;
+    case SWFDEC_TAG_DOABC:
+      {
+	SwfdecAbcFile *file;
+	guint flags;
+	char *name;
+	if (!first_time)
+	  return TRUE;
+	flags = swfdec_bits_get_u32 (&bits);
+	name = swfdec_bits_get_string (&bits, 9);
+	SWFDEC_LOG ("  flags: %u", flags);
+	if (name == NULL) {
+	  SWFDEC_ERROR ("couldn't parse name of DoAbc tag");
+	  return TRUE;
+	}
+	g_free (name);
+	SWFDEC_LOG ("  name: %s", name);
+	file = swfdec_abc_file_new (SWFDEC_AS_CONTEXT (player), &bits);
+	if (file)
+	  g_object_unref (file);
       }
       return TRUE;
     case SWFDEC_TAG_SOUNDSTREAMHEAD:
