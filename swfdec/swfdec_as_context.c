@@ -25,6 +25,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include "swfdec_as_context.h"
+#include "swfdec_abc_internal.h"
 #include "swfdec_as_array.h"
 #include "swfdec_as_frame_internal.h"
 #include "swfdec_as_function.h"
@@ -1002,6 +1003,37 @@ error:
 out:
   context->version = original_version;
   return;
+}
+
+/*** ABC ***/
+
+void
+swfdec_as_context_throw_abc (SwfdecAsContext *context, SwfdecAbcErrorType type,
+  const char *format, ...)
+{
+  va_list args;
+
+  g_return_if_fail (SWFDEC_IS_AS_CONTEXT (context));
+  g_return_if_fail (format != NULL);
+
+  va_start (args, format);
+  swfdec_as_context_throw_abcv (context, type, format, args);
+  va_end (args);
+}
+
+void
+swfdec_as_context_throw_abcv (SwfdecAsContext *context, SwfdecAbcErrorType type,
+    const char *format, va_list	args)
+{
+  char *s;
+
+  g_return_if_fail (SWFDEC_IS_AS_CONTEXT (context));
+  g_return_if_fail (format != NULL);
+
+  s = g_strdup_vprintf (format, args);
+  SWFDEC_ERROR ("throwing exception of type %d: %s", type, s);
+  SWFDEC_FIXME ("now actually throw this thing!");
+  g_free (s);
 }
 
 /*** AS CODE ***/
