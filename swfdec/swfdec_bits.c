@@ -265,6 +265,48 @@ swfdec_bits_get_s32 (SwfdecBits *b)
 }
 
 guint
+swfdec_bits_get_vu32 (SwfdecBits *b)
+{
+  guint ret;
+
+  ret = swfdec_bits_get_u8 (b);
+  if ((ret & (1 << 8)) == 0)
+    return ret;
+  ret |= swfdec_bits_get_u8 (b) << 7;
+  if ((ret & (1 << 15)) == 0)
+    return ret;
+  ret |= swfdec_bits_get_u8 (b) << 14;
+  if ((ret & (1 << 22)) == 0)
+    return ret;
+  ret |= swfdec_bits_get_u8 (b) << 21;
+  if ((ret & (1 << 29)) == 0)
+    return ret;
+  ret |= swfdec_bits_get_u8 (b) << 28;
+  return ret;
+}
+
+int 
+swfdec_bits_get_vs32 (SwfdecBits *b)
+{
+  int ret;
+
+  ret = swfdec_bits_get_u8 (b);
+  if ((ret & (1 << 8)) == 0)
+    return ret & (1 << 7) ? ret & -1 : ret;
+  ret |= swfdec_bits_get_u8 (b) << 7;
+  if ((ret & (1 << 15)) == 0)
+    return ret & (1 << 14) ? ret & -1 : ret;
+  ret |= swfdec_bits_get_u8 (b) << 14;
+  if ((ret & (1 << 22)) == 0)
+    return ret & (1 << 21) ? ret & -1 : ret;
+  ret |= swfdec_bits_get_u8 (b) << 21;
+  if ((ret & (1 << 29)) == 0)
+    return ret & (1 << 28) ? ret & -1 : ret;
+  ret |= swfdec_bits_get_u8 (b) << 28;
+  return ret;
+}
+
+guint
 swfdec_bits_get_bu16 (SwfdecBits *b)
 {
   guint r;
