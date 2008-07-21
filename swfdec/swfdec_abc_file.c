@@ -22,6 +22,7 @@
 #endif
 
 #include "swfdec_abc_file.h"
+#include "swfdec_abc_internal.h"
 #include "swfdec_debug.h"
 
 G_DEFINE_TYPE (SwfdecAbcFile, swfdec_abc_file, G_TYPE_OBJECT)
@@ -64,18 +65,16 @@ swfdec_abc_file_new (SwfdecAsContext *context, SwfdecBits *bits)
   major = swfdec_bits_get_u16 (bits);
   SWFDEC_LOG ("  major version: %u", major);
   SWFDEC_LOG ("  minor version: %u", minor);
-  switch (major) {
-    case 46:
-      if (minor > 16) {
-	SWFDEC_ERROR ("too big minor version %u for major 46, must be <= 16", minor);
-	goto fail;
-      }
-      if (!swfdec_abc_file_parse_46 (file, bits))
-	goto fail;
-      break;
-    default:
-      SWFDEC_ERROR ("invalid major version %u", major);
+  if (major == 46 && minor == 16) {
+    if (!swfdec_abc_file_parse_46 (file, bits)) {
+      swfdec_as_context_throw_abc (context, SWFDEC_ABC_ERROR_VERIFY,
+	  "The ABC data is corrupt, attempt to read out of bounds.");
       goto fail;
+    }
+  } else {
+    swfdec_as_context_throw_abc (context, SWFDEC_ABC_ERROR_VERIFY,
+	"Not an ABC file.  major_version=%u minor_version=%u.", major, minor);
+    goto fail;
   }
 
   return file;
