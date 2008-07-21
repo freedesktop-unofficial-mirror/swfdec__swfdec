@@ -39,6 +39,13 @@ struct _SwfdecAbcFile {
   GObject		object;
 
   SwfdecAsContext *	context;	/* the context we are loaded into. NOTE: we hold no reference */
+
+  int *			ints;		/* all integer values in the file */
+  guint			n_ints;		/* number of integers */
+  guint *		uints;		/* all unsigned integer values in the file */
+  guint			n_uints;	/* number of unsigned integers */
+  double *		doubles;	/* all double values in the file */
+  guint			n_doubles;	/* number of doubles */
 };
 
 struct _SwfdecAbcFileClass {

@@ -25,15 +25,35 @@
 #include "swfdec_abc_internal.h"
 #include "swfdec_debug.h"
 
+/*** SWFDEC_ABC_FILE ***/
+
 G_DEFINE_TYPE (SwfdecAbcFile, swfdec_abc_file, G_TYPE_OBJECT)
 
-/*
- * Class functions
- */
+static void
+swfdec_abc_file_dispose (GObject *object)
+{
+  SwfdecAbcFile *file = SWFDEC_ABC_FILE (object);
+
+  if (file->n_ints) {
+    swfdec_as_context_unuse_mem (file->context, file->n_ints * sizeof (int));
+    g_free (file->ints);
+  }
+  if (file->n_uints) {
+    swfdec_as_context_unuse_mem (file->context, file->n_uints * sizeof (guint));
+    g_free (file->uints);
+  }
+  if (file->n_doubles) {
+    swfdec_as_context_unuse_mem (file->context, file->n_doubles * sizeof (double));
+    g_free (file->doubles);
+  }
+}
 
 static void
 swfdec_abc_file_class_init (SwfdecAbcFileClass *klass)
 {
+  GObjectClass *object_class = G_OBJECT_CLASS (klass);
+
+  object_class->dispose = swfdec_abc_file_dispose;
 }
 
 static void
@@ -43,9 +63,60 @@ swfdec_abc_file_init (SwfdecAbcFile *date)
 
 /*** PARSING ***/
 
+#define READ_U30(x, bits) G_STMT_START{ \
+  x = swfdec_bits_get_vu32 (bits); \
+  if (x >= (1 << 30)) \
+    return FALSE; \
+}G_STMT_END;
+
 static gboolean
 swfdec_abc_file_parse_46 (SwfdecAbcFile *file, SwfdecBits *bits)
 {
+  guint i;
+
+  SWFDEC_LOG ("parsing ABC block");
+  /* read all integers */
+  READ_U30 (file->n_ints, bits);
+  if (file->n_ints) {
+    if (!swfdec_as_context_use_mem (file->context, file->n_ints * sizeof (int))) {
+      file->n_ints = 0;
+      return FALSE;
+    }
+    file->ints = g_new0 (int, file->n_ints);
+    for (i = 1; i < file->n_ints && swfdec_bits_left (bits); i++) {
+      file->ints[i] = swfdec_bits_get_vs32 (bits);
+      SWFDEC_LOG ("  int %u: %d", i, file->ints[i]);
+    }
+  }
+
+  /* read all unsigned integers */
+  READ_U30 (file->n_uints, bits);
+  if (file->n_uints) {
+    if (!swfdec_as_context_use_mem (file->context, file->n_uints * sizeof (guint))) {
+      file->n_uints = 0;
+      return FALSE;
+    }
+    file->uints = g_new0 (guint, file->n_uints);
+    for (i = 1; i < file->n_uints && swfdec_bits_left (bits); i++) {
+      file->uints[i] = swfdec_bits_get_vu32 (bits);
+      SWFDEC_LOG ("  uint %u: %u", i, file->uints[i]);
+    }
+  }
+
+  /* read all doubles */
+  READ_U30 (file->n_doubles, bits);
+  if (file->n_doubles) {
+    if (!swfdec_as_context_use_mem (file->context, file->n_doubles * sizeof (double))) {
+      file->n_doubles = 0;
+      return FALSE;
+    }
+    file->doubles = g_new0 (double, file->n_doubles);
+    for (i = 1; i < file->n_doubles && swfdec_bits_left (bits); i++) {
+      file->doubles[i] = swfdec_bits_get_double (bits);
+      SWFDEC_LOG ("  double %u: %g", i, file->doubles[i]);
+    }
+  }
+
   return TRUE;
 }
 
