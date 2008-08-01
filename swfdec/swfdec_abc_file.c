@@ -78,7 +78,7 @@ swfdec_abc_file_parse_46 (SwfdecAbcFile *file, SwfdecBits *bits)
   /* read all integers */
   READ_U30 (file->n_ints, bits);
   if (file->n_ints) {
-    if (!swfdec_as_context_use_mem (file->context, file->n_ints * sizeof (int))) {
+    if (!swfdec_as_context_try_use_mem (file->context, file->n_ints * sizeof (int))) {
       file->n_ints = 0;
       return FALSE;
     }
@@ -92,7 +92,7 @@ swfdec_abc_file_parse_46 (SwfdecAbcFile *file, SwfdecBits *bits)
   /* read all unsigned integers */
   READ_U30 (file->n_uints, bits);
   if (file->n_uints) {
-    if (!swfdec_as_context_use_mem (file->context, file->n_uints * sizeof (guint))) {
+    if (!swfdec_as_context_try_use_mem (file->context, file->n_uints * sizeof (guint))) {
       file->n_uints = 0;
       return FALSE;
     }
@@ -106,7 +106,7 @@ swfdec_abc_file_parse_46 (SwfdecAbcFile *file, SwfdecBits *bits)
   /* read all doubles */
   READ_U30 (file->n_doubles, bits);
   if (file->n_doubles) {
-    if (!swfdec_as_context_use_mem (file->context, file->n_doubles * sizeof (double))) {
+    if (!swfdec_as_context_try_use_mem (file->context, file->n_doubles * sizeof (double))) {
       file->n_doubles = 0;
       return FALSE;
     }
