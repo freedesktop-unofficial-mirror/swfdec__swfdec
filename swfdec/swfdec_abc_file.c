@@ -47,16 +47,36 @@ swfdec_abc_file_dispose (GObject *object)
     swfdec_as_context_unuse_mem (context, file->n_doubles * sizeof (double));
     g_free (file->doubles);
   }
+  if (file->n_strings) {
+    swfdec_as_context_unuse_mem (context, file->n_strings * sizeof (const char *));
+    g_free (file->strings);
+  }
 
   G_OBJECT_CLASS (swfdec_abc_file_parent_class)->dispose (object);
+}
+
+static void
+swfdec_abc_file_mark (SwfdecGcObject *object)
+{
+  SwfdecAbcFile *file = SWFDEC_ABC_FILE (object);
+  guint i;
+
+  for (i = 0; i < file->n_strings; i++) {
+    swfdec_as_string_mark (file->strings[i]);
+  }
+
+  SWFDEC_GC_OBJECT_CLASS (swfdec_abc_file_parent_class)->mark (object);
 }
 
 static void
 swfdec_abc_file_class_init (SwfdecAbcFileClass *klass)
 {
   GObjectClass *object_class = G_OBJECT_CLASS (klass);
+  SwfdecGcObjectClass *gc_class = SWFDEC_GC_OBJECT_CLASS (klass);
 
   object_class->dispose = swfdec_abc_file_dispose;
+
+  gc_class->mark = swfdec_abc_file_mark;
 }
 
 static void
@@ -118,6 +138,26 @@ swfdec_abc_file_parse_46 (SwfdecAbcFile *file, SwfdecBits *bits)
     for (i = 1; i < file->n_doubles && swfdec_bits_left (bits); i++) {
       file->doubles[i] = swfdec_bits_get_double (bits);
       SWFDEC_LOG ("  double %u: %g", i, file->doubles[i]);
+    }
+  }
+
+  /* read all strings */
+  READ_U30 (file->n_strings, bits);
+  if (file->n_strings) {
+    if (!swfdec_as_context_try_use_mem (context, file->n_strings * sizeof (const char *))) {
+      file->n_strings = 0;
+      return FALSE;
+    }
+    file->strings = g_new0 (const char *, file->n_strings);
+    for (i = 1; i < file->n_strings; i++) {
+      guint len;
+      char *s;
+      READ_U30 (len, bits);
+      s = swfdec_bits_get_string_length (bits, len, 9);
+      if (s == NULL)
+	return FALSE;
+      file->strings[i] = swfdec_as_context_give_string (context, s);
+      SWFDEC_LOG ("  string %u: %s", i, file->strings[i]);
     }
   }
 

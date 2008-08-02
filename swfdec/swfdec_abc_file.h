@@ -44,6 +44,8 @@ struct _SwfdecAbcFile {
   guint			n_uints;	/* number of unsigned integers */
   double *		doubles;	/* all double values in the file */
   guint			n_doubles;	/* number of doubles */
+  const char **		strings;	/* all string values in the file */
+  guint			n_strings;	/* number of strings */
 };
 
 struct _SwfdecAbcFileClass {
