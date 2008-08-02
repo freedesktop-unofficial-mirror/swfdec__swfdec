@@ -27,25 +27,28 @@
 
 /*** SWFDEC_ABC_FILE ***/
 
-G_DEFINE_TYPE (SwfdecAbcFile, swfdec_abc_file, G_TYPE_OBJECT)
+G_DEFINE_TYPE (SwfdecAbcFile, swfdec_abc_file, SWFDEC_TYPE_GC_OBJECT)
 
 static void
 swfdec_abc_file_dispose (GObject *object)
 {
   SwfdecAbcFile *file = SWFDEC_ABC_FILE (object);
+  SwfdecAsContext *context = swfdec_gc_object_get_context (file);
 
   if (file->n_ints) {
-    swfdec_as_context_unuse_mem (file->context, file->n_ints * sizeof (int));
+    swfdec_as_context_unuse_mem (context, file->n_ints * sizeof (int));
     g_free (file->ints);
   }
   if (file->n_uints) {
-    swfdec_as_context_unuse_mem (file->context, file->n_uints * sizeof (guint));
+    swfdec_as_context_unuse_mem (context, file->n_uints * sizeof (guint));
     g_free (file->uints);
   }
   if (file->n_doubles) {
-    swfdec_as_context_unuse_mem (file->context, file->n_doubles * sizeof (double));
+    swfdec_as_context_unuse_mem (context, file->n_doubles * sizeof (double));
     g_free (file->doubles);
   }
+
+  G_OBJECT_CLASS (swfdec_abc_file_parent_class)->dispose (object);
 }
 
 static void
@@ -72,13 +75,14 @@ swfdec_abc_file_init (SwfdecAbcFile *date)
 static gboolean
 swfdec_abc_file_parse_46 (SwfdecAbcFile *file, SwfdecBits *bits)
 {
+  SwfdecAsContext *context = swfdec_gc_object_get_context (file);
   guint i;
 
   SWFDEC_LOG ("parsing ABC block");
   /* read all integers */
   READ_U30 (file->n_ints, bits);
   if (file->n_ints) {
-    if (!swfdec_as_context_try_use_mem (file->context, file->n_ints * sizeof (int))) {
+    if (!swfdec_as_context_try_use_mem (context, file->n_ints * sizeof (int))) {
       file->n_ints = 0;
       return FALSE;
     }
@@ -92,7 +96,7 @@ swfdec_abc_file_parse_46 (SwfdecAbcFile *file, SwfdecBits *bits)
   /* read all unsigned integers */
   READ_U30 (file->n_uints, bits);
   if (file->n_uints) {
-    if (!swfdec_as_context_try_use_mem (file->context, file->n_uints * sizeof (guint))) {
+    if (!swfdec_as_context_try_use_mem (context, file->n_uints * sizeof (guint))) {
       file->n_uints = 0;
       return FALSE;
     }
@@ -106,7 +110,7 @@ swfdec_abc_file_parse_46 (SwfdecAbcFile *file, SwfdecBits *bits)
   /* read all doubles */
   READ_U30 (file->n_doubles, bits);
   if (file->n_doubles) {
-    if (!swfdec_as_context_try_use_mem (file->context, file->n_doubles * sizeof (double))) {
+    if (!swfdec_as_context_try_use_mem (context, file->n_doubles * sizeof (double))) {
       file->n_doubles = 0;
       return FALSE;
     }
@@ -129,8 +133,7 @@ swfdec_abc_file_new (SwfdecAsContext *context, SwfdecBits *bits)
   g_return_val_if_fail (SWFDEC_IS_AS_CONTEXT (context), NULL);
   g_return_val_if_fail (bits != NULL, NULL);
 
-  file = g_object_new (SWFDEC_TYPE_ABC_FILE, NULL);
-  file->context = context;
+  file = g_object_new (SWFDEC_TYPE_ABC_FILE, "context", context, NULL);
 
   minor = swfdec_bits_get_u16 (bits);
   major = swfdec_bits_get_u16 (bits);
@@ -140,17 +143,13 @@ swfdec_abc_file_new (SwfdecAsContext *context, SwfdecBits *bits)
     if (!swfdec_abc_file_parse_46 (file, bits)) {
       swfdec_as_context_throw_abc (context, SWFDEC_ABC_ERROR_VERIFY,
 	  "The ABC data is corrupt, attempt to read out of bounds.");
-      goto fail;
+      return NULL;
     }
   } else {
     swfdec_as_context_throw_abc (context, SWFDEC_ABC_ERROR_VERIFY,
 	"Not an ABC file.  major_version=%u minor_version=%u.", major, minor);
-    goto fail;
+    return NULL;
   }
 
   return file;
-
-fail:
-  g_object_unref (file);
-  return NULL;
 }

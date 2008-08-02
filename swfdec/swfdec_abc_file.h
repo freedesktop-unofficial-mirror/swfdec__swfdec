@@ -20,8 +20,8 @@
 #ifndef _SWFDEC_ABC_FILE_H_
 #define _SWFDEC_ABC_FILE_H_
 
-#include <swfdec/swfdec_as_context.h>
 #include <swfdec/swfdec_bits.h>
+#include <swfdec/swfdec_gc_object.h>
 
 G_BEGIN_DECLS
 
@@ -36,9 +36,7 @@ typedef struct _SwfdecAbcFileClass SwfdecAbcFileClass;
 #define SWFDEC_ABC_FILE_GET_CLASS(obj)          (G_TYPE_INSTANCE_GET_CLASS ((obj), SWFDEC_TYPE_ABC_FILE, SwfdecAbcFileClass))
 
 struct _SwfdecAbcFile {
-  GObject		object;
-
-  SwfdecAsContext *	context;	/* the context we are loaded into. NOTE: we hold no reference */
+  SwfdecGcObject	object;
 
   int *			ints;		/* all integer values in the file */
   guint			n_ints;		/* number of integers */
@@ -49,7 +47,7 @@ struct _SwfdecAbcFile {
 };
 
 struct _SwfdecAbcFileClass {
-  GObjectClass		object_class;
+  SwfdecGcObjectClass	object_class;
 };
 
 GType		swfdec_abc_file_get_type	(void);
