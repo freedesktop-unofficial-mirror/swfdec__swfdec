@@ -17,36 +17,22 @@
  * Boston, MA  02110-1301  USA
  */
 
-#include <glib.h>
+#include <swfdec/swfdec_abc_namespace.h>
 
-#ifndef _SWFDEC_ABC_NAMESPACE_H_
-#define _SWFDEC_ABC_NAMESPACE_H_
+#ifndef _SWFDEC_ABC_NS_SET_H_
+#define _SWFDEC_ABC_NS_SET_H_
 
 G_BEGIN_DECLS
 
-typedef enum {
-  SWFDEC_ABC_NAMESPACE_PUBLIC = 0,
-  SWFDEC_ABC_NAMESPACE_PROTECTED = 1,
-  SWFDEC_ABC_NAMESPACE_PACKAGE = 2,
-  SWFDEC_ABC_NAMESPACE_PRIVATE = 3,
-  SWFDEC_ABC_NAMESPACE_EXPLICIT = 4,
-  SWFDEC_ABC_NAMESPACE_STATIC_PROTECTED = 5
-} SwfdecAbcNamespaceType;
 
-typedef struct _SwfdecAbcNamespace SwfdecAbcNamespace;
-struct _SwfdecAbcNamespace {
-  SwfdecAbcNamespaceType	type;
-  const char *			prefix;	/* prefix of namespace or NULL */
-  const char *			uri;	/* uri */
-};
+typedef GPtrArray SwfdecAbcNsSet;
 
-void		swfdec_abc_namespace_init	(SwfdecAbcNamespace *		ns,
-						 SwfdecAbcNamespaceType		type,
-						 const char *			prefix,
-						 const char *			uri);
+#define swfdec_abc_ns_set_new() g_ptr_array_new ()
+#define swfdec_abc_ns_set_free(set) g_ptr_array_free (set, TRUE)
 
-gboolean	swfdec_abc_namespace_equal	(const SwfdecAbcNamespace *	a,
-						 const SwfdecAbcNamespace *	b);
+#define swfdec_abc_ns_set_add(set, ns) g_ptr_array_add (set, ns)
+gboolean	swfdec_abc_ns_set_contains (const SwfdecAbcNsSet *	set,
+					    const SwfdecAbcNamespace *	ns);
 
 
 G_END_DECLS

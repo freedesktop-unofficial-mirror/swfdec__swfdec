@@ -56,6 +56,14 @@ swfdec_abc_file_dispose (GObject *object)
     swfdec_as_context_unuse_mem (context, file->n_namespaces * sizeof (SwfdecAbcNamespace));
     g_free (file->namespaces);
   }
+  if (file->n_nssets) {
+    guint i;
+    for (i = 0; i < file->n_nssets; i++) {
+      swfdec_abc_ns_set_free (file->nssets[i]);
+    }
+    swfdec_as_context_unuse_mem (context, file->n_nssets * sizeof (SwfdecAbcNsSet));
+    g_free (file->nssets);
+  }
 
   G_OBJECT_CLASS (swfdec_abc_file_parent_class)->dispose (object);
 }
@@ -212,6 +220,31 @@ swfdec_abc_file_parse_46 (SwfdecAbcFile *file, SwfdecBits *bits)
       } else {
 	return FALSE;
       }
+    }
+  }
+
+  /* read all namespace sets */
+  READ_U30 (file->n_nssets, bits);
+  if (file->n_nssets) {
+    if (!swfdec_as_context_try_use_mem (context, file->n_nssets * sizeof (SwfdecAbcNsSet *))) {
+      file->n_nssets = 0;
+      return FALSE;
+    }
+    file->nssets = g_new0 (SwfdecAbcNsSet *, file->n_nssets);
+    for (i = 0; i < file->n_nssets; i++) {
+      file->nssets[i] = swfdec_abc_ns_set_new ();
+    }
+    for (i = 1; i < file->n_nssets; i++) {
+      guint j, len;
+      READ_U30 (len, bits);
+      for (j = 0; j < len; j++) {
+	guint ns;
+	READ_U30 (ns, bits);
+	if (ns == 0 || ns >= file->n_namespaces)
+	  return FALSE;
+	swfdec_abc_ns_set_add (file->nssets[i], &file->namespaces[ns]);
+      }
+      SWFDEC_LOG ("  ns set %u: %u namespaces", i, len);
     }
   }
 
