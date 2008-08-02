@@ -17,7 +17,8 @@
  * Boston, MA  02110-1301  USA
  */
 
-#include <glib.h>
+#include <swfdec/swfdec_as_types.h>
+#include <swfdec/swfdec_gc_object.h>
 
 #ifndef _SWFDEC_ABC_NAMESPACE_H_
 #define _SWFDEC_ABC_NAMESPACE_H_
@@ -33,14 +34,32 @@ typedef enum {
   SWFDEC_ABC_NAMESPACE_STATIC_PROTECTED = 5
 } SwfdecAbcNamespaceType;
 
-typedef struct _SwfdecAbcNamespace SwfdecAbcNamespace;
+//typedef struct _SwfdecAbcNamespace SwfdecAbcNamespace;
+typedef struct _SwfdecAbcNamespaceClass SwfdecAbcNamespaceClass;
+
+#define SWFDEC_TYPE_ABC_NAMESPACE                    (swfdec_abc_namespace_get_type())
+#define SWFDEC_IS_ABC_NAMESPACE(obj)                 (G_TYPE_CHECK_INSTANCE_TYPE ((obj), SWFDEC_TYPE_ABC_NAMESPACE))
+#define SWFDEC_IS_ABC_NAMESPACE_CLASS(klass)         (G_TYPE_CHECK_CLASS_TYPE ((klass), SWFDEC_TYPE_ABC_NAMESPACE))
+#define SWFDEC_ABC_NAMESPACE(obj)                    (G_TYPE_CHECK_INSTANCE_CAST ((obj), SWFDEC_TYPE_ABC_NAMESPACE, SwfdecAbcNamespace))
+#define SWFDEC_ABC_NAMESPACE_CLASS(klass)            (G_TYPE_CHECK_CLASS_CAST ((klass), SWFDEC_TYPE_ABC_NAMESPACE, SwfdecAbcNamespaceClass))
+#define SWFDEC_ABC_NAMESPACE_GET_CLASS(obj)          (G_TYPE_INSTANCE_GET_CLASS ((obj), SWFDEC_TYPE_ABC_NAMESPACE, SwfdecAbcNamespaceClass))
+
 struct _SwfdecAbcNamespace {
+  SwfdecGcObject		object;
+
   SwfdecAbcNamespaceType	type;
   const char *			prefix;	/* prefix of namespace or NULL */
   const char *			uri;	/* uri */
 };
 
-void		swfdec_abc_namespace_init	(SwfdecAbcNamespace *		ns,
+struct _SwfdecAbcNamespaceClass {
+  SwfdecGcObjectClass	object_class;
+};
+
+GType		swfdec_abc_namespace_get_type	(void) G_GNUC_CONST;
+
+SwfdecAbcNamespace *
+		swfdec_abc_namespace_new	(SwfdecAsContext *		context,
 						 SwfdecAbcNamespaceType		type,
 						 const char *			prefix,
 						 const char *			uri);

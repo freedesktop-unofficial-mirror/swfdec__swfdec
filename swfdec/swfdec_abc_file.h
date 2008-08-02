@@ -48,7 +48,7 @@ struct _SwfdecAbcFile {
   guint			n_doubles;	/* number of doubles */
   const char **		strings;	/* all string values in the file */
   guint			n_strings;	/* number of strings */
-  SwfdecAbcNamespace *	namespaces;	/* all the namespaces in use */
+  SwfdecAbcNamespace **	namespaces;	/* all the namespaces in use */
   guint			n_namespaces;	/* number of namespaces */
   SwfdecAbcNsSet **	nssets;		/* all the namespace sets in use */
   guint			n_nssets;	/* number of namespace sets */

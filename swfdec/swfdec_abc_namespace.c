@@ -22,18 +22,63 @@
 #endif
 
 #include "swfdec_abc_namespace.h"
+#include "swfdec_as_context.h"
 #include "swfdec_debug.h"
 
-void
-swfdec_abc_namespace_init (SwfdecAbcNamespace *ns, SwfdecAbcNamespaceType type,
+G_DEFINE_TYPE (SwfdecAbcNamespace, swfdec_abc_namespace, SWFDEC_TYPE_GC_OBJECT)
+
+static void
+swfdec_abc_namespace_dispose (GObject *object)
+{
+  //SwfdecAbcNamespace *ns = SWFDEC_ABC_NAMESPACE (object);
+
+  G_OBJECT_CLASS (swfdec_abc_namespace_parent_class)->dispose (object);
+}
+
+static void
+swfdec_abc_namespace_mark (SwfdecGcObject *object)
+{
+  SwfdecAbcNamespace *ns = SWFDEC_ABC_NAMESPACE (object);
+
+  if (ns->prefix)
+    swfdec_as_string_mark (ns->prefix);
+  swfdec_as_string_mark (ns->uri);
+
+  SWFDEC_GC_OBJECT_CLASS (swfdec_abc_namespace_parent_class)->mark (object);
+}
+
+static void
+swfdec_abc_namespace_class_init (SwfdecAbcNamespaceClass *klass)
+{
+  GObjectClass *object_class = G_OBJECT_CLASS (klass);
+  SwfdecGcObjectClass *gc_class = SWFDEC_GC_OBJECT_CLASS (klass);
+
+  object_class->dispose = swfdec_abc_namespace_dispose;
+
+  gc_class->mark = swfdec_abc_namespace_mark;
+}
+
+static void
+swfdec_abc_namespace_init (SwfdecAbcNamespace *date)
+{
+}
+
+SwfdecAbcNamespace *
+swfdec_abc_namespace_new (SwfdecAsContext *context, SwfdecAbcNamespaceType type,
     const char *prefix, const char *uri)
 {
-  g_return_if_fail (ns != NULL);
-  g_return_if_fail (uri != NULL);
+  SwfdecAbcNamespace *ns;
+
+  g_return_val_if_fail (SWFDEC_IS_AS_CONTEXT (context), NULL);
+  g_return_val_if_fail (uri != NULL, NULL);
+
+  ns = g_object_new (SWFDEC_TYPE_ABC_NAMESPACE, "context", context, NULL);
 
   ns->type = type;
   ns->prefix = prefix;
   ns->uri = uri;
+
+  return ns;
 }
 
 gboolean

@@ -21,7 +21,6 @@
 #define _SWFDEC_AS_TYPES_H_
 
 #include <glib-object.h>
-#include <swfdec/swfdec_abc_namespace.h>
 
 G_BEGIN_DECLS
 
@@ -38,6 +37,7 @@ typedef enum {
   SWFDEC_AS_TYPE_NAMESPACE
 } SwfdecAsValueType;
 
+typedef struct _SwfdecAbcNamespace SwfdecAbcNamespace;
 typedef struct _SwfdecAsArray SwfdecAsArray;
 typedef struct _SwfdecAsContext SwfdecAsContext;
 typedef struct _SwfdecAsDebugger SwfdecAsDebugger;

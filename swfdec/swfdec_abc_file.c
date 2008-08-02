@@ -77,6 +77,9 @@ swfdec_abc_file_mark (SwfdecGcObject *object)
   for (i = 0; i < file->n_strings; i++) {
     swfdec_as_string_mark (file->strings[i]);
   }
+  for (i = 1; i < file->n_namespaces; i++) {
+    swfdec_gc_object_mark (file->namespaces[i]);
+  }
 
   SWFDEC_GC_OBJECT_CLASS (swfdec_abc_file_parent_class)->mark (object);
 }
@@ -177,11 +180,11 @@ swfdec_abc_file_parse_46 (SwfdecAbcFile *file, SwfdecBits *bits)
   /* read all namespaces */
   READ_U30 (file->n_namespaces, bits);
   if (file->n_namespaces) {
-    if (!swfdec_as_context_try_use_mem (context, file->n_strings * sizeof (SwfdecAbcNamespace))) {
+    if (!swfdec_as_context_try_use_mem (context, file->n_strings * sizeof (SwfdecAbcNamespace *))) {
       file->n_namespaces = 0;
       return FALSE;
     }
-    file->namespaces = g_new0 (SwfdecAbcNamespace, file->n_namespaces);
+    file->namespaces = g_new0 (SwfdecAbcNamespace *, file->n_namespaces);
     for (i = 1; i < file->n_namespaces; i++) {
       SwfdecAbcNamespaceType type;
       guint id;
@@ -211,12 +214,12 @@ swfdec_abc_file_parse_46 (SwfdecAbcFile *file, SwfdecBits *bits)
       READ_U30 (id, bits);
       if (id == 0) {
 	SWFDEC_LOG ("  namespace %u: undefined", i);
-	swfdec_abc_namespace_init (&file->namespaces[i], type,
-	    NULL, SWFDEC_AS_STR_undefined);
+	file->namespaces[i] = swfdec_abc_namespace_new (context,
+	    type, NULL, SWFDEC_AS_STR_undefined);
       } else if (id < file->n_strings) {
 	SWFDEC_LOG ("  namespace %u: %s", i, file->strings[id]);
-	swfdec_abc_namespace_init (&file->namespaces[i], type,
-	    NULL, file->strings[id]);
+	file->namespaces[i] = swfdec_abc_namespace_new (context,
+	    type, NULL, file->strings[id]);
       } else {
 	return FALSE;
       }
