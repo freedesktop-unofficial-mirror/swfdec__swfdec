@@ -23,6 +23,7 @@
 
 #include "swfdec_abc_file.h"
 #include "swfdec_abc_internal.h"
+#include "swfdec_as_strings.h"
 #include "swfdec_debug.h"
 
 /*** SWFDEC_ABC_FILE ***/
@@ -50,6 +51,10 @@ swfdec_abc_file_dispose (GObject *object)
   if (file->n_strings) {
     swfdec_as_context_unuse_mem (context, file->n_strings * sizeof (const char *));
     g_free (file->strings);
+  }
+  if (file->n_namespaces) {
+    swfdec_as_context_unuse_mem (context, file->n_namespaces * sizeof (SwfdecAbcNamespace));
+    g_free (file->namespaces);
   }
 
   G_OBJECT_CLASS (swfdec_abc_file_parent_class)->dispose (object);
@@ -158,6 +163,55 @@ swfdec_abc_file_parse_46 (SwfdecAbcFile *file, SwfdecBits *bits)
 	return FALSE;
       file->strings[i] = swfdec_as_context_give_string (context, s);
       SWFDEC_LOG ("  string %u: %s", i, file->strings[i]);
+    }
+  }
+
+  /* read all namespaces */
+  READ_U30 (file->n_namespaces, bits);
+  if (file->n_namespaces) {
+    if (!swfdec_as_context_try_use_mem (context, file->n_strings * sizeof (SwfdecAbcNamespace))) {
+      file->n_namespaces = 0;
+      return FALSE;
+    }
+    file->namespaces = g_new0 (SwfdecAbcNamespace, file->n_namespaces);
+    for (i = 1; i < file->n_namespaces; i++) {
+      SwfdecAbcNamespaceType type;
+      guint id;
+      switch (swfdec_bits_get_u8 (bits)) {
+	case 0x05:
+	  type = SWFDEC_ABC_NAMESPACE_PRIVATE;
+	  break;
+	case 0x08:
+	case 0x16:
+	  type = SWFDEC_ABC_NAMESPACE_PUBLIC;
+	  break;
+	case 0x17:
+	  type = SWFDEC_ABC_NAMESPACE_PACKAGE;
+	  break;
+	case 0x18:
+	  type = SWFDEC_ABC_NAMESPACE_PROTECTED;
+	  break;
+	case 0x19:
+	  type = SWFDEC_ABC_NAMESPACE_EXPLICIT;
+	  break;
+	case 0x1A:
+	  type = SWFDEC_ABC_NAMESPACE_STATIC_PROTECTED;
+	  break;
+	default:
+	  return FALSE;
+      }
+      READ_U30 (id, bits);
+      if (id == 0) {
+	SWFDEC_LOG ("  namespace %u: undefined", i);
+	swfdec_abc_namespace_init (&file->namespaces[i], type,
+	    NULL, SWFDEC_AS_STR_undefined);
+      } else if (id < file->n_strings) {
+	SWFDEC_LOG ("  namespace %u: %s", i, file->strings[id]);
+	swfdec_abc_namespace_init (&file->namespaces[i], type,
+	    NULL, file->strings[id]);
+      } else {
+	return FALSE;
+      }
     }
   }
 

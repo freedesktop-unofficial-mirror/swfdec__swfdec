@@ -20,6 +20,7 @@
 #ifndef _SWFDEC_ABC_FILE_H_
 #define _SWFDEC_ABC_FILE_H_
 
+#include <swfdec/swfdec_abc_namespace.h>
 #include <swfdec/swfdec_bits.h>
 #include <swfdec/swfdec_gc_object.h>
 
@@ -46,6 +47,8 @@ struct _SwfdecAbcFile {
   guint			n_doubles;	/* number of doubles */
   const char **		strings;	/* all string values in the file */
   guint			n_strings;	/* number of strings */
+  SwfdecAbcNamespace *	namespaces;	/* all the namespaces in use */
+  guint			n_namespaces;	/* number of namespaces */
 };
 
 struct _SwfdecAbcFileClass {
