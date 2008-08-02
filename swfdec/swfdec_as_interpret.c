@@ -1601,6 +1601,10 @@ swfdec_action_strict_equals (SwfdecAsContext *cx, guint action, const guint8 *da
 	  }
 	}
 	break;
+      case SWFDEC_AS_TYPE_NAMESPACE:
+	cond = swfdec_abc_namespace_equal (SWFDEC_AS_VALUE_GET_NAMESPACE (lval),
+	    SWFDEC_AS_VALUE_GET_NAMESPACE (rval));
+	break;
       case SWFDEC_AS_TYPE_INT:
       default:
 	g_assert_not_reached ();
@@ -2184,6 +2188,9 @@ swfdec_action_type_of (SwfdecAsContext *cx, guint action, const guint8 *data, gu
 	  type = SWFDEC_AS_STR_object;
 	}
       }
+      break;
+    case SWFDEC_AS_TYPE_NAMESPACE:
+      type = SWFDEC_AS_STR_object;
       break;
     case SWFDEC_AS_TYPE_INT:
     default:

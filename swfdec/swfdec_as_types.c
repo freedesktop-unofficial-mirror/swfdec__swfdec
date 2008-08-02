@@ -408,6 +408,8 @@ swfdec_as_value_to_string (SwfdecAsContext *context, const SwfdecAsValue *value)
 	    return SWFDEC_AS_STR__type_Object_;
 	}
       }
+    case SWFDEC_AS_TYPE_NAMESPACE:
+      return SWFDEC_AS_VALUE_GET_NAMESPACE (value)->uri;
     case SWFDEC_AS_TYPE_INT:
     default:
       g_assert_not_reached ();
@@ -442,11 +444,45 @@ swfdec_as_value_to_debug (const SwfdecAsValue *value)
       return g_strdup_printf ("%g", SWFDEC_AS_VALUE_GET_NUMBER (value));
     case SWFDEC_AS_TYPE_OBJECT:
       return swfdec_as_object_get_debug (SWFDEC_AS_VALUE_GET_OBJECT (value));
+    case SWFDEC_AS_TYPE_NAMESPACE:
+      {
+	SwfdecAbcNamespace *ns = SWFDEC_AS_VALUE_GET_NAMESPACE (value);
+	return g_strdup_printf ("%s::%s", ns->prefix ? ns->prefix : "", ns->uri);
+      }
     case SWFDEC_AS_TYPE_INT:
     default:
       g_assert_not_reached ();
       return NULL;
   }
+}
+
+static double
+swfdec_as_string_to_number (SwfdecAsContext *context, const char *s)
+{
+  char *end;
+  double d;
+  
+  g_return_val_if_fail (SWFDEC_IS_AS_CONTEXT (context), 0);
+  g_return_val_if_fail (s != NULL, 0);
+
+  // FIXME: We should most likely copy Tamarin's code here (MathUtils.cpp)
+  if (s == SWFDEC_AS_STR_EMPTY)
+    return (context->version >= 5) ? NAN : 0.0;
+  if (context->version > 5 && s[0] == '0' &&
+      (s[1] == 'x' || s[1] == 'X')) {
+    d = g_ascii_strtoll (s + 2, &end, 16);
+  } else if (context->version > 5 && s[0] == '0' &&
+      s[strspn (s, "01234567")] == '\0') {
+    d = g_ascii_strtoll (s, &end, 8);
+  } else {
+    if (strpbrk (s, "xXiI") != NULL)
+      return (context->version >= 5) ? NAN : 0.0;
+    d = g_ascii_strtod (s, &end);
+  }
+  if (*end == '\0' || context->version < 5)
+    return d == -0.0 ? 0.0 : d;
+  else
+    return NAN;
 }
 
 /**
@@ -481,33 +517,13 @@ swfdec_as_value_to_number (SwfdecAsContext *context, const SwfdecAsValue *value)
     case SWFDEC_AS_TYPE_NUMBER:
       return SWFDEC_AS_VALUE_GET_NUMBER (&tmp);
     case SWFDEC_AS_TYPE_STRING:
-      {
-	const char *s;
-	char *end;
-	double d;
-	
-	// FIXME: We should most likely copy Tamarin's code here (MathUtils.cpp)
-	s = SWFDEC_AS_VALUE_GET_STRING (&tmp);
-	if (s == SWFDEC_AS_STR_EMPTY)
-	  return (context->version >= 5) ? NAN : 0.0;
-	if (context->version > 5 && s[0] == '0' &&
-	    (s[1] == 'x' || s[1] == 'X')) {
-	  d = g_ascii_strtoll (s + 2, &end, 16);
-	} else if (context->version > 5 && s[0] == '0' &&
-	    s[strspn (s, "01234567")] == '\0') {
-	  d = g_ascii_strtoll (s, &end, 8);
-	} else {
-	  if (strpbrk (s, "xXiI") != NULL)
-	    return (context->version >= 5) ? NAN : 0.0;
-	  d = g_ascii_strtod (s, &end);
-	}
-	if (*end == '\0' || context->version < 5)
-	  return d == -0.0 ? 0.0 : d;
-	else
-	  return NAN;
-      }
+      return swfdec_as_string_to_number (context,
+	  SWFDEC_AS_VALUE_GET_STRING (&tmp));
     case SWFDEC_AS_TYPE_OBJECT:
       return (context->version >= 5) ? NAN : 0.0;
+    case SWFDEC_AS_TYPE_NAMESPACE:
+      return swfdec_as_string_to_number (context,
+	  SWFDEC_AS_VALUE_GET_NAMESPACE (&tmp)->uri);
     case SWFDEC_AS_TYPE_INT:
     default:
       g_assert_not_reached ();
@@ -595,6 +611,9 @@ swfdec_as_value_to_object (SwfdecAsContext *context, const SwfdecAsValue *value)
       break;
     case SWFDEC_AS_TYPE_OBJECT:
       return SWFDEC_AS_VALUE_GET_OBJECT (value);
+    case SWFDEC_AS_TYPE_NAMESPACE:
+      SWFDEC_FIXME ("implement NameSpace class");
+      return NULL;
     case SWFDEC_AS_TYPE_INT:
     default:
       g_assert_not_reached ();
@@ -650,6 +669,7 @@ swfdec_as_value_to_boolean (SwfdecAsContext *context, const SwfdecAsValue *value
 	return SWFDEC_AS_VALUE_GET_STRING (value) != SWFDEC_AS_STR_EMPTY;
       }
     case SWFDEC_AS_TYPE_OBJECT:
+    case SWFDEC_AS_TYPE_NAMESPACE:
       return TRUE;
     case SWFDEC_AS_TYPE_INT:
     default:

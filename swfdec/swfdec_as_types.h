@@ -1,5 +1,5 @@
 /* Swfdec
- * Copyright (C) 2007 Benjamin Otte <otte@gnome.org>
+ * Copyright (C) 2007-2008 Benjamin Otte <otte@gnome.org>
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -21,6 +21,7 @@
 #define _SWFDEC_AS_TYPES_H_
 
 #include <glib-object.h>
+#include <swfdec/swfdec_abc_namespace.h>
 
 G_BEGIN_DECLS
 
@@ -32,7 +33,9 @@ typedef enum {
   SWFDEC_AS_TYPE_NUMBER,
   SWFDEC_AS_TYPE_STRING,
   SWFDEC_AS_TYPE_NULL,
-  SWFDEC_AS_TYPE_OBJECT
+  SWFDEC_AS_TYPE_OBJECT,
+  /* types for ABC */
+  SWFDEC_AS_TYPE_NAMESPACE
 } SwfdecAsValueType;
 
 typedef struct _SwfdecAsArray SwfdecAsArray;
@@ -62,6 +65,7 @@ struct _SwfdecAsValue {
     double		number;
     const char *	string;
     SwfdecAsObject *	object;
+    SwfdecAbcNamespace *ns;
   } value;
 };
 
@@ -76,16 +80,16 @@ struct _SwfdecAsValue {
   SwfdecAsValue *__val = (val); \
   gboolean __tmp = (b); \
   g_assert (__tmp == TRUE || __tmp == FALSE); \
-  (__val)->value.boolean = __tmp; \
-  (__val)->type = SWFDEC_AS_TYPE_BOOLEAN; \
+  __val->value.boolean = __tmp; \
+  __val->type = SWFDEC_AS_TYPE_BOOLEAN; \
 } G_STMT_END
 
 #define SWFDEC_AS_VALUE_IS_NUMBER(val) ((val)->type == SWFDEC_AS_TYPE_NUMBER)
 #define SWFDEC_AS_VALUE_GET_NUMBER(val) ((val)->value.number)
 #define SWFDEC_AS_VALUE_SET_NUMBER(val,d) G_STMT_START { \
   SwfdecAsValue *__val = (val); \
-  (__val)->value.number = (d); \
-  (__val)->type = SWFDEC_AS_TYPE_NUMBER; \
+  __val->value.number = (d); \
+  __val->type = SWFDEC_AS_TYPE_NUMBER; \
 } G_STMT_END
 
 #define SWFDEC_AS_VALUE_SET_INT(val,d) SWFDEC_AS_VALUE_SET_NUMBER(val,(int) (d))
@@ -94,8 +98,10 @@ struct _SwfdecAsValue {
 #define SWFDEC_AS_VALUE_GET_STRING(val) ((val)->value.string)
 #define SWFDEC_AS_VALUE_SET_STRING(val,s) G_STMT_START { \
   SwfdecAsValue *__val = (val); \
-  (__val)->value.string = s; \
-  (__val)->type = SWFDEC_AS_TYPE_STRING; \
+  const char *__s = (s); \
+  g_assert (__s != NULL); \
+  __val->value.string = __s; \
+  __val->type = SWFDEC_AS_TYPE_STRING; \
 } G_STMT_END
 
 #define SWFDEC_AS_VALUE_IS_NULL(val) ((val)->type == SWFDEC_AS_TYPE_NULL)
@@ -107,8 +113,18 @@ struct _SwfdecAsValue {
   SwfdecAsValue *__val = (val); \
   SwfdecAsObject *__o = (o); \
   g_assert (__o != NULL); \
-  (__val)->type = SWFDEC_AS_TYPE_OBJECT; \
-  (__val)->value.object = __o; \
+  __val->type = SWFDEC_AS_TYPE_OBJECT; \
+  __val->value.object = __o; \
+} G_STMT_END
+
+#define SWFDEC_AS_VALUE_IS_NAMESPACE(val) ((val)->type == SWFDEC_AS_TYPE_NAMESPACE)
+#define SWFDEC_AS_VALUE_GET_NAMESPACE(val) ((val)->value.ns)
+#define SWFDEC_AS_VALUE_SET_NAMESPACE(val,ns) G_STMT_START { \
+  SwfdecAsValue *__val = (val); \
+  SwfdecAsObject *__ns = (ns); \
+  g_assert (__ns != NULL); \
+  __val->type = SWFDEC_AS_TYPE_NAMESPACE; \
+  __val->value.object = __ns; \
 } G_STMT_END
 
 /* value conversion functions */

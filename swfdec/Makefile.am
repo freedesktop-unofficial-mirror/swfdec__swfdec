@@ -11,6 +11,7 @@ lib_LTLIBRARIES = libswfdec-@SWFDEC_MAJORMINOR@.la
 # these are files that must be in SRCDIR
 libswfdec_source_files = \
 	swfdec_abc_file.c \
+	swfdec_abc_namespace.c \
 	swfdec_access.c \
 	swfdec_accessibility.c \
 	swfdec_actor.c \
@@ -193,6 +194,7 @@ libswfdec_@SWFDEC_MAJORMINOR@_la_LDFLAGS = \
 
 public_headers = \
 	swfdec.h \
+	swfdec_abc_namespace.h \
 	swfdec_as_array.h \
 	swfdec_as_context.h \
 	swfdec_as_debugger.h \

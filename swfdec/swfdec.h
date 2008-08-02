@@ -1,7 +1,7 @@
 /* Swfdec
  * Copyright (C) 2003-2006 David Schleef <ds@schleef.org>
  *		 2005-2006 Eric Anholt <eric@anholt.net>
- *		 2006-2007 Benjamin Otte <otte@gnome.org>
+ *		 2006-2008 Benjamin Otte <otte@gnome.org>
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -21,6 +21,8 @@
 
 #ifndef __SWFDEC_H__
 #define __SWFDEC_H__
+
+#include <swfdec/swfdec_abc_namespace.h>
 
 #include <swfdec/swfdec_as_array.h>
 #include <swfdec/swfdec_as_context.h>
