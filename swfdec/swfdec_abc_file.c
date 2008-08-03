@@ -218,11 +218,13 @@ swfdec_abc_file_parse_constants (SwfdecAbcFile *file, SwfdecBits *bits)
       READ_U30 (id, bits);
       if (id == 0) {
 	SWFDEC_LOG ("  namespace %u: undefined", i);
-	file->namespaces[i] = swfdec_abc_namespace_new (context,
+	file->namespaces[i] = (type == SWFDEC_ABC_NAMESPACE_PRIVATE ? 
+	    swfdec_abc_namespace_new : swfdec_as_context_get_namespace) (context,
 	    type, NULL, SWFDEC_AS_STR_undefined);
       } else if (id < file->n_strings) {
 	SWFDEC_LOG ("  namespace %u: %s", i, file->strings[id]);
-	file->namespaces[i] = swfdec_abc_namespace_new (context,
+	file->namespaces[i] = (type == SWFDEC_ABC_NAMESPACE_PRIVATE ? 
+	    swfdec_abc_namespace_new : swfdec_as_context_get_namespace) (context,
 	    type, NULL, file->strings[id]);
       } else {
 	return FALSE;

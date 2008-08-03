@@ -278,7 +278,7 @@ swfdec_as_context_remove_strings (gpointer key, gpointer value, gpointer data)
 }
 
 static gboolean
-swfdec_as_context_remove_objects (gpointer key, gpointer value, gpointer debugger)
+swfdec_as_context_remove_objects (gpointer key, gpointer value, gpointer context)
 {
   SwfdecGcObject *gc;
 
@@ -291,6 +291,11 @@ swfdec_as_context_remove_objects (gpointer key, gpointer value, gpointer debugge
     return FALSE;
   } else {
     SWFDEC_LOG ("deleted: %s %p", G_OBJECT_TYPE_NAME (gc), gc);
+    /* FIXME: solve this smarter */
+    if (SWFDEC_IS_ABC_NAMESPACE (gc)) {
+      if (g_hash_table_lookup (SWFDEC_AS_CONTEXT (context)->namespaces, gc) == gc)
+	g_hash_table_remove (SWFDEC_AS_CONTEXT (context)->namespaces, gc);
+    }
     g_object_unref (gc);
     return TRUE;
   }
@@ -304,7 +309,7 @@ swfdec_as_context_collect (SwfdecAsContext *context)
   g_hash_table_foreach_remove (context->strings, 
     swfdec_as_context_remove_strings, context);
   g_hash_table_foreach_remove (context->objects, 
-    swfdec_as_context_remove_objects, context->debugger);
+    swfdec_as_context_remove_objects, context);
   SWFDEC_INFO (">> done collecting garbage");
 }
 
@@ -383,6 +388,7 @@ swfdec_as_context_do_mark (SwfdecAsContext *context)
     swfdec_gc_object_mark (context->Object);
     swfdec_gc_object_mark (context->Object_prototype);
   }
+  swfdec_gc_object_mark (context->public_ns);
   if (context->exception)
     swfdec_as_value_mark (&context->exception_value);
   g_hash_table_foreach (context->objects, swfdec_as_context_mark_roots, NULL);
@@ -524,6 +530,7 @@ swfdec_as_context_dispose (GObject *object)
   g_hash_table_destroy (context->constant_pools);
   g_hash_table_destroy (context->objects);
   g_hash_table_destroy (context->strings);
+  g_hash_table_destroy (context->namespaces);
   g_rand_free (context->rand);
   if (context->debugger) {
     g_object_unref (context->debugger);
@@ -582,6 +589,8 @@ swfdec_as_context_init (SwfdecAsContext *context)
   context->strings = g_hash_table_new (g_str_hash, g_str_equal);
   context->objects = g_hash_table_new (g_direct_hash, g_direct_equal);
   context->constant_pools = g_hash_table_new (g_direct_hash, g_direct_equal);
+  context->namespaces = g_hash_table_new (swfdec_abc_namespace_hash, 
+      swfdec_abc_namespace_equal);
 
   for (s = swfdec_as_strings; *s == '\2'; s += strlen (s) + 1) {
     g_hash_table_insert (context->strings, (char *) s + 1, (char *) s);
@@ -589,6 +598,9 @@ swfdec_as_context_init (SwfdecAsContext *context)
   g_assert (*s == 0);
   context->rand = g_rand_new ();
   g_get_current_time (&context->start_time);
+
+  context->public_ns = swfdec_as_context_get_namespace (context,
+      SWFDEC_ABC_NAMESPACE_PUBLIC, SWFDEC_AS_STR_EMPTY, SWFDEC_AS_STR_EMPTY);
 }
 
 /*** STRINGS ***/
@@ -1036,6 +1048,28 @@ swfdec_as_context_throw_abcv (SwfdecAsContext *context, SwfdecAbcErrorType type,
   SWFDEC_ERROR ("throwing exception of type %d: %s", type, s);
   SWFDEC_FIXME ("now actually throw this thing!");
   g_free (s);
+}
+
+SwfdecAbcNamespace *
+swfdec_as_context_get_namespace (SwfdecAsContext *context, SwfdecAbcNamespaceType type,
+    const char *prefix, const char *uri)
+{
+  SwfdecAbcNamespace *ns, cmp;
+
+  g_return_val_if_fail (SWFDEC_IS_AS_CONTEXT (context), NULL);
+  g_return_val_if_fail (uri != NULL, NULL);
+
+  cmp.type = type;
+  cmp.prefix = prefix;
+  cmp.uri = uri;
+
+  ns = g_hash_table_lookup (context->namespaces, &cmp);
+  if (ns)
+    return ns;
+
+  ns = swfdec_abc_namespace_new (context, type, prefix, uri);
+  g_hash_table_insert (context->namespaces, ns, ns);
+  return ns;
 }
 
 /*** AS CODE ***/

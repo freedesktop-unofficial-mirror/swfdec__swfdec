@@ -81,15 +81,23 @@ swfdec_abc_namespace_new (SwfdecAsContext *context, SwfdecAbcNamespaceType type,
   return ns;
 }
 
-gboolean
-swfdec_abc_namespace_equal (const SwfdecAbcNamespace *a,
-    const SwfdecAbcNamespace *b)
+guint
+swfdec_abc_namespace_hash (gconstpointer a)
 {
-  g_return_val_if_fail (a != NULL, FALSE);
-  g_return_val_if_fail (b != NULL, FALSE);
+  /* no type checking here due to swfdec_as_context_get_namespace() hack */
+  SwfdecAbcNamespace *nsa = (SwfdecAbcNamespace *) a;
 
-  if (a->prefix == NULL || b->prefix == NULL)
-    return a == b;
+  return g_str_hash (nsa->uri) << 3 | nsa->type;
+}
 
-  return a->uri == b->uri;
+gboolean
+swfdec_abc_namespace_equal (gconstpointer a, gconstpointer b)
+{
+  /* no type checking here due to swfdec_as_context_get_namespace() hack */
+  SwfdecAbcNamespace *nsa = (SwfdecAbcNamespace *) a;
+  SwfdecAbcNamespace *nsb = (SwfdecAbcNamespace *) b;
+
+  if (nsa->prefix == NULL || nsb->prefix == NULL)
+    return nsa == nsb;
+  return nsa->uri == nsb->uri;
 }

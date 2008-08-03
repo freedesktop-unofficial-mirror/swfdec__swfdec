@@ -20,6 +20,7 @@
 #ifndef _SWFDEC_ABC_INTERNAL_H_
 #define _SWFDEC_ABC_INTERNAL_H_
 
+#include <swfdec/swfdec_abc_namespace.h>
 #include <swfdec/swfdec_as_context.h>
 
 G_BEGIN_DECLS
@@ -42,14 +43,19 @@ typedef enum {
 } SwfdecAbcErrorType;
 
 /* swfdec_as_context.c */
-void		swfdec_as_context_throw_abc		(SwfdecAsContext *	context,
-							 SwfdecAbcErrorType	type,
-							 const char *		format,
-							 ...) G_GNUC_PRINTF (3, 4);
-void		swfdec_as_context_throw_abcv		(SwfdecAsContext *	context,
-							 SwfdecAbcErrorType	type,
-							 const char *		format,
-							 va_list		args);
+void			swfdec_as_context_throw_abc		(SwfdecAsContext *	context,
+								 SwfdecAbcErrorType	type,
+								 const char *		format,
+								 ...) G_GNUC_PRINTF (3, 4);
+void			swfdec_as_context_throw_abcv		(SwfdecAsContext *	context,
+								 SwfdecAbcErrorType	type,
+								 const char *		format,
+								 va_list		args);
+
+SwfdecAbcNamespace *	swfdec_as_context_get_namespace		(SwfdecAsContext *	context,
+								 SwfdecAbcNamespaceType	type,
+								 const char *		prefix,
+								 const char *		uri);
 
 
 G_END_DECLS

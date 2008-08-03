@@ -59,6 +59,7 @@ struct _SwfdecAsContext {
   GHashTable *		strings;	/* string => memory mapping the context manages */
   GHashTable *		objects;	/* all objects the context manages */
   GHashTable *		constant_pools;	/* memory address => SwfdecConstantPool for all gc'ed pools */
+  GHashTable *		namespaces;	/* SwfdecAbcNamespacePrivate => SwfdecAbcNamespace for all public namespaces */
 
   /* execution state */
   unsigned int	      	version;	/* currently active version */
@@ -78,6 +79,7 @@ struct _SwfdecAsContext {
   SwfdecAsObject *	Function_prototype;	/* Function.prototype */
   SwfdecAsObject *	Object;		/* Object */
   SwfdecAsObject *	Object_prototype;	/* Object.prototype */
+  SwfdecAbcNamespace *	public_ns;	/* the public default namespace */
 
   /* debugging */
   SwfdecAsDebugger *	debugger;	/* debugger (or NULL if none) */

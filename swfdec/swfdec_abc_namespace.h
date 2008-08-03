@@ -59,13 +59,14 @@ struct _SwfdecAbcNamespaceClass {
 GType		swfdec_abc_namespace_get_type	(void) G_GNUC_CONST;
 
 SwfdecAbcNamespace *
-		swfdec_abc_namespace_new	(SwfdecAsContext *		context,
-						 SwfdecAbcNamespaceType		type,
-						 const char *			prefix,
-						 const char *			uri);
+		swfdec_abc_namespace_new	(SwfdecAsContext *	context,
+						 SwfdecAbcNamespaceType	type,
+						 const char *		prefix,
+						 const char *		uri);
 
-gboolean	swfdec_abc_namespace_equal	(const SwfdecAbcNamespace *	a,
-						 const SwfdecAbcNamespace *	b);
+guint		swfdec_abc_namespace_hash	(gconstpointer		a);
+gboolean	swfdec_abc_namespace_equal	(gconstpointer		a,
+						 gconstpointer		b);
 
 
 G_END_DECLS
