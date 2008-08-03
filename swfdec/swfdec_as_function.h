@@ -35,7 +35,6 @@ typedef struct _SwfdecAsFunctionClass SwfdecAsFunctionClass;
 #define SWFDEC_AS_FUNCTION_CLASS(klass)            (G_TYPE_CHECK_CLASS_CAST ((klass), SWFDEC_TYPE_AS_FUNCTION, SwfdecAsFunctionClass))
 #define SWFDEC_AS_FUNCTION_GET_CLASS(obj)          (G_TYPE_INSTANCE_GET_CLASS ((obj), SWFDEC_TYPE_AS_FUNCTION, SwfdecAsFunctionClass))
 
-/* FIXME: do two obejcts, one for scripts and one for native? */
 struct _SwfdecAsFunction {
   /*< private >*/
   SwfdecAsObject	object;
