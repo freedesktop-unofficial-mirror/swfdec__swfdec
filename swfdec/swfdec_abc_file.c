@@ -64,6 +64,10 @@ swfdec_abc_file_dispose (GObject *object)
     swfdec_as_context_unuse_mem (context, file->n_nssets * sizeof (SwfdecAbcNsSet));
     g_free (file->nssets);
   }
+  if (file->n_multinames) {
+    swfdec_as_context_unuse_mem (context, file->n_multinames * sizeof (SwfdecAbcMultiname));
+    g_free (file->multinames);
+  }
 
   G_OBJECT_CLASS (swfdec_abc_file_parent_class)->dispose (object);
 }
@@ -248,6 +252,77 @@ swfdec_abc_file_parse_46 (SwfdecAbcFile *file, SwfdecBits *bits)
 	swfdec_abc_ns_set_add (file->nssets[i], &file->namespaces[ns]);
       }
       SWFDEC_LOG ("  ns set %u: %u namespaces", i, len);
+    }
+  }
+
+  /* read all multinames */
+  READ_U30 (file->n_multinames, bits);
+  if (file->n_multinames) {
+    guint nsid, nameid;
+    if (!swfdec_as_context_try_use_mem (context, file->n_multinames * sizeof (SwfdecAbcMultiname))) {
+      file->n_multinames = 0;
+      return FALSE;
+    }
+    file->multinames = g_new0 (SwfdecAbcMultiname, file->n_multinames);
+    for (i = 1; i < file->n_multinames; i++) {
+      switch (swfdec_bits_get_u8 (bits)) {
+	case 0x0D:
+	  SWFDEC_FIXME ("implement attributes");
+	case 0x07:
+	  READ_U30 (nsid, bits);
+	  READ_U30 (nameid, bits);
+	  if (nameid >= file->n_strings || nsid >= file->n_namespaces)
+	    return FALSE;
+	  swfdec_abc_multiname_init (&file->multinames[i],
+	      nameid == 0 ? SWFDEC_ABC_MULTINAME_ANY : file->strings[nameid],
+	      nsid == 0 ? SWFDEC_ABC_MULTINAME_ANY : file->namespaces[nsid],
+	      NULL);
+	  break;
+	case 0x10:
+	  SWFDEC_FIXME ("implement attributes");
+	case 0x0F:
+	  READ_U30 (nameid, bits);
+	  if (nameid >= file->n_strings)
+	    return FALSE;
+	  swfdec_abc_multiname_init (&file->multinames[i],
+	      nameid == 0 ? SWFDEC_ABC_MULTINAME_ANY : file->strings[nameid],
+	      NULL, NULL);
+	  break;
+	case 0x12:
+	  SWFDEC_FIXME ("implement attributes");
+	case 0x11:
+	  swfdec_abc_multiname_init (&file->multinames[i],
+	      NULL, NULL, NULL);
+	  break;
+	case 0x0E:
+	  SWFDEC_FIXME ("implement attributes");
+	case 0x09:
+	  READ_U30 (nameid, bits);
+	  READ_U30 (nsid, bits);
+	  if (nameid >= file->n_strings || nsid >= file->n_nssets || nsid == 0)
+	    return FALSE;
+	  swfdec_abc_multiname_init (&file->multinames[i],
+	      nameid == 0 ? SWFDEC_ABC_MULTINAME_ANY : file->strings[nameid],
+	      NULL, file->nssets[nsid]);
+	  break;
+	case 0x1C:
+	  SWFDEC_FIXME ("implement attributes");
+	case 0x1B:
+	  READ_U30 (nsid, bits);
+	  if (nsid >= file->n_nssets || nsid == 0)
+	    return FALSE;
+	  swfdec_abc_multiname_init (&file->multinames[i],
+	      NULL, NULL, file->nssets[nsid]);
+	  break;
+	default:
+	  SWFDEC_ERROR ("invalid multiname type");
+	  return FALSE;
+      }
+      SWFDEC_LOG ("  multiname %u: %s::%s", i, file->multinames[i].ns == NULL ? 
+	  (file->multinames[i].nsset ? "[SET]" : "[RUNTIME]") : 
+	  file->multinames[i].ns == SWFDEC_ABC_MULTINAME_ANY ? "[*]" : file->multinames[i].ns->uri,
+	  file->multinames[i].name == NULL ? "[RUNTIME]" : 
+	  file->multinames[i].name == SWFDEC_ABC_MULTINAME_ANY ? "[*]" : file->multinames[i].name);
     }
   }
 
