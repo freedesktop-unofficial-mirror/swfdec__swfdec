@@ -113,7 +113,7 @@ swfdec_abc_file_init (SwfdecAbcFile *date)
 }G_STMT_END;
 
 static gboolean
-swfdec_abc_file_parse_46 (SwfdecAbcFile *file, SwfdecBits *bits)
+swfdec_abc_file_parse_constants (SwfdecAbcFile *file, SwfdecBits *bits)
 {
   SwfdecAsContext *context = swfdec_gc_object_get_context (file);
   guint i;
@@ -329,6 +329,22 @@ swfdec_abc_file_parse_46 (SwfdecAbcFile *file, SwfdecBits *bits)
   return TRUE;
 }
 
+static gboolean
+swfdec_abc_file_parse_methods (SwfdecAbcFile *file, SwfdecBits *bits)
+{
+  return TRUE;
+}
+
+static gboolean
+swfdec_abc_file_parse (SwfdecAbcFile *file, SwfdecBits *bits)
+{
+  if (swfdec_abc_file_parse_constants (file, bits) &&
+      swfdec_abc_file_parse_methods (file, bits))
+    return TRUE;
+
+  return FALSE;
+}
+
 SwfdecAbcFile *
 swfdec_abc_file_new (SwfdecAsContext *context, SwfdecBits *bits)
 {
@@ -345,7 +361,7 @@ swfdec_abc_file_new (SwfdecAsContext *context, SwfdecBits *bits)
   SWFDEC_LOG ("  major version: %u", major);
   SWFDEC_LOG ("  minor version: %u", minor);
   if (major == 46 && minor == 16) {
-    if (!swfdec_abc_file_parse_46 (file, bits)) {
+    if (!swfdec_abc_file_parse (file, bits)) {
       swfdec_as_context_throw_abc (context, SWFDEC_ABC_ERROR_VERIFY,
 	  "The ABC data is corrupt, attempt to read out of bounds.");
       return NULL;
