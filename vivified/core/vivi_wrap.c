@@ -96,6 +96,9 @@ vivi_wrap_value (ViviApplication *app, SwfdecAsValue *dest, const SwfdecAsValue 
       SWFDEC_AS_VALUE_SET_OBJECT (dest,
 	  vivi_wrap_object (app, SWFDEC_AS_VALUE_GET_OBJECT (src)));
       break;
+    case SWFDEC_AS_TYPE_NAMESPACE:
+      g_assert_not_reached ();
+      break;
     case SWFDEC_AS_TYPE_INT:
     default:
       g_assert_not_reached ();
