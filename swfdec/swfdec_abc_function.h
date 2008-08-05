@@ -26,6 +26,7 @@ G_BEGIN_DECLS
 
 typedef struct _SwfdecAbcFunction SwfdecAbcFunction;
 typedef struct _SwfdecAbcFunctionClass SwfdecAbcFunctionClass;
+typedef struct _SwfdecAbcFunctionArgument SwfdecAbcFunctionArgument;
 
 #define SWFDEC_TYPE_ABC_FUNCTION                    (swfdec_abc_function_get_type())
 #define SWFDEC_IS_ABC_FUNCTION(obj)                 (G_TYPE_CHECK_INSTANCE_TYPE ((obj), SWFDEC_TYPE_ABC_FUNCTION))
@@ -34,9 +35,26 @@ typedef struct _SwfdecAbcFunctionClass SwfdecAbcFunctionClass;
 #define SWFDEC_ABC_FUNCTION_CLASS(klass)            (G_TYPE_CHECK_CLASS_CAST ((klass), SWFDEC_TYPE_ABC_FUNCTION, SwfdecAbcFunctionClass))
 #define SWFDEC_ABC_FUNCTION_GET_CLASS(obj)          (G_TYPE_INSTANCE_GET_CLASS ((obj), SWFDEC_TYPE_ABC_FUNCTION, SwfdecAbcFunctionClass))
 
+struct _SwfdecAbcFunctionArgument {
+  gpointer		type;			/* trait pointer if verified, multiname otherwise */
+  const char *		name;			/* name of argument or NULL if not given or read error */
+  guint			default_index;		/* index of default value */
+  guint8		default_type;		/* type of default value */
+};
+
 struct _SwfdecAbcFunction {
-  /*< private >*/
   SwfdecAsFunction	function;
+
+  const char *		name;			/* gc'd name of the function or NULL if unnamed */
+  gboolean		verified:1;		/* function body has been verified */
+  gboolean		need_arguments:1;	/* needs arguments object */
+  gboolean		need_rest:1;		/* needs rest object */
+  gboolean		need_activation:1;	/* needs activation object */
+  gboolean		set_dxns:1;		/* sets dynamic xml namespace */
+
+  gpointer		return_type;		/* trait pointer if verified, multiname otherwise */
+  guint			n_args;			/* number of arguments */
+  SwfdecAbcFunctionArgument *args;		/* n_args arguments */ 
 };
 
 struct _SwfdecAbcFunctionClass {

@@ -53,7 +53,7 @@ swfdec_abc_file_dispose (GObject *object)
     g_free (file->strings);
   }
   if (file->n_namespaces) {
-    swfdec_as_context_unuse_mem (context, file->n_namespaces * sizeof (SwfdecAbcNamespace));
+    swfdec_as_context_unuse_mem (context, file->n_namespaces * sizeof (SwfdecAbcNamespace *));
     g_free (file->namespaces);
   }
   if (file->n_nssets) {
@@ -61,12 +61,16 @@ swfdec_abc_file_dispose (GObject *object)
     for (i = 0; i < file->n_nssets; i++) {
       swfdec_abc_ns_set_free (file->nssets[i]);
     }
-    swfdec_as_context_unuse_mem (context, file->n_nssets * sizeof (SwfdecAbcNsSet));
+    swfdec_as_context_unuse_mem (context, file->n_nssets * sizeof (SwfdecAbcNsSet *));
     g_free (file->nssets);
   }
   if (file->n_multinames) {
     swfdec_as_context_unuse_mem (context, file->n_multinames * sizeof (SwfdecAbcMultiname));
     g_free (file->multinames);
+  }
+  if (file->n_functions) {
+    swfdec_as_context_unuse_mem (context, file->n_functions * sizeof (SwfdecAbcFunction *));
+    g_free (file->functions);
   }
 
   G_OBJECT_CLASS (swfdec_abc_file_parent_class)->dispose (object);
@@ -184,7 +188,7 @@ swfdec_abc_file_parse_constants (SwfdecAbcFile *file, SwfdecBits *bits)
   /* read all namespaces */
   READ_U30 (file->n_namespaces, bits);
   if (file->n_namespaces) {
-    if (!swfdec_as_context_try_use_mem (context, file->n_strings * sizeof (SwfdecAbcNamespace *))) {
+    if (!swfdec_as_context_try_use_mem (context, file->n_namespaces * sizeof (SwfdecAbcNamespace *))) {
       file->n_namespaces = 0;
       return FALSE;
     }
@@ -334,6 +338,95 @@ swfdec_abc_file_parse_constants (SwfdecAbcFile *file, SwfdecBits *bits)
 static gboolean
 swfdec_abc_file_parse_methods (SwfdecAbcFile *file, SwfdecBits *bits)
 {
+  SwfdecAsContext *context = swfdec_gc_object_get_context (file);
+  guint i;
+
+  READ_U30 (file->n_functions, bits);
+  if (file->n_functions) {
+    gboolean param_names, optional;
+    if (!swfdec_as_context_try_use_mem (context, file->n_functions * sizeof (SwfdecAbcFunction *))) {
+      file->n_functions = 0;
+      return FALSE;
+    }
+    file->functions = g_new0 (SwfdecAbcFunction *, file->n_functions);
+    for (i = 1; i < file->n_functions; i++) {
+      guint id, j, len;
+      SwfdecAbcFunction *fun = file->functions[i] = 
+	g_object_new (SWFDEC_TYPE_ABC_FUNCTION, "context", context, NULL);
+      READ_U30 (len, bits);
+      if (len) {
+	if (!swfdec_as_context_try_use_mem (context, len * sizeof (SwfdecAbcFunctionArgument)))
+	  return FALSE;
+	fun->args = g_new0 (SwfdecAbcFunctionArgument, len);
+	fun->n_args = len;
+      }
+      READ_U30 (id, bits);
+      if (id == 0) {
+	fun->return_type = NULL;
+      } else if (id < file->n_multinames) {
+	fun->return_type = &file->multinames[id];
+      } else {
+	return FALSE;
+      }
+      for (j = 0; j < fun->n_args; j++) {
+	READ_U30 (id, bits);
+	if (id == 0) {
+	  fun->args[j].type = NULL;
+	} else if (id < file->n_multinames) {
+	  fun->args[j].type = &file->multinames[id];
+	} else {
+	  return FALSE;
+	}
+      }
+      READ_U30 (id, bits);
+      if (id > file->n_strings) {
+	return FALSE;
+      } else if (id > 0) {
+	fun->name = file->strings[id];
+      }
+      SWFDEC_LOG ("  function %u: %s (%u args)", i, fun->name ? fun->name : "[unnamed]", fun->n_args);
+      param_names = swfdec_bits_getbit (bits);
+      fun->set_dxns = swfdec_bits_getbit (bits);
+      /* ignored = */ swfdec_bits_getbits (bits, 2);
+      optional = swfdec_bits_getbit (bits);
+      fun->need_rest = swfdec_bits_getbit (bits);
+      fun->need_activation = swfdec_bits_getbit (bits);
+      fun->need_arguments = swfdec_bits_getbit (bits);
+      if (optional) {
+	READ_U30 (len, bits);
+	if (len == 0 || len > fun->n_args)
+	  return FALSE;
+	for (j = fun->n_args - len; j < fun->n_args; j++) {
+	  READ_U30 (id, bits);
+	  fun->args[j].default_index = id;
+	  fun->args[j].default_type = swfdec_bits_get_u8 (bits);
+	}
+      }
+      if (param_names) {
+	/* Tamarin doesn't parse this, so we must not error out here */
+	for (j = 0; j < fun->n_args; j++) {
+	  id = swfdec_bits_get_vu32 (bits);
+	  if (id > 0 && id < file->n_strings)
+	    fun->args[j].name = file->strings[i];
+	}
+      }
+    }
+  }
+
+  return TRUE;
+}
+
+static gboolean
+swfdec_abc_file_skip_metadata (SwfdecAbcFile *file, SwfdecBits *bits)
+{
+  guint i, ignore, count;
+
+  READ_U30 (ignore, bits);
+  READ_U30 (count, bits);
+  for (i = 0; i < count; i++) {
+    READ_U30 (ignore, bits); /* key */
+    READ_U30 (ignore, bits); /* value */
+  }
   return TRUE;
 }
 
@@ -341,7 +434,8 @@ static gboolean
 swfdec_abc_file_parse (SwfdecAbcFile *file, SwfdecBits *bits)
 {
   if (swfdec_abc_file_parse_constants (file, bits) &&
-      swfdec_abc_file_parse_methods (file, bits))
+      swfdec_abc_file_parse_methods (file, bits) &&
+      swfdec_abc_file_skip_metadata (file, bits))
     return TRUE;
 
   return FALSE;

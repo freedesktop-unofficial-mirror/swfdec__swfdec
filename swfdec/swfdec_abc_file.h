@@ -20,6 +20,7 @@
 #ifndef _SWFDEC_ABC_FILE_H_
 #define _SWFDEC_ABC_FILE_H_
 
+#include <swfdec/swfdec_abc_function.h>
 #include <swfdec/swfdec_abc_multiname.h>
 #include <swfdec/swfdec_abc_namespace.h>
 #include <swfdec/swfdec_abc_ns_set.h>
@@ -53,8 +54,10 @@ struct _SwfdecAbcFile {
   guint			n_namespaces;	/* number of namespaces */
   SwfdecAbcNsSet **	nssets;		/* all the namespace sets in use */
   guint			n_nssets;	/* number of namespace sets */
-  SwfdecAbcMultiname *	multinames;   	/* all the multinamesin use */
+  SwfdecAbcMultiname *	multinames;   	/* all the multinames in use */
   guint			n_multinames;	/* number of multinames */
+  SwfdecAbcFunction **	functions;   	/* all the functions defined */
+  guint			n_functions;	/* number of functions */
 };
 
 struct _SwfdecAbcFileClass {

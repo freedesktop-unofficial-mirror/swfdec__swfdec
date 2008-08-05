@@ -22,13 +22,31 @@
 #endif
 
 #include "swfdec_abc_function.h"
+#include "swfdec_as_context.h"
 #include "swfdec_debug.h"
 
 G_DEFINE_TYPE (SwfdecAbcFunction, swfdec_abc_function, SWFDEC_TYPE_AS_FUNCTION)
 
 static void
+swfdec_abc_function_dispose (GObject *object)
+{
+  SwfdecAbcFunction *fun = SWFDEC_ABC_FUNCTION (object);
+  SwfdecAsContext *context = swfdec_gc_object_get_context (object);
+
+  if (fun->n_args) {
+    swfdec_as_context_unuse_mem (context, fun->n_args * sizeof (SwfdecAbcFunctionArgument));
+    g_free (fun->args);
+  }
+
+  G_OBJECT_CLASS (swfdec_abc_function_parent_class)->dispose (object);
+}
+
+static void
 swfdec_abc_function_class_init (SwfdecAbcFunctionClass *klass)
 {
+  GObjectClass *object_class = G_OBJECT_CLASS (klass);
+
+  object_class->dispose = swfdec_abc_function_dispose;
 }
 
 static void
