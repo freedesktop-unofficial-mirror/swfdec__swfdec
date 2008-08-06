@@ -1,4 +1,4 @@
-noinst_PROGRAMS = swfdec-extract dump crashfinder
+noinst_PROGRAMS = swfdec-extract dump crashfinder abcextract
 
 crashfinder_CFLAGS = $(GLOBAL_CFLAGS) $(SWFDEC_CFLAGS)
 crashfinder_LDFLAGS = $(SWFDEC_LIBS) $(CAIRO_LIBS)
@@ -9,3 +9,6 @@ dump_LDFLAGS = $(SWFDEC_LIBS) $(CAIRO_LIBS) $(PANGO_LIBS)
 
 swfdec_extract_CFLAGS = $(GLOBAL_CFLAGS) $(SWFDEC_CFLAGS) $(CAIRO_CFLAGS)
 swfdec_extract_LDFLAGS = $(SWFDEC_LIBS) $(CAIRO_LIBS)
+
+abcextract_CFLAGS = $(GLOBAL_CFLAGS) $(SWFDEC_CFLAGS) $(CAIRO_CFLAGS)
+abcextract_LDFLAGS = $(SWFDEC_LIBS) $(CAIRO_LIBS)
