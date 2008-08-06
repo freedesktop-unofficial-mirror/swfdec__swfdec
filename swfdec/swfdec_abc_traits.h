@@ -65,9 +65,11 @@ struct _SwfdecAbcTraits {
   const char *			name;		/* name of type we represent */
   SwfdecAbcTraits *		base;		/* parent type traits */
   SwfdecAbcFunction *		construct;	/* constructor for objects of these traits or NULL */
+  SwfdecAbcNamespace *		protected_ns;	/* protected namespace */
+
   SwfdecAbcTrait *		traits;		/* the traits we have */
   guint				n_traits;	/* number of traits */
-  gboolean			protected_ns:1;	/* use protected namespace */
+
   gboolean			sealed:1;	/* cannot add properties to object */
   gboolean			final:1;	/* no derived traits */
   gboolean			interface:1;	/* traits describe an interface */

@@ -52,6 +52,8 @@ swfdec_abc_traits_mark (SwfdecGcObject *object)
     swfdec_gc_object_mark (traits->base);
   if (traits->construct)
     swfdec_gc_object_mark (traits->construct);
+  if (traits->protected_ns)
+    swfdec_gc_object_mark (traits->protected_ns);
 
   SWFDEC_GC_OBJECT_CLASS (swfdec_abc_traits_parent_class)->mark (object);
 }

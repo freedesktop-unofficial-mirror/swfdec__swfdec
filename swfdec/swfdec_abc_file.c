@@ -472,7 +472,7 @@ static gboolean
 swfdec_abc_file_parse_instance (SwfdecAbcFile *file, SwfdecBits *bits)
 {
   SwfdecAsContext *context = swfdec_gc_object_get_context (file);
-  SwfdecAbcNamespace *protected_ns;
+  gboolean protected_ns;
   SwfdecAbcTraits *traits;
   guint id, i, n;
 
@@ -481,7 +481,7 @@ swfdec_abc_file_parse_instance (SwfdecAbcFile *file, SwfdecBits *bits)
     return FALSE;
   
   /* reserved = */ swfdec_bits_getbits (bits, 4);
-  traits->protected_ns = swfdec_bits_getbit (bits);
+  protected_ns = swfdec_bits_getbit (bits);
   traits->interface = swfdec_bits_getbit (bits);
   traits->final = swfdec_bits_getbit (bits);
   traits->sealed = swfdec_bits_getbit (bits);
@@ -502,17 +502,15 @@ swfdec_abc_file_parse_instance (SwfdecAbcFile *file, SwfdecBits *bits)
       THROW (file, "Class %s cannot extend %s.", file->multinames[id].name, base->name);
     }
   } 
-  if (traits->protected_ns) {
+  if (protected_ns) {
     READ_U30 (id, bits);
     if (id == 0) {
-      protected_ns = NULL;
+      /* traits->protected_ns = NULL; */
     } else if (id < file->n_namespaces) {
-      protected_ns = file->namespaces[id];
-    } else {
+      traits->protected_ns = file->namespaces[id];
+    } else if (i != 0) {
       THROW (file, "Cpool index %u is out of range %u.", id, file->n_multinames);
     }
-  } else {
-    protected_ns = NULL;
   }
   READ_U30 (n, bits);
   if (n > 0) {
