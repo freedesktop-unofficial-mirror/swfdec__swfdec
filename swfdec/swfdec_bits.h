@@ -59,6 +59,7 @@ guint swfdec_bits_get_vu32 (SwfdecBits *b);
 int swfdec_bits_get_vs32 (SwfdecBits *b);
 float swfdec_bits_get_float (SwfdecBits * b);
 double swfdec_bits_get_double (SwfdecBits * b);
+double swfdec_bits_get_ldouble (SwfdecBits * b);
 double swfdec_bits_get_bdouble (SwfdecBits * b);
 void swfdec_bits_syncbits (SwfdecBits * b);
 

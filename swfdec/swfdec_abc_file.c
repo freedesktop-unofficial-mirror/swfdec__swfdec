@@ -156,7 +156,7 @@ swfdec_abc_file_parse_constants (SwfdecAbcFile *file, SwfdecBits *bits)
       return FALSE;
     }
     for (i = 1; i < file->n_doubles && swfdec_bits_left (bits); i++) {
-      file->doubles[i] = swfdec_bits_get_double (bits);
+      file->doubles[i] = swfdec_bits_get_ldouble (bits);
       SWFDEC_LOG ("  double %u: %g", i, file->doubles[i]);
     }
   }

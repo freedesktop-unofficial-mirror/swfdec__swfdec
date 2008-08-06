@@ -409,6 +409,24 @@ swfdec_bits_get_bdouble (SwfdecBits * b)
   return u.d;
 }
 
+double
+swfdec_bits_get_ldouble (SwfdecBits * b)
+{
+  union {
+    double d;
+    guint64 u64;
+  } u;
+
+  SWFDEC_BYTES_CHECK (b, 8);
+
+  memcpy (&u.u64, b->ptr, 8);
+  b->ptr += 8;
+
+  u.u64 = GUINT64_FROM_LE (u.u64);
+
+  return u.d;
+}
+
 void
 swfdec_bits_syncbits (SwfdecBits * b)
 {
