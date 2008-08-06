@@ -37,40 +37,36 @@ swfdec_abc_file_dispose (GObject *object)
   SwfdecAsContext *context = swfdec_gc_object_get_context (file);
 
   if (file->n_ints) {
-    swfdec_as_context_unuse_mem (context, file->n_ints * sizeof (int));
-    g_free (file->ints);
+    swfdec_as_context_free (context, file->n_ints * sizeof (int), file->ints);
   }
   if (file->n_uints) {
-    swfdec_as_context_unuse_mem (context, file->n_uints * sizeof (guint));
-    g_free (file->uints);
+    swfdec_as_context_free (context, file->n_uints * sizeof (guint), file->uints);
   }
   if (file->n_doubles) {
-    swfdec_as_context_unuse_mem (context, file->n_doubles * sizeof (double));
-    g_free (file->doubles);
+    swfdec_as_context_free (context, file->n_doubles * sizeof (double), file->doubles);
   }
   if (file->n_strings) {
-    swfdec_as_context_unuse_mem (context, file->n_strings * sizeof (const char *));
-    g_free (file->strings);
+    swfdec_as_context_free (context, file->n_strings * sizeof (const char *), file->strings);
   }
   if (file->n_namespaces) {
-    swfdec_as_context_unuse_mem (context, file->n_namespaces * sizeof (SwfdecAbcNamespace *));
-    g_free (file->namespaces);
+    swfdec_as_context_free (context, file->n_namespaces * sizeof (SwfdecAbcNamespace *),
+	file->namespaces);
   }
   if (file->n_nssets) {
     guint i;
     for (i = 0; i < file->n_nssets; i++) {
       swfdec_abc_ns_set_free (file->nssets[i]);
     }
-    swfdec_as_context_unuse_mem (context, file->n_nssets * sizeof (SwfdecAbcNsSet *));
-    g_free (file->nssets);
+    swfdec_as_context_free (context, file->n_nssets * sizeof (SwfdecAbcNsSet *),
+	file->nssets);
   }
   if (file->n_multinames) {
-    swfdec_as_context_unuse_mem (context, file->n_multinames * sizeof (SwfdecAbcMultiname));
-    g_free (file->multinames);
+    swfdec_as_context_free (context, file->n_multinames * sizeof (SwfdecAbcMultiname),
+	file->multinames);
   }
   if (file->n_functions) {
-    swfdec_as_context_unuse_mem (context, file->n_functions * sizeof (SwfdecAbcFunction *));
-    g_free (file->functions);
+    swfdec_as_context_free (context, file->n_functions * sizeof (SwfdecAbcFunction *),
+	file->functions);
   }
 
   G_OBJECT_CLASS (swfdec_abc_file_parent_class)->dispose (object);
@@ -126,11 +122,11 @@ swfdec_abc_file_parse_constants (SwfdecAbcFile *file, SwfdecBits *bits)
   /* read all integers */
   READ_U30 (file->n_ints, bits);
   if (file->n_ints) {
-    if (!swfdec_as_context_try_use_mem (context, file->n_ints * sizeof (int))) {
+    file->ints = swfdec_as_context_try_new (context, int, file->n_ints);
+    if (file->ints == NULL) {
       file->n_ints = 0;
       return FALSE;
     }
-    file->ints = g_new0 (int, file->n_ints);
     for (i = 1; i < file->n_ints && swfdec_bits_left (bits); i++) {
       file->ints[i] = swfdec_bits_get_vs32 (bits);
       SWFDEC_LOG ("  int %u: %d", i, file->ints[i]);
@@ -140,11 +136,11 @@ swfdec_abc_file_parse_constants (SwfdecAbcFile *file, SwfdecBits *bits)
   /* read all unsigned integers */
   READ_U30 (file->n_uints, bits);
   if (file->n_uints) {
-    if (!swfdec_as_context_try_use_mem (context, file->n_uints * sizeof (guint))) {
+    file->uints = swfdec_as_context_try_new (context, guint, file->n_uints);
+    if (file->uints == NULL) {
       file->n_uints = 0;
       return FALSE;
     }
-    file->uints = g_new0 (guint, file->n_uints);
     for (i = 1; i < file->n_uints && swfdec_bits_left (bits); i++) {
       file->uints[i] = swfdec_bits_get_vu32 (bits);
       SWFDEC_LOG ("  uint %u: %u", i, file->uints[i]);
@@ -154,11 +150,11 @@ swfdec_abc_file_parse_constants (SwfdecAbcFile *file, SwfdecBits *bits)
   /* read all doubles */
   READ_U30 (file->n_doubles, bits);
   if (file->n_doubles) {
-    if (!swfdec_as_context_try_use_mem (context, file->n_doubles * sizeof (double))) {
+    file->doubles = swfdec_as_context_try_new (context, double, file->n_doubles);
+    if (file->doubles == NULL) {
       file->n_doubles = 0;
       return FALSE;
     }
-    file->doubles = g_new0 (double, file->n_doubles);
     for (i = 1; i < file->n_doubles && swfdec_bits_left (bits); i++) {
       file->doubles[i] = swfdec_bits_get_double (bits);
       SWFDEC_LOG ("  double %u: %g", i, file->doubles[i]);
@@ -168,11 +164,11 @@ swfdec_abc_file_parse_constants (SwfdecAbcFile *file, SwfdecBits *bits)
   /* read all strings */
   READ_U30 (file->n_strings, bits);
   if (file->n_strings) {
-    if (!swfdec_as_context_try_use_mem (context, file->n_strings * sizeof (const char *))) {
+    file->strings = swfdec_as_context_try_new (context, const char *, file->n_strings);
+    if (file->strings == NULL) {
       file->n_strings = 0;
       return FALSE;
     }
-    file->strings = g_new0 (const char *, file->n_strings);
     for (i = 1; i < file->n_strings; i++) {
       guint len;
       char *s;
@@ -188,11 +184,11 @@ swfdec_abc_file_parse_constants (SwfdecAbcFile *file, SwfdecBits *bits)
   /* read all namespaces */
   READ_U30 (file->n_namespaces, bits);
   if (file->n_namespaces) {
-    if (!swfdec_as_context_try_use_mem (context, file->n_namespaces * sizeof (SwfdecAbcNamespace *))) {
+    file->namespaces = swfdec_as_context_try_new (context, SwfdecAbcNamespace *, file->n_namespaces);
+    if (file->namespaces == NULL) {
       file->n_namespaces = 0;
       return FALSE;
     }
-    file->namespaces = g_new0 (SwfdecAbcNamespace *, file->n_namespaces);
     for (i = 1; i < file->n_namespaces; i++) {
       SwfdecAbcNamespaceType type;
       guint id;
@@ -239,11 +235,11 @@ swfdec_abc_file_parse_constants (SwfdecAbcFile *file, SwfdecBits *bits)
   /* read all namespace sets */
   READ_U30 (file->n_nssets, bits);
   if (file->n_nssets) {
-    if (!swfdec_as_context_try_use_mem (context, file->n_nssets * sizeof (SwfdecAbcNsSet *))) {
+    file->nssets = swfdec_as_context_try_new (context, SwfdecAbcNsSet *, file->n_nssets);
+    if (file->nssets == NULL) {
       file->n_nssets = 0;
       return FALSE;
     }
-    file->nssets = g_new0 (SwfdecAbcNsSet *, file->n_nssets);
     for (i = 0; i < file->n_nssets; i++) {
       file->nssets[i] = swfdec_abc_ns_set_new ();
     }
@@ -265,11 +261,11 @@ swfdec_abc_file_parse_constants (SwfdecAbcFile *file, SwfdecBits *bits)
   READ_U30 (file->n_multinames, bits);
   if (file->n_multinames) {
     guint nsid, nameid;
-    if (!swfdec_as_context_try_use_mem (context, file->n_multinames * sizeof (SwfdecAbcMultiname))) {
+    file->multinames = swfdec_as_context_try_new (context, SwfdecAbcMultiname, file->n_multinames);
+    if (file->multinames == NULL) {
       file->n_multinames = 0;
       return FALSE;
     }
-    file->multinames = g_new0 (SwfdecAbcMultiname, file->n_multinames);
     for (i = 1; i < file->n_multinames; i++) {
       switch (swfdec_bits_get_u8 (bits)) {
 	case 0x0D:
@@ -344,11 +340,11 @@ swfdec_abc_file_parse_methods (SwfdecAbcFile *file, SwfdecBits *bits)
   READ_U30 (file->n_functions, bits);
   if (file->n_functions) {
     gboolean param_names, optional;
-    if (!swfdec_as_context_try_use_mem (context, file->n_functions * sizeof (SwfdecAbcFunction *))) {
+    file->functions = swfdec_as_context_try_new (context, SwfdecAbcFunction *, file->n_functions);
+    if (file->functions == NULL) {
       file->n_functions = 0;
       return FALSE;
     }
-    file->functions = g_new0 (SwfdecAbcFunction *, file->n_functions);
     for (i = 1; i < file->n_functions; i++) {
       guint id, j, len;
       SwfdecAbcFunction *fun = file->functions[i] = 
