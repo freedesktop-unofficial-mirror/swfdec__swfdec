@@ -20,11 +20,12 @@
 #ifndef _SWFDEC_ABC_FUNCTION_H_
 #define _SWFDEC_ABC_FUNCTION_H_
 
+#include <swfdec/swfdec_abc_traits.h>
 #include <swfdec/swfdec_as_function.h>
 
 G_BEGIN_DECLS
 
-typedef struct _SwfdecAbcFunction SwfdecAbcFunction;
+//typedef struct _SwfdecAbcFunction SwfdecAbcFunction;
 typedef struct _SwfdecAbcFunctionClass SwfdecAbcFunctionClass;
 typedef struct _SwfdecAbcFunctionArgument SwfdecAbcFunctionArgument;
 
@@ -55,6 +56,8 @@ struct _SwfdecAbcFunction {
   gpointer		return_type;		/* trait pointer if verified, multiname otherwise */
   guint			n_args;			/* number of arguments */
   SwfdecAbcFunctionArgument *args;		/* n_args arguments */ 
+
+  SwfdecAbcTraits *	construct_traits;	/* traits of objects we construct or NULL */
 };
 
 struct _SwfdecAbcFunctionClass {
@@ -62,6 +65,9 @@ struct _SwfdecAbcFunctionClass {
 };
 
 GType			swfdec_abc_function_get_type	(void);
+
+gboolean		swfdec_abc_function_bind	(SwfdecAbcFunction *	fun,
+							 SwfdecAbcTraits *	traits);
 
 
 G_END_DECLS

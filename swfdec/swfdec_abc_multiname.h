@@ -34,10 +34,19 @@ struct _SwfdecAbcMultiname {
   SwfdecAbcNsSet *	nsset;		/* namespace set or NULL - must not be set if ns is set */
 };
 
-void		swfdec_abc_multiname_init   (SwfdecAbcMultiname *	multi,
-					     const char *		name,
-					     SwfdecAbcNamespace *	ns,
-					     SwfdecAbcNsSet *		set);
+void			swfdec_abc_multiname_init		(SwfdecAbcMultiname *		multi,
+								 const char *			name,
+								 SwfdecAbcNamespace *		ns,
+								 SwfdecAbcNsSet *		set);
+
+#define swfdec_abc_multiname_is_qualified(mn) ((mn)->name > (const char *) SWFDEC_ABC_MULTINAME_ANY \
+    && (mn)->ns > (SwfdecAbcNamespace *) SWFDEC_ABC_MULTINAME_ANY)
+#define swfdec_abc_multiname_is_binding(mn) ((mn)->name > (const char *) SWFDEC_ABC_MULTINAME_ANY \
+    && ((mn)->nsset || (mn)->ns > (SwfdecAbcNamespace *) SWFDEC_ABC_MULTINAME_ANY))
+#define swfdec_abc_multiname_get_n_namespaces(mn) ((mn)->nsset ? \
+    swfdec_abc_ns_set_get_n_namespaces ((mn)->nsset) : 1)
+SwfdecAbcNamespace *	swfdec_abc_multiname_get_namespace	(const SwfdecAbcMultiname *	mn,
+								 guint				i);
 
 
 G_END_DECLS

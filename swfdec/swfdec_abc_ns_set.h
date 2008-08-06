@@ -33,6 +33,8 @@ typedef GPtrArray SwfdecAbcNsSet;
 #define swfdec_abc_ns_set_add(set, ns) g_ptr_array_add (set, ns)
 gboolean	swfdec_abc_ns_set_contains (const SwfdecAbcNsSet *	set,
 					    const SwfdecAbcNamespace *	ns);
+#define swfdec_abc_ns_set_get_n_namespaces(set) ((set)->len)
+#define swfdec_abc_ns_set_get_namespace(set, i) (g_ptr_array_index (set, i))
 
 
 G_END_DECLS

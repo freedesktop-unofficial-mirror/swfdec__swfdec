@@ -21,6 +21,7 @@
 #define _SWFDEC_ABC_FILE_H_
 
 #include <swfdec/swfdec_abc_function.h>
+#include <swfdec/swfdec_abc_global.h>
 #include <swfdec/swfdec_abc_multiname.h>
 #include <swfdec/swfdec_abc_namespace.h>
 #include <swfdec/swfdec_abc_ns_set.h>
@@ -42,6 +43,8 @@ typedef struct _SwfdecAbcFileClass SwfdecAbcFileClass;
 struct _SwfdecAbcFile {
   SwfdecGcObject	object;
 
+  SwfdecAbcGlobal *	global;		/* the global object we belong to */
+
   int *			ints;		/* all integer values in the file */
   guint			n_ints;		/* number of integers */
   guint *		uints;		/* all unsigned integer values in the file */
@@ -58,6 +61,8 @@ struct _SwfdecAbcFile {
   guint			n_multinames;	/* number of multinames */
   SwfdecAbcFunction **	functions;   	/* all the functions defined */
   guint			n_functions;	/* number of functions */
+  SwfdecAbcFunction **	classes;   	/* all the functions defined */
+  guint			n_classes;	/* number of functions */
 };
 
 struct _SwfdecAbcFileClass {

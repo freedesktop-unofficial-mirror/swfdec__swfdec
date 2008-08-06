@@ -37,3 +37,16 @@ swfdec_abc_multiname_init (SwfdecAbcMultiname *multi, const char *name,
   multi->nsset = set;
 }
 
+SwfdecAbcNamespace *
+swfdec_abc_multiname_get_namespace (const SwfdecAbcMultiname *mn, guint i)
+{
+  g_return_val_if_fail (mn != NULL, NULL);
+  g_return_val_if_fail (i < swfdec_abc_multiname_get_n_namespaces (mn), NULL);
+
+  if (mn->nsset) {
+    return swfdec_abc_ns_set_get_namespace (mn->nsset, i);
+  } else {
+    g_assert (mn->ns > (SwfdecAbcNamespace *) SWFDEC_ABC_MULTINAME_ANY);
+    return mn->ns;
+  }
+}

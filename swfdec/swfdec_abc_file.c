@@ -23,6 +23,7 @@
 
 #include "swfdec_abc_file.h"
 #include "swfdec_abc_internal.h"
+#include "swfdec_abc_traits.h"
 #include "swfdec_as_strings.h"
 #include "swfdec_debug.h"
 
@@ -68,6 +69,10 @@ swfdec_abc_file_dispose (GObject *object)
     swfdec_as_context_free (context, file->n_functions * sizeof (SwfdecAbcFunction *),
 	file->functions);
   }
+  if (file->n_classes) {
+    swfdec_as_context_free (context, file->n_classes * sizeof (SwfdecAbcFunction *),
+	file->classes);
+  }
 
   G_OBJECT_CLASS (swfdec_abc_file_parent_class)->dispose (object);
 }
@@ -83,6 +88,14 @@ swfdec_abc_file_mark (SwfdecGcObject *object)
   }
   for (i = 1; i < file->n_namespaces; i++) {
     swfdec_gc_object_mark (file->namespaces[i]);
+  }
+  for (i = 1; i < file->n_functions; i++) {
+    if (file->functions[i])
+      swfdec_gc_object_mark (file->functions[i]);
+  }
+  for (i = 1; i < file->n_classes; i++) {
+    if (file->classes[i])
+      swfdec_gc_object_mark (file->classes[i]);
   }
 
   SWFDEC_GC_OBJECT_CLASS (swfdec_abc_file_parent_class)->mark (object);
@@ -111,6 +124,11 @@ swfdec_abc_file_init (SwfdecAbcFile *date)
   if (x >= (1 << 30)) \
     return FALSE; \
 }G_STMT_END;
+#define THROW(file, ...) G_STMT_START{ \
+  swfdec_as_context_throw_abc (swfdec_gc_object_get_context (file), \
+      SWFDEC_ABC_ERROR_VERIFY, __VA_ARGS__); \
+  return FALSE; \
+}G_STMT_END
 
 static gboolean
 swfdec_abc_file_parse_constants (SwfdecAbcFile *file, SwfdecBits *bits)
@@ -331,6 +349,12 @@ swfdec_abc_file_parse_constants (SwfdecAbcFile *file, SwfdecBits *bits)
   return TRUE;
 }
 
+static SwfdecAbcTraits *
+swfdec_abc_file_parse_traits (SwfdecAbcFile *file, SwfdecAbcTraits *traits, SwfdecBits *bits)
+{
+  return NULL;
+}
+
 static gboolean
 swfdec_abc_file_parse_methods (SwfdecAbcFile *file, SwfdecBits *bits)
 {
@@ -427,11 +451,121 @@ swfdec_abc_file_skip_metadata (SwfdecAbcFile *file, SwfdecBits *bits)
 }
 
 static gboolean
+swfdec_abc_file_parse_qname (SwfdecAbcFile *file, SwfdecBits *bits, SwfdecAbcNamespace **ns, const char **name)
+{
+  SwfdecAbcMultiname *mn;
+  guint id;
+
+  READ_U30 (id, bits);
+  if (id == 0 || id >= file->n_multinames)
+    THROW (file, "Cpool index %u is out of range %u.", id, file->n_multinames);
+  mn = &file->multinames[id];
+  if (!swfdec_abc_multiname_is_qualified (mn))
+    THROW (file, "Cpool entry %u is wrong type.", id);
+
+  *ns = mn->ns;
+  *name = mn->name;
+  return TRUE;
+}
+
+static gboolean
+swfdec_abc_file_parse_instance (SwfdecAbcFile *file, SwfdecBits *bits)
+{
+  SwfdecAsContext *context = swfdec_gc_object_get_context (file);
+  SwfdecAbcNamespace *protected_ns;
+  SwfdecAbcTraits *traits;
+  guint id, i, n;
+
+  traits = g_object_new (SWFDEC_TYPE_ABC_TRAITS, "context", context, NULL);
+  if (!swfdec_abc_file_parse_qname (file, bits, &traits->ns, &traits->name))
+    return FALSE;
+  
+  /* reserved = */ swfdec_bits_getbits (bits, 4);
+  traits->protected_ns = swfdec_bits_getbit (bits);
+  traits->interface = swfdec_bits_getbit (bits);
+  traits->final = swfdec_bits_getbit (bits);
+  traits->sealed = swfdec_bits_getbit (bits);
+  READ_U30 (id, bits);
+  /* id == 0 means no base traits */
+  if (id >= file->n_multinames) {
+    THROW (file, "Cpool index %u is out of range %u.", id, file->n_multinames);
+  } else if (id > 0) {
+    SwfdecAbcTraits *base = swfdec_abc_global_get_traits_for_multiname (file->global,
+	&file->multinames[id]);
+    if (base == NULL)
+      return FALSE;
+    if (base->final) {
+      /* FIXME: check for CLASS and FUNCTION traits */
+      THROW (file, "Class %s cannot extend final base class.", file->multinames[id].name);
+    }
+    if (base->interface || traits->interface) {
+      THROW (file, "Class %s cannot extend %s.", file->multinames[id].name, base->name);
+    }
+  } 
+  if (traits->protected_ns) {
+    READ_U30 (id, bits);
+    if (id == 0) {
+      protected_ns = NULL;
+    } else if (id < file->n_namespaces) {
+      protected_ns = file->namespaces[id];
+    } else {
+      THROW (file, "Cpool index %u is out of range %u.", id, file->n_multinames);
+    }
+  } else {
+    protected_ns = NULL;
+  }
+  READ_U30 (n, bits);
+  if (n > 0) {
+    SWFDEC_FIXME ("implement interface parsing");
+    for (i = 0; i < n; i++) {
+      READ_U30 (id, bits);
+    }
+  } 
+  READ_U30 (id, bits);
+  if (id >= file->n_functions) {
+    THROW (file, "Method_info %u exceeds method_count=%u.", id, file->n_functions);
+  } else if (file->functions[id] == NULL) {
+    THROW (file, "MethodInfo-%u referenced before definition.", id);
+  } else {
+    if (!swfdec_abc_function_bind (file->functions[id], traits)) {
+      THROW (file, "Function %s has already been bound to %s.", file->functions[id]->name,
+	  file->functions[id]->construct_traits->name);
+    }
+  }
+  swfdec_abc_file_parse_traits (file, traits, bits);
+  swfdec_abc_global_add_traits (file->global, traits);
+
+  return TRUE;
+}
+
+static gboolean
+swfdec_abc_file_parse_instances (SwfdecAbcFile *file, SwfdecBits *bits)
+{
+  SwfdecAsContext *context = swfdec_gc_object_get_context (file);
+  guint i;
+
+  READ_U30 (file->n_classes, bits);
+  if (file->n_classes) {
+    file->classes = swfdec_as_context_try_new (context, SwfdecAbcFunction *, file->n_classes);
+    if (file->classes == NULL) {
+      file->n_classes = 0;
+      return FALSE;
+    }
+    for (i = 1; i < file->n_classes; i++) {
+      if (!swfdec_abc_file_parse_instance (file, bits))
+	return FALSE;
+    }
+  }
+  return TRUE;
+}
+
+static gboolean
 swfdec_abc_file_parse (SwfdecAbcFile *file, SwfdecBits *bits)
 {
   if (swfdec_abc_file_parse_constants (file, bits) &&
       swfdec_abc_file_parse_methods (file, bits) &&
-      swfdec_abc_file_skip_metadata (file, bits))
+      swfdec_abc_file_skip_metadata (file, bits) &&
+      swfdec_abc_file_parse_instances (file, bits))
     return TRUE;
 
   return FALSE;
@@ -447,6 +581,7 @@ swfdec_abc_file_new (SwfdecAsContext *context, SwfdecBits *bits)
   g_return_val_if_fail (bits != NULL, NULL);
 
   file = g_object_new (SWFDEC_TYPE_ABC_FILE, "context", context, NULL);
+  file->global = g_object_new (SWFDEC_TYPE_ABC_GLOBAL, "context", context, NULL);
 
   minor = swfdec_bits_get_u16 (bits);
   major = swfdec_bits_get_u16 (bits);

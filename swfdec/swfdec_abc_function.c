@@ -54,3 +54,16 @@ swfdec_abc_function_init (SwfdecAbcFunction *function)
 {
 }
 
+gboolean
+swfdec_abc_function_bind (SwfdecAbcFunction *fun, SwfdecAbcTraits *traits)
+{
+  g_return_val_if_fail (SWFDEC_IS_ABC_FUNCTION (fun), FALSE);
+  g_return_val_if_fail (SWFDEC_IS_ABC_TRAITS (traits), FALSE);
+
+  if (fun->construct_traits || traits->construct)
+    return FALSE;
+
+  fun->construct_traits = traits;
+  traits->construct = fun;
+  return TRUE;
+}
