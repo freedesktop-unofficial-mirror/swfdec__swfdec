@@ -250,6 +250,72 @@ swfdec_as_context_unuse_mem (SwfdecAsContext *context, gsize bytes)
       bytes, context->memory, context->memory_since_gc);
 }
 
+/**
+ * swfdec_as_context_try_alloc:
+ * @context: context to manage the bytes
+ * @bytes: amount of bytes to allocate. Must not be 0.
+ *
+ * Allocates the given @bytes of memory, if the @context has enough space 
+ * available. If not, returns %NULL is returned. The returned memory is 
+ * initialized to 0.
+ *
+ * Returns: the amount of bytes allocated or %NULL on error. Must be freed with
+ *          swfdec_as_context_free()
+ **/
+gpointer
+swfdec_as_context_try_alloc (SwfdecAsContext *context, gsize bytes)
+{
+  g_return_val_if_fail (SWFDEC_IS_AS_CONTEXT (context), NULL);
+  g_return_val_if_fail (bytes > 0, NULL);
+
+  if (!swfdec_as_context_try_use_mem (context, bytes))
+    return NULL;
+
+  return g_slice_alloc0 (bytes);
+}
+
+/**
+ * swfdec_as_context_alloc:
+ * @context: context to manage the bytes
+ * @bytes: amount of bytes to allocate. Must not be 0.
+ *
+ * Allocates the given amount of @bytes and initializes them to 0. The
+ * memory is added to the memory managed by @context.
+ *
+ * Returns: the amount of bytes allocated. Must be freed with
+ *          swfdec_as_context_free()
+ **/
+gpointer
+swfdec_as_context_alloc (SwfdecAsContext *context, gsize bytes)
+{
+  g_return_val_if_fail (SWFDEC_IS_AS_CONTEXT (context), NULL);
+  g_return_val_if_fail (bytes > 0, NULL);
+
+  swfdec_as_context_use_mem (context, bytes);
+  return g_slice_alloc0 (bytes);
+}
+
+/**
+ * swfdec_as_context_free:
+ * @context: context that manages the bytes
+ * @bytes: size of the given memory
+ * @mem: the memory to free
+ *
+ * Frees memory previously allocated via swfdec_as_context_alloc() or
+ * swfdec_as_context_try_alloc() by unregistering it from @context and 
+ * freeing it.
+ **/
+void
+swfdec_as_context_free (SwfdecAsContext *context, gsize bytes, gpointer mem)
+{
+  g_return_if_fail (SWFDEC_IS_AS_CONTEXT (context));
+  g_return_if_fail (bytes > 0);
+  g_return_if_fail (mem != NULL);
+
+  swfdec_as_context_unuse_mem (context, bytes);
+  g_slice_free1 (bytes, mem);
+}
+
 /*** GC ***/
 
 static gboolean

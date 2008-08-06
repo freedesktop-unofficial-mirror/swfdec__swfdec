@@ -126,6 +126,18 @@ void		swfdec_as_context_use_mem	(SwfdecAsContext *	context,
 						 gsize			bytes);
 void		swfdec_as_context_unuse_mem   	(SwfdecAsContext *	context,
 						 gsize			bytes);
+#define swfdec_as_context_try_new(context, type, n_items) \
+    (G_MAXSIZE / sizeof (type) < n_items ? NULL : \
+     swfdec_as_context_try_alloc (context, sizeof (type) * n_items))
+gpointer	swfdec_as_context_try_alloc	(SwfdecAsContext *	context,
+						 gsize			bytes);
+#define swfdec_as_context_new(context, type, n_items) \
+    swfdec_as_context_alloc (context, sizeof (type) * n_items)
+gpointer	swfdec_as_context_alloc		(SwfdecAsContext *	context,
+						 gsize			bytes);
+void		swfdec_as_context_free		(SwfdecAsContext *	context,
+						 gsize			bytes,
+						 gpointer		mem);
 void		swfdec_as_value_mark		(SwfdecAsValue *	value);
 void		swfdec_as_string_mark		(const char *		string);
 void		swfdec_as_context_gc		(SwfdecAsContext *	context);
