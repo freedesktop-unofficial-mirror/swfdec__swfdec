@@ -71,6 +71,8 @@ swfdec_abc_file_dispose (GObject *object)
   }
   if (file->n_classes) {
     swfdec_as_context_free (context, file->n_classes * sizeof (SwfdecAbcFunction *),
+	file->instances);
+    swfdec_as_context_free (context, file->n_classes * sizeof (SwfdecAbcFunction *),
 	file->classes);
   }
 
@@ -121,8 +123,10 @@ swfdec_abc_file_init (SwfdecAbcFile *date)
 
 #define READ_U30(x, bits) G_STMT_START{ \
   x = swfdec_bits_get_vu32 (bits); \
-  if (x >= (1 << 30)) \
+  if (x >= (1 << 30)) { \
+    SWFDEC_ERROR ("invalid U30 value %u\n", x); \
     return FALSE; \
+  } \
 }G_STMT_END;
 #define THROW(file, ...) G_STMT_START{ \
   swfdec_as_context_throw_abc (swfdec_gc_object_get_context (file), \
@@ -249,7 +253,7 @@ swfdec_abc_file_parse_constants (SwfdecAbcFile *file, SwfdecBits *bits)
 	  type = SWFDEC_ABC_NAMESPACE_STATIC_PROTECTED;
 	  break;
 	default:
-	  return FALSE;
+	  THROW (file, "Cpool entry %u is wrong type.", i);
       }
       READ_U30 (id, bits);
       if (id == 0) {
@@ -263,7 +267,7 @@ swfdec_abc_file_parse_constants (SwfdecAbcFile *file, SwfdecBits *bits)
 	    swfdec_abc_namespace_new : swfdec_as_context_get_namespace) (context,
 	    type, NULL, file->strings[id]);
       } else {
-	return FALSE;
+	THROW (file, "Cpool index %u is out of range %u.", id, file->n_strings);
       }
     }
   }
@@ -308,9 +312,11 @@ swfdec_abc_file_parse_constants (SwfdecAbcFile *file, SwfdecBits *bits)
 	  SWFDEC_FIXME ("implement attributes");
 	case 0x07:
 	  READ_U30 (nsid, bits);
+	  if (nsid >= file->n_namespaces)
+	    THROW (file, "Cpool index %u is out of range %u.", nsid, file->n_namespaces);
 	  READ_U30 (nameid, bits);
-	  if (nameid >= file->n_strings || nsid >= file->n_namespaces)
-	    return FALSE;
+	  if (nameid >= file->n_strings)
+	    THROW (file, "Cpool index %u is out of range %u.", nameid, file->n_strings);
 	  swfdec_abc_multiname_init (&file->multinames[i],
 	      nameid == 0 ? SWFDEC_ABC_MULTINAME_ANY : file->strings[nameid],
 	      nsid == 0 ? SWFDEC_ABC_MULTINAME_ANY : file->namespaces[nsid],
@@ -321,7 +327,7 @@ swfdec_abc_file_parse_constants (SwfdecAbcFile *file, SwfdecBits *bits)
 	case 0x0F:
 	  READ_U30 (nameid, bits);
 	  if (nameid >= file->n_strings)
-	    return FALSE;
+	    THROW (file, "Cpool index %u is out of range %u.", nameid, file->n_strings);
 	  swfdec_abc_multiname_init (&file->multinames[i],
 	      nameid == 0 ? SWFDEC_ABC_MULTINAME_ANY : file->strings[nameid],
 	      NULL, NULL);
@@ -336,9 +342,11 @@ swfdec_abc_file_parse_constants (SwfdecAbcFile *file, SwfdecBits *bits)
 	  SWFDEC_FIXME ("implement attributes");
 	case 0x09:
 	  READ_U30 (nameid, bits);
+	  if (nameid >= file->n_strings)
+	    THROW (file, "Cpool index %u is out of range %u.", nameid, file->n_strings);
 	  READ_U30 (nsid, bits);
-	  if (nameid >= file->n_strings || nsid >= file->n_nssets || nsid == 0)
-	    return FALSE;
+	  if (nsid >= file->n_nssets)
+	    THROW (file, "Cpool index %u is out of range %u.", nsid, file->n_nssets);
 	  swfdec_abc_multiname_init (&file->multinames[i],
 	      nameid == 0 ? SWFDEC_ABC_MULTINAME_ANY : file->strings[nameid],
 	      NULL, file->nssets[nsid]);
@@ -347,14 +355,13 @@ swfdec_abc_file_parse_constants (SwfdecAbcFile *file, SwfdecBits *bits)
 	  SWFDEC_FIXME ("implement attributes");
 	case 0x1B:
 	  READ_U30 (nsid, bits);
-	  if (nsid >= file->n_nssets || nsid == 0)
-	    return FALSE;
+	  if (nsid >= file->n_nssets)
+	    THROW (file, "Cpool index %u is out of range %u.", nsid, file->n_nssets);
 	  swfdec_abc_multiname_init (&file->multinames[i],
 	      NULL, NULL, file->nssets[nsid]);
 	  break;
 	default:
-	  SWFDEC_ERROR ("invalid multiname type");
-	  return FALSE;
+	  THROW (file, "Cpool entry %u is wrong type.", i);
       }
       SWFDEC_LOG ("  multiname %u: %s::%s", i, file->multinames[i].ns == NULL ? 
 	  (file->multinames[i].nsset ? "[SET]" : "[RUNTIME]") : 
@@ -382,6 +389,7 @@ swfdec_abc_file_parse_method (SwfdecAbcFile *file, SwfdecBits *bits, SwfdecAbcTr
       THROW (file, "Function %s has already been bound to %s.", file->functions[id]->name,
 	  file->functions[id]->bound_traits->name);
     }
+    SWFDEC_LOG ("  binding method %u to traits %s", id, traits->name);
   }
   if (ret)
     *ret = file->functions[id];
@@ -399,10 +407,12 @@ swfdec_abc_file_parse_traits (SwfdecAbcFile *file, SwfdecAbcTraits *traits, Swfd
   gboolean early, metadata;
 
   READ_U30 (n_traits, bits);
-  traits->traits = swfdec_as_context_try_new (context, SwfdecAbcTraits, traits->n_traits);
-  if (traits->traits == NULL)
-    return FALSE;
-  traits->n_traits = n_traits;
+  if (n_traits) {
+    traits->traits = swfdec_as_context_try_new (context, SwfdecAbcTraits, traits->n_traits);
+    if (traits->traits == NULL)
+      return FALSE;
+    traits->n_traits = n_traits;
+  }
 
   /* copy protected traits from base class into new protected namespace */
   if (base && base->protected_ns && traits->protected_ns) {
@@ -580,7 +590,7 @@ swfdec_abc_file_parse_methods (SwfdecAbcFile *file, SwfdecBits *bits)
       file->n_functions = 0;
       return FALSE;
     }
-    for (i = 1; i < file->n_functions; i++) {
+    for (i = 0; i < file->n_functions; i++) {
       guint id, j, len;
       SwfdecAbcFunction *fun = file->functions[i] = 
 	g_object_new (SWFDEC_TYPE_ABC_FUNCTION, "context", context, NULL);
@@ -650,19 +660,22 @@ swfdec_abc_file_parse_methods (SwfdecAbcFile *file, SwfdecBits *bits)
 static gboolean
 swfdec_abc_file_skip_metadata (SwfdecAbcFile *file, SwfdecBits *bits)
 {
-  guint i, ignore, count;
+  guint i, j, ignore, count, count2;
 
-  READ_U30 (ignore, bits);
   READ_U30 (count, bits);
   for (i = 0; i < count; i++) {
-    READ_U30 (ignore, bits); /* key */
-    READ_U30 (ignore, bits); /* value */
+    READ_U30 (ignore, bits);
+    READ_U30 (count2, bits);
+    for (j = 0; j < count; j++) {
+      READ_U30 (ignore, bits); /* key */
+      READ_U30 (ignore, bits); /* value */
+    }
   }
   return TRUE;
 }
 
 static gboolean
-swfdec_abc_file_parse_instance (SwfdecAbcFile *file, SwfdecBits *bits)
+swfdec_abc_file_parse_instance (SwfdecAbcFile *file, guint instance_id, SwfdecBits *bits)
 {
   SwfdecAsContext *context = swfdec_gc_object_get_context (file);
   gboolean protected_ns;
@@ -674,11 +687,6 @@ swfdec_abc_file_parse_instance (SwfdecAbcFile *file, SwfdecBits *bits)
   if (!swfdec_abc_file_parse_qname (file, bits, &traits->ns, &traits->name))
     return FALSE;
   
-  /* reserved = */ swfdec_bits_getbits (bits, 4);
-  protected_ns = swfdec_bits_getbit (bits);
-  traits->interface = swfdec_bits_getbit (bits);
-  traits->final = swfdec_bits_getbit (bits);
-  traits->sealed = swfdec_bits_getbit (bits);
   READ_U30 (id, bits);
   /* id == 0 means no base traits */
   if (id >= file->n_multinames) {
@@ -696,6 +704,11 @@ swfdec_abc_file_parse_instance (SwfdecAbcFile *file, SwfdecBits *bits)
       THROW (file, "Class %s cannot extend %s.", file->multinames[id].name, base->name);
     }
   } 
+  /* reserved = */ swfdec_bits_getbits (bits, 4);
+  protected_ns = swfdec_bits_getbit (bits);
+  traits->interface = swfdec_bits_getbit (bits);
+  traits->final = swfdec_bits_getbit (bits);
+  traits->sealed = swfdec_bits_getbit (bits);
   if (protected_ns) {
     READ_U30 (id, bits);
     if (id == 0) {
@@ -716,8 +729,10 @@ swfdec_abc_file_parse_instance (SwfdecAbcFile *file, SwfdecBits *bits)
   if (!swfdec_abc_file_parse_method (file, bits, traits, NULL))
     return FALSE;
 
-  swfdec_abc_file_parse_traits (file, traits, bits);
+  if (!swfdec_abc_file_parse_traits (file, traits, bits))
+    return FALSE;
   swfdec_abc_global_add_traits (file->global, traits);
+  file->instances[instance_id] = traits;
 
   return TRUE;
 }
@@ -730,14 +745,54 @@ swfdec_abc_file_parse_instances (SwfdecAbcFile *file, SwfdecBits *bits)
 
   READ_U30 (file->n_classes, bits);
   if (file->n_classes) {
+    file->instances = swfdec_as_context_try_new (context, SwfdecAbcFunction *, file->n_classes);
     file->classes = swfdec_as_context_try_new (context, SwfdecAbcFunction *, file->n_classes);
-    if (file->classes == NULL) {
+    if (file->instances == NULL || file->classes == NULL) {
+      if (file->instances) {
+	swfdec_as_context_free (context, sizeof (SwfdecAbcFunction *) * file->n_classes, file->instances);
+	file->instances = NULL;
+      }
+      if (file->classes) {
+	swfdec_as_context_free (context, sizeof (SwfdecAbcFunction *) * file->n_classes, file->classes);
+	file->classes = NULL;
+      }
       file->n_classes = 0;
       return FALSE;
     }
-    for (i = 1; i < file->n_classes; i++) {
-      if (!swfdec_abc_file_parse_instance (file, bits))
+    for (i = 0; i < file->n_classes; i++) {
+      if (!swfdec_abc_file_parse_instance (file, i, bits))
 	return FALSE;
+    }
+  }
+  return TRUE;
+}
+
+static gboolean
+swfdec_abc_file_parse_classes (SwfdecAbcFile *file, SwfdecBits *bits)
+{
+  SwfdecAsContext *context = swfdec_gc_object_get_context (file);
+  guint i;
+
+  if (file->n_classes) {
+    for (i = 0; i < file->n_classes; i++) {
+      SwfdecAbcTraits *traits;
+
+      traits = g_object_new (SWFDEC_TYPE_ABC_TRAITS, "context", context, NULL);
+      traits->pool = file;
+
+      traits->ns = file->instances[i]->ns;
+      traits->name = file->instances[i]->name;
+      traits->final = TRUE;
+      traits->sealed = FALSE;
+
+      if (!swfdec_abc_file_parse_method (file, bits, traits, NULL))
+	return FALSE;
+
+      if (!swfdec_abc_file_parse_traits (file, traits, bits))
+	return FALSE;
+
+      traits->instance_traits = file->instances[i];
+      file->classes[i] = traits;
     }
   }
   return TRUE;
@@ -749,7 +804,8 @@ swfdec_abc_file_parse (SwfdecAbcFile *file, SwfdecBits *bits)
   if (swfdec_abc_file_parse_constants (file, bits) &&
       swfdec_abc_file_parse_methods (file, bits) &&
       swfdec_abc_file_skip_metadata (file, bits) &&
-      swfdec_abc_file_parse_instances (file, bits))
+      swfdec_abc_file_parse_instances (file, bits) &&
+      swfdec_abc_file_parse_classes(file, bits))
     return TRUE;
 
   return FALSE;

@@ -86,6 +86,7 @@ struct _SwfdecAbcTraits {
   SwfdecAbcNamespace *		ns;		/* namespace of type we represent */
   const char *			name;		/* name of type we represent */
   SwfdecAbcTraits *		base;		/* parent type traits */
+  SwfdecAbcTraits *		instance_traits;/* traits for instances we construct or NULL */
   SwfdecAbcFunction *		construct;	/* constructor for objects of these traits or NULL */
   SwfdecAbcNamespace *		protected_ns;	/* protected namespace */
 

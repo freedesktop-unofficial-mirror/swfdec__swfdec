@@ -62,7 +62,8 @@ struct _SwfdecAbcFile {
   guint			n_multinames;	/* number of multinames */
   SwfdecAbcFunction **	functions;   	/* all the functions defined */
   guint			n_functions;	/* number of functions */
-  SwfdecAbcFunction **	classes;   	/* all the classes defined */
+  SwfdecAbcTraits **	instances;   	/* instance infos for the defined classes */
+  SwfdecAbcTraits **	classes;   	/* all the classes defined */
   guint			n_classes;   	/* number of classes */
 };
 
