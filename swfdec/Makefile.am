@@ -236,6 +236,7 @@ noinst_HEADERS = \
 	swfdec_abc_multiname.h \
 	swfdec_abc_ns_set.h \
 	swfdec_abc_traits.h \
+	swfdec_abc_types.h \
 	swfdec_access.h \
 	swfdec_actor.h \
 	swfdec_amf.h \

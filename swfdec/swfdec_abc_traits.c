@@ -22,6 +22,7 @@
 #endif
 
 #include "swfdec_abc_traits.h"
+#include "swfdec_abc_namespace.h"
 #include "swfdec_as_context.h"
 #include "swfdec_debug.h"
 
@@ -72,5 +73,61 @@ swfdec_abc_traits_class_init (SwfdecAbcTraitsClass *klass)
 static void
 swfdec_abc_traits_init (SwfdecAbcTraits *date)
 {
+}
+
+gboolean
+swfdec_abc_traits_allow_early_binding (SwfdecAbcTraits *traits)
+{
+  g_return_val_if_fail (SWFDEC_IS_ABC_TRAITS (traits), FALSE);
+
+  do {
+    if (traits->n_slots == 0 ||
+	traits->base == NULL)
+      return TRUE;
+    if (traits->base->pool != traits->pool)
+      return FALSE;
+  } while ((traits = traits->base) != NULL);
+  g_return_val_if_reached (FALSE);
+}
+
+const SwfdecAbcTrait *
+swfdec_abc_traits_get_trait (SwfdecAbcTraits *traits,
+    SwfdecAbcNamespace *ns, const char *name)
+{
+  guint i;
+
+  g_return_val_if_fail (SWFDEC_IS_ABC_TRAITS (traits), NULL);
+  g_return_val_if_fail (SWFDEC_IS_ABC_NAMESPACE (ns), NULL);
+  g_return_val_if_fail (name != NULL, NULL);
+
+  for (i = 0; i < traits->n_traits; i++) {
+    SwfdecAbcTrait *trait = &traits->traits[i];
+
+    if (trait->type == SWFDEC_ABC_TRAIT_NONE)
+      continue;
+
+    if (trait->ns == ns && trait->name == name)
+      return trait;
+  }
+  return NULL;
+}
+
+const SwfdecAbcTrait *
+swfdec_abc_traits_find_trait (SwfdecAbcTraits *traits,
+    SwfdecAbcNamespace *ns, const char *name)
+{
+  const SwfdecAbcTrait *trait;
+
+  g_return_val_if_fail (SWFDEC_IS_ABC_TRAITS (traits), NULL);
+  g_return_val_if_fail (SWFDEC_IS_ABC_NAMESPACE (ns), NULL);
+  g_return_val_if_fail (name != NULL, NULL);
+
+  do {
+    trait = swfdec_abc_traits_get_trait (traits, ns, name);
+    if (trait)
+      return trait;
+    traits = traits->base;
+  } while (traits);
+  return NULL;
 }
 

@@ -131,6 +131,24 @@ swfdec_abc_file_init (SwfdecAbcFile *date)
 }G_STMT_END
 
 static gboolean
+swfdec_abc_file_parse_qname (SwfdecAbcFile *file, SwfdecBits *bits, SwfdecAbcNamespace **ns, const char **name)
+{
+  SwfdecAbcMultiname *mn;
+  guint id;
+
+  READ_U30 (id, bits);
+  if (id == 0 || id >= file->n_multinames)
+    THROW (file, "Cpool index %u is out of range %u.", id, file->n_multinames);
+  mn = &file->multinames[id];
+  if (!swfdec_abc_multiname_is_qualified (mn))
+    THROW (file, "Cpool entry %u is wrong type.", id);
+
+  *ns = mn->ns;
+  *name = mn->name;
+  return TRUE;
+}
+
+static gboolean
 swfdec_abc_file_parse_constants (SwfdecAbcFile *file, SwfdecBits *bits)
 {
   SwfdecAsContext *context = swfdec_gc_object_get_context (file);
@@ -349,10 +367,203 @@ swfdec_abc_file_parse_constants (SwfdecAbcFile *file, SwfdecBits *bits)
   return TRUE;
 }
 
-static SwfdecAbcTraits *
+static gboolean
+swfdec_abc_file_parse_method (SwfdecAbcFile *file, SwfdecBits *bits, SwfdecAbcTraits *traits, SwfdecAbcFunction **ret)
+{
+  guint id;
+
+  READ_U30 (id, bits);
+  if (id >= file->n_functions) {
+    THROW (file, "Method_info %u exceeds method_count=%u.", id, file->n_functions);
+  } else if (file->functions[id] == NULL) {
+    THROW (file, "MethodInfo-%u referenced before definition.", id);
+  } else if (traits) {
+    if (!swfdec_abc_function_bind (file->functions[id], traits)) {
+      THROW (file, "Function %s has already been bound to %s.", file->functions[id]->name,
+	  file->functions[id]->bound_traits->name);
+    }
+  }
+  if (ret)
+    *ret = file->functions[id];
+  return TRUE;
+}
+
+static gboolean
 swfdec_abc_file_parse_traits (SwfdecAbcFile *file, SwfdecAbcTraits *traits, SwfdecBits *bits)
 {
-  return NULL;
+  SwfdecAsContext *context = swfdec_gc_object_get_context (file);
+  SwfdecAbcTraits *base = traits->base;
+  guint i, n_slots, n_methods, n_traits;
+  SwfdecAbcNamespace *ns;
+  const char *name;
+  gboolean early, metadata;
+
+  READ_U30 (n_traits, bits);
+  traits->traits = swfdec_as_context_try_new (context, SwfdecAbcTraits, traits->n_traits);
+  if (traits->traits == NULL)
+    return FALSE;
+  traits->n_traits = n_traits;
+
+  /* copy protected traits from base class into new protected namespace */
+  if (base && base->protected_ns && traits->protected_ns) {
+    SWFDEC_FIXME ("copy protected slots");
+  }
+
+  if (base) {
+    n_slots = base->n_slots;
+    n_methods = base->n_methods;
+  } else {
+    n_slots = 0;
+    n_methods = 0;
+  }
+
+  early = base ? swfdec_abc_traits_allow_early_binding (traits) : TRUE;
+
+  for (i = 0; i < n_traits; i++) {
+    SwfdecAbcTrait *trait = &traits->traits[i];
+    guint type;
+    if (!swfdec_abc_file_parse_qname (file, bits, &ns, &name))
+      return FALSE;
+
+    /* reserved = */ swfdec_bits_getbit (bits);
+    metadata = swfdec_bits_getbit (bits);
+    trait->override = swfdec_bits_getbit (bits);
+    trait->final = swfdec_bits_getbit (bits);
+    type = swfdec_bits_getbits (bits, 4);
+    switch (type) {
+      case 0: /* slot */
+      case 6: /* const */
+      case 4: /* class */
+	{
+          guint slot;
+	  READ_U30 (slot, bits);
+	  if (!early)
+	    slot = 0;
+	  if (slot == 0) {
+	    slot = n_slots;
+	    n_slots++;
+	  } else {
+	    if (slot > n_traits || slot == 0)
+	      THROW (file, "The ABC data is corrupt, attempt to read out of bounds.");
+	    if (slot > n_slots)
+	      n_slots = slot;
+	    slot--;
+	    if (base && slot < base->n_slots)
+	      THROW (file, "Illegal override of %s in %s.", trait->name, traits->name);
+	  }
+
+	  if (swfdec_abc_traits_get_trait (traits, trait->ns, trait->name))
+	    THROW (file, "The ABC data is corrupt, attempt to read out of bounds.");
+				
+	  /* FIXME: if (script) addNamedScript(ns, name, script); */
+
+	  if (type == 4) {
+	    guint id;
+	    READ_U30 (id, bits);
+	    if (id >= file->n_functions)
+	      THROW (file, "ClassInfo %u exceeds class_count=%u.", id, file->n_functions);
+	    if (file->classes[id] == NULL)
+	      THROW (file, "ClassInfo-%u is referenced before definition.", id);
+
+	    /* if (script) addNamedTraits(ns, name, cinit->declaringTraits->itraits); */
+	    
+	    trait->type = SWFDEC_ABC_TRAIT_CONST;
+	  } else {
+	    g_assert (type == 0 || type == 6);
+	    READ_U30 (trait->slot.type, bits);
+	    READ_U30 (trait->slot.default_index, bits);
+	    if (trait->slot.default_index) {
+	      trait->slot.default_type = swfdec_bits_get_u8 (bits);
+	    }
+	    trait->type = SWFDEC_ABC_BINDING_NEW (type == 0 ? SWFDEC_ABC_TRAIT_SLOT : SWFDEC_ABC_TRAIT_CONST, slot);
+	  }
+	}
+	break;
+      case 1: /* method */
+      case 2: /* getter */
+      case 3: /* setter */
+	{
+	  guint ignore;
+	  SwfdecAbcBinding bind;
+	  const SwfdecAbcTrait *found;
+	  SwfdecAbcFunction *fun;
+	  READ_U30 (ignore, bits);
+	  SWFDEC_LOG ("    display id = %u", ignore);
+	  if (!swfdec_abc_file_parse_method (file, bits, traits, &fun))
+	    return FALSE;
+
+#if 0
+	  // only export one name for an accessor 
+	  if (script && !domain->getNamedScript(name,ns))
+		  addNamedScript(ns, name, script);
+#endif
+	  
+	  if (traits->base && (found = swfdec_abc_traits_find_trait (traits->base,
+	      trait->ns == traits->protected_ns ? traits->base->protected_ns: trait->ns, 
+	      trait->name))) {
+	    bind = found->type;
+	  } else {
+	    bind = SWFDEC_ABC_BINDING_NONE;
+	  }
+
+	  if (type == 1) { 
+	    /* method */
+	    if (bind == SWFDEC_ABC_BINDING_NONE) {
+	      if (trait->override)
+		THROW (file, "Illegal override of %s in %s.", trait->name, traits->name);
+	      trait->type = SWFDEC_ABC_BINDING_NEW (SWFDEC_ABC_TRAIT_METHOD, n_methods);
+	      n_methods++;
+	    } else if (SWFDEC_ABC_BINDING_IS_TYPE (bind, SWFDEC_ABC_TRAIT_METHOD)) {
+	      if (!trait->override)
+		THROW (file, "Illegal override of %s in %s.", trait->name, traits->name);
+	      trait->type = SWFDEC_ABC_BINDING_NEW (SWFDEC_ABC_TRAIT_METHOD, 
+		  SWFDEC_ABC_BINDING_GET_ID (bind));
+	    } else {
+	      THROW (file, "The ABC data is corrupt, attempt to read out of bounds.");
+	    }
+	  } else {
+	    /* getter or setter */
+	    found = swfdec_abc_traits_get_trait (traits, trait->ns, trait->name);
+	    if (found)
+	      bind = found->type;
+
+	    if (bind == SWFDEC_ABC_BINDING_NONE) {
+	      if (trait->override)
+		THROW (file, "Illegal override of %s in %s.", trait->name, traits->name);
+	      trait->type = SWFDEC_ABC_BINDING_NEW (type == 2 ? 
+		  SWFDEC_ABC_TRAIT_GET : SWFDEC_ABC_TRAIT_SET, n_methods);
+	      n_methods += 2;
+	    } else if (SWFDEC_ABC_BINDING_IS_ACCESSOR (bind)) {
+	      if (!trait->override)
+		THROW (file, "Illegal override of %s in %s.", trait->name, traits->name);
+	      trait->type = SWFDEC_ABC_BINDING_NEW (SWFDEC_ABC_BINDING_GET_TYPE (bind) | 
+		  (type == 2 ? SWFDEC_ABC_TRAIT_GET : SWFDEC_ABC_TRAIT_SET),
+		  SWFDEC_ABC_BINDING_GET_ID (bind));
+	    } else {
+	      THROW (file, "The ABC data is corrupt, attempt to read out of bounds.");
+	    }
+	  }
+	}
+        break;
+      default:
+	THROW (file, "Unsupported traits kind=%u.", type);
+    }
+
+    if (metadata) {
+      guint ignore, j, count;
+      READ_U30 (count, bits);
+  
+      SWFDEC_FIXME ("parse metadata, in particular \"NeedsDxns\"");
+      for (j = 0; j < count; j++) {
+	READ_U30 (ignore, bits);
+      }
+    }
+
+    traits->n_slots = n_slots;
+    traits->n_methods = n_methods;
+  }
+
+  return TRUE;
 }
 
 static gboolean
@@ -451,24 +662,6 @@ swfdec_abc_file_skip_metadata (SwfdecAbcFile *file, SwfdecBits *bits)
 }
 
 static gboolean
-swfdec_abc_file_parse_qname (SwfdecAbcFile *file, SwfdecBits *bits, SwfdecAbcNamespace **ns, const char **name)
-{
-  SwfdecAbcMultiname *mn;
-  guint id;
-
-  READ_U30 (id, bits);
-  if (id == 0 || id >= file->n_multinames)
-    THROW (file, "Cpool index %u is out of range %u.", id, file->n_multinames);
-  mn = &file->multinames[id];
-  if (!swfdec_abc_multiname_is_qualified (mn))
-    THROW (file, "Cpool entry %u is wrong type.", id);
-
-  *ns = mn->ns;
-  *name = mn->name;
-  return TRUE;
-}
-
-static gboolean
 swfdec_abc_file_parse_instance (SwfdecAbcFile *file, SwfdecBits *bits)
 {
   SwfdecAsContext *context = swfdec_gc_object_get_context (file);
@@ -477,6 +670,7 @@ swfdec_abc_file_parse_instance (SwfdecAbcFile *file, SwfdecBits *bits)
   guint id, i, n;
 
   traits = g_object_new (SWFDEC_TYPE_ABC_TRAITS, "context", context, NULL);
+  traits->pool = file;
   if (!swfdec_abc_file_parse_qname (file, bits, &traits->ns, &traits->name))
     return FALSE;
   
@@ -519,17 +713,9 @@ swfdec_abc_file_parse_instance (SwfdecAbcFile *file, SwfdecBits *bits)
       READ_U30 (id, bits);
     }
   } 
-  READ_U30 (id, bits);
-  if (id >= file->n_functions) {
-    THROW (file, "Method_info %u exceeds method_count=%u.", id, file->n_functions);
-  } else if (file->functions[id] == NULL) {
-    THROW (file, "MethodInfo-%u referenced before definition.", id);
-  } else {
-    if (!swfdec_abc_function_bind (file->functions[id], traits)) {
-      THROW (file, "Function %s has already been bound to %s.", file->functions[id]->name,
-	  file->functions[id]->construct_traits->name);
-    }
-  }
+  if (!swfdec_abc_file_parse_method (file, bits, traits, NULL))
+    return FALSE;
+
   swfdec_abc_file_parse_traits (file, traits, bits);
   swfdec_abc_global_add_traits (file->global, traits);
 

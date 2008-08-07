@@ -22,6 +22,7 @@
 #endif
 
 #include "swfdec_abc_function.h"
+#include "swfdec_abc_traits.h"
 #include "swfdec_as_context.h"
 #include "swfdec_debug.h"
 
@@ -60,10 +61,10 @@ swfdec_abc_function_bind (SwfdecAbcFunction *fun, SwfdecAbcTraits *traits)
   g_return_val_if_fail (SWFDEC_IS_ABC_FUNCTION (fun), FALSE);
   g_return_val_if_fail (SWFDEC_IS_ABC_TRAITS (traits), FALSE);
 
-  if (fun->construct_traits || traits->construct)
+  if (fun->bound_traits || traits->construct)
     return FALSE;
 
-  fun->construct_traits = traits;
+  fun->bound_traits = traits;
   traits->construct = fun;
   return TRUE;
 }

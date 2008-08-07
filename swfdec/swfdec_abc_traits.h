@@ -17,6 +17,7 @@
  * Boston, MA  02110-1301  USA
  */
 
+#include <swfdec/swfdec_abc_types.h>
 #include <swfdec/swfdec_as_types.h>
 #include <swfdec/swfdec_gc_object.h>
 
@@ -25,21 +26,34 @@
 
 G_BEGIN_DECLS
 
+/* NB: The indexes for the binding types have a lot of magic associated with 
+ * them, so be sure to update this magic. Examples:
+ * (type & 6) == 2 => slot or const
+ * type > 4 => accessor
+ * type | SWFDEC_ABC_TRAIT_GET => make getter out of any accessor
+ */
 typedef enum {
-  SWFDEC_ABC_TRAIT_SLOT = 0,
+  SWFDEC_ABC_TRAIT_NONE = 0,
   SWFDEC_ABC_TRAIT_METHOD = 1,
-  SWFDEC_ABC_TRAIT_GETTER = 2,
-  SWFDEC_ABC_TRAIT_SETTER = 3,
-  SWFDEC_ABC_TRAIT_CLASS = 4,
-  SWFDEC_ABC_TRAIT_FUNCTION = 5,
-  SWFDEC_ABC_TRAIT_CONST = 6
+  SWFDEC_ABC_TRAIT_SLOT = 2,
+  SWFDEC_ABC_TRAIT_CONST = 3,
+  SWFDEC_ABC_TRAIT_ITRAMP = 4,
+  SWFDEC_ABC_TRAIT_GET = 5,
+  SWFDEC_ABC_TRAIT_SET = 6,
+  SWFDEC_ABC_TRAIT_GETSET = 7,
 } SwfdecAbcTraitType;
 
-/* forward declaration */
-typedef struct _SwfdecAbcFunction SwfdecAbcFunction;
+typedef guint SwfdecAbcBinding;
+
+#define SWFDEC_ABC_BINDING_NEW(type, id) ((id) << 3 | (type))
+#define SWFDEC_ABC_BINDING_NONE SWFDEC_ABC_BINDING_NEW (SWFDEC_ABC_TRAIT_NONE, 0)
+#define SWFDEC_ABC_BINDING_GET_ID(bind) ((bind) >> 3)
+#define SWFDEC_ABC_BINDING_GET_TYPE(bind) ((bind) & 7)
+#define SWFDEC_ABC_BINDING_IS_TYPE(bind, type) (((bind) & 7) == (type))
+#define SWFDEC_ABC_BINDING_IS_ACCESSOR(bind) (SWFDEC_ABC_BINDING_GET_TYPE (bind) > 4)
 
 typedef struct _SwfdecAbcTrait SwfdecAbcTrait;
-typedef struct _SwfdecAbcTraits SwfdecAbcTraits;
+//typedef struct _SwfdecAbcTraits SwfdecAbcTraits;
 typedef struct _SwfdecAbcTraitsClass SwfdecAbcTraitsClass;
 
 #define SWFDEC_TYPE_ABC_TRAITS                    (swfdec_abc_traits_get_type())
@@ -52,15 +66,23 @@ typedef struct _SwfdecAbcTraitsClass SwfdecAbcTraitsClass;
 struct _SwfdecAbcTrait {
   SwfdecAbcTraitType		type;		/* type of trait */
   gsize				offset;		/* offset into allocated memory or 0 if not verified */
+  SwfdecAbcNamespace *		ns;		/* namespace described by this trait */
+  const char *			name;		/* name described by this trait */
   gboolean			final:1;	/* TRUE if trait is final */
   gboolean			override:1;	/* TRUE if trait overrides a base trait */
-  guint				id;		/* id of data for type */
-  guint				id_data;	/* relevant data for id */
+  union {
+    struct {
+      guint			type;
+      guint			default_index;
+      guint			default_type;
+    }				slot;
+  };
 };
 
 struct _SwfdecAbcTraits {
   SwfdecGcObject		object;
 
+  SwfdecAbcFile *		pool;		/* pool that defined this traits */
   SwfdecAbcNamespace *		ns;		/* namespace of type we represent */
   const char *			name;		/* name of type we represent */
   SwfdecAbcTraits *		base;		/* parent type traits */
@@ -69,6 +91,9 @@ struct _SwfdecAbcTraits {
 
   SwfdecAbcTrait *		traits;		/* the traits we have */
   guint				n_traits;	/* number of traits */
+
+  guint				n_slots;	/* number of slots */
+  guint				n_methods;	/* number of methods */
 
   gboolean			sealed:1;	/* cannot add properties to object */
   gboolean			final:1;	/* no derived traits */
@@ -79,7 +104,16 @@ struct _SwfdecAbcTraitsClass {
   SwfdecGcObjectClass	object_class;
 };
 
-GType		swfdec_abc_traits_get_type	(void) G_GNUC_CONST;
+GType			swfdec_abc_traits_get_type		(void) G_GNUC_CONST;
+
+gboolean		swfdec_abc_traits_allow_early_binding	(SwfdecAbcTraits *	traits);
+
+const SwfdecAbcTrait *	swfdec_abc_traits_get_trait		(SwfdecAbcTraits *	traits,
+								 SwfdecAbcNamespace *	ns,
+								 const char *		name);
+const SwfdecAbcTrait *	swfdec_abc_traits_find_trait		(SwfdecAbcTraits *	traits,
+								 SwfdecAbcNamespace *	ns,
+								 const char *		name);
 
 
 G_END_DECLS

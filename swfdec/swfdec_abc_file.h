@@ -25,12 +25,13 @@
 #include <swfdec/swfdec_abc_multiname.h>
 #include <swfdec/swfdec_abc_namespace.h>
 #include <swfdec/swfdec_abc_ns_set.h>
+#include <swfdec/swfdec_abc_types.h>
 #include <swfdec/swfdec_bits.h>
 #include <swfdec/swfdec_gc_object.h>
 
 G_BEGIN_DECLS
 
-typedef struct _SwfdecAbcFile SwfdecAbcFile;
+//typedef struct _SwfdecAbcFile SwfdecAbcFile;
 typedef struct _SwfdecAbcFileClass SwfdecAbcFileClass;
 
 #define SWFDEC_TYPE_ABC_FILE                    (swfdec_abc_file_get_type())
@@ -61,8 +62,8 @@ struct _SwfdecAbcFile {
   guint			n_multinames;	/* number of multinames */
   SwfdecAbcFunction **	functions;   	/* all the functions defined */
   guint			n_functions;	/* number of functions */
-  SwfdecAbcFunction **	classes;   	/* all the functions defined */
-  guint			n_classes;	/* number of functions */
+  SwfdecAbcFunction **	classes;   	/* all the classes defined */
+  guint			n_classes;   	/* number of classes */
 };
 
 struct _SwfdecAbcFileClass {
