@@ -505,8 +505,8 @@ swfdec_sprite_movie_perform_one_action (SwfdecSpriteMovie *movie, guint tag, Swf
 	  SWFDEC_ERROR ("couldn't parse name of DoAbc tag");
 	  return TRUE;
 	}
-	g_free (name);
 	SWFDEC_LOG ("  name: %s", name);
+	g_free (name);
 	file = swfdec_abc_file_new (SWFDEC_AS_CONTEXT (player), &bits);
       }
       return TRUE;
