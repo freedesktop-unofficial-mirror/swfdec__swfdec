@@ -588,7 +588,7 @@ swfdec_abc_file_parse_methods (SwfdecAbcFile *file, SwfdecBits *bits)
 
   READ_U30 (file->n_functions, bits);
   if (file->n_functions) {
-    gboolean param_names, optional;
+    gboolean param_names, optional, native;
     file->functions = swfdec_as_context_try_new (context, SwfdecAbcFunction *, file->n_functions);
     if (file->functions == NULL) {
       file->n_functions = 0;
@@ -599,6 +599,7 @@ swfdec_abc_file_parse_methods (SwfdecAbcFile *file, SwfdecBits *bits)
       SwfdecAbcFunction *fun = file->functions[i] = 
 	g_object_new (SWFDEC_TYPE_ABC_FUNCTION, "context", context, NULL);
       READ_U30 (len, bits);
+      SWFDEC_LOG ("  function %u:", i);
       if (len) {
 	if (!swfdec_as_context_try_use_mem (context, len * sizeof (SwfdecAbcFunctionArgument)))
 	  return FALSE;
@@ -611,8 +612,9 @@ swfdec_abc_file_parse_methods (SwfdecAbcFile *file, SwfdecBits *bits)
       } else if (id < file->n_multinames) {
 	fun->return_type = &file->multinames[id];
       } else {
-	return FALSE;
+	THROW (file, "Cpool index %u is out of range %u.", id, file->n_multinames);
       }
+      SWFDEC_LOG ("    return type: %s", fun->return_type ? ((SwfdecAbcMultiname *) fun->return_type)->name : "void");
       for (j = 0; j < fun->n_args; j++) {
 	READ_U30 (id, bits);
 	if (id == 0) {
@@ -620,23 +622,27 @@ swfdec_abc_file_parse_methods (SwfdecAbcFile *file, SwfdecBits *bits)
 	} else if (id < file->n_multinames) {
 	  fun->args[j].type = &file->multinames[id];
 	} else {
-	  return FALSE;
+	  THROW (file, "Cpool index %u is out of range %u.", id, file->n_multinames);
 	}
+	SWFDEC_LOG ("    argument %u: type %s", j, fun->args[j].type ? ((SwfdecAbcMultiname *) fun->args[j].type)->name : "void");
       }
       READ_U30 (id, bits);
       if (id > file->n_strings) {
-	return FALSE;
+	THROW (file, "Cpool index %u is out of range %u.", id, file->n_strings);
       } else if (id > 0) {
 	fun->name = file->strings[id];
       }
-      SWFDEC_LOG ("  function %u: %s (%u args)", i, fun->name ? fun->name : "[unnamed]", fun->n_args);
       param_names = swfdec_bits_getbit (bits);
       fun->set_dxns = swfdec_bits_getbit (bits);
-      /* ignored = */ swfdec_bits_getbits (bits, 2);
+      native = swfdec_bits_getbit (bits);
+      /* ignored = */ swfdec_bits_getbit (bits);
       optional = swfdec_bits_getbit (bits);
       fun->need_rest = swfdec_bits_getbit (bits);
       fun->need_activation = swfdec_bits_getbit (bits);
       fun->need_arguments = swfdec_bits_getbit (bits);
+      if (native) {
+	SWFDEC_FIXME ("supposed to load native method %u here", i);
+      }
       if (optional) {
 	READ_U30 (len, bits);
 	if (len == 0 || len > fun->n_args)
