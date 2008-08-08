@@ -21,9 +21,28 @@
 #include "config.h"
 #endif
 
+#include <stdlib.h>
+
 #include <swfdec/swfdec.h>
 #include <swfdec/swfdec_abc_file.h>
 #include <swfdec/swfdec_bits.h>
+
+static void
+extract (SwfdecAsContext *cx, SwfdecBuffer *buffer, gsize offset)
+{
+  SwfdecAbcFile *file;
+  SwfdecBits bits;
+
+  g_print ("extracting data at offset %"G_GSIZE_FORMAT"...\n", offset);
+  swfdec_bits_init (&bits, buffer);
+  swfdec_bits_skip_bytes (&bits, offset);
+  file = swfdec_abc_file_new (cx, &bits);
+  if (file) {
+    g_print ("  SUCCESS\n");
+  } else {
+    g_print ("  failed\n");
+  }
+}
 
 int
 main (int argc, char **argv)
@@ -34,8 +53,8 @@ main (int argc, char **argv)
     { NULL }
   };
   GOptionContext *context;
+  GPtrArray *offsets;
   SwfdecAsContext *cx;
-  SwfdecAbcFile *file;
   GError *err;
   SwfdecBuffer *buffer;
   gsize i;
@@ -64,21 +83,30 @@ main (int argc, char **argv)
   }
 
   cx = g_object_new (SWFDEC_TYPE_AS_CONTEXT, NULL);
+  offsets = g_ptr_array_new ();
   for (i = 0; i < buffer->length - 3; i++) {
-    SwfdecBits bits;
     if (buffer->data[i] != 0x10 ||
         buffer->data[i + 1] != 0x00 ||
         buffer->data[i + 2] != 0x2E ||
         buffer->data[i + 3] != 0x00)
       continue;
-    g_print ("found data at offset %u, testing...\n", i);
-    swfdec_bits_init (&bits, buffer);
-    swfdec_bits_skip_bytes (&bits, i);
-    file = swfdec_abc_file_new (cx, &bits);
-    if (file) {
-      g_print ("  failed\n");
-    } else {
-      g_print ("  SUCCESS\n");
+    g_print ("found data (index %u) at offset %u\n", offsets->len, i);
+    g_ptr_array_add (offsets, GSIZE_TO_POINTER (i));
+  }
+
+  if (filenames[1] == NULL) {
+    for (i = 0; i < offsets->len; i++) {
+      extract (cx, buffer, GPOINTER_TO_SIZE (g_ptr_array_index (offsets, i)));
+    }
+  } else {
+    for (i = 1; filenames[i]; i++) {
+      guint id = strtoul (filenames[i], NULL, 10);
+      if (id >= offsets->len) {
+	g_printerr ("Cannot extract data index %u, only %u indexes available\n",
+	    id, offsets->len);
+	return 1;
+      }
+      extract (cx, buffer, GPOINTER_TO_SIZE (g_ptr_array_index (offsets, id)));
     }
   }
 
