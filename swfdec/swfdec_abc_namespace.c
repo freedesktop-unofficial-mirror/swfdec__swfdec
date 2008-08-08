@@ -97,7 +97,5 @@ swfdec_abc_namespace_equal (gconstpointer a, gconstpointer b)
   SwfdecAbcNamespace *nsa = (SwfdecAbcNamespace *) a;
   SwfdecAbcNamespace *nsb = (SwfdecAbcNamespace *) b;
 
-  if (nsa->prefix == NULL || nsb->prefix == NULL)
-    return nsa == nsb;
   return nsa->uri == nsb->uri;
 }
