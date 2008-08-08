@@ -161,6 +161,7 @@ swfdec_abc_file_parse_constants (SwfdecAbcFile *file, SwfdecBits *bits)
   SWFDEC_LOG ("parsing ABC block");
   /* read all integers */
   READ_U30 (file->n_ints, bits);
+  SWFDEC_LOG ("%u integers", file->n_ints);
   if (file->n_ints) {
     file->ints = swfdec_as_context_try_new (context, int, file->n_ints);
     if (file->ints == NULL) {
@@ -175,6 +176,7 @@ swfdec_abc_file_parse_constants (SwfdecAbcFile *file, SwfdecBits *bits)
 
   /* read all unsigned integers */
   READ_U30 (file->n_uints, bits);
+  SWFDEC_LOG ("%u unsigned integers", file->n_uints);
   if (file->n_uints) {
     file->uints = swfdec_as_context_try_new (context, guint, file->n_uints);
     if (file->uints == NULL) {
@@ -189,6 +191,7 @@ swfdec_abc_file_parse_constants (SwfdecAbcFile *file, SwfdecBits *bits)
 
   /* read all doubles */
   READ_U30 (file->n_doubles, bits);
+  SWFDEC_LOG ("%u doubles", file->n_doubles);
   if (file->n_doubles) {
     file->doubles = swfdec_as_context_try_new (context, double, file->n_doubles);
     if (file->doubles == NULL) {
@@ -203,6 +206,7 @@ swfdec_abc_file_parse_constants (SwfdecAbcFile *file, SwfdecBits *bits)
 
   /* read all strings */
   READ_U30 (file->n_strings, bits);
+  SWFDEC_LOG ("%u strings", file->n_strings);
   if (file->n_strings) {
     file->strings = swfdec_as_context_try_new (context, const char *, file->n_strings);
     if (file->strings == NULL) {
@@ -223,6 +227,7 @@ swfdec_abc_file_parse_constants (SwfdecAbcFile *file, SwfdecBits *bits)
 
   /* read all namespaces */
   READ_U30 (file->n_namespaces, bits);
+  SWFDEC_LOG ("%u namespaces", file->n_namespaces);
   if (file->n_namespaces) {
     file->namespaces = swfdec_as_context_try_new (context, SwfdecAbcNamespace *, file->n_namespaces);
     if (file->namespaces == NULL) {
@@ -274,6 +279,7 @@ swfdec_abc_file_parse_constants (SwfdecAbcFile *file, SwfdecBits *bits)
 
   /* read all namespace sets */
   READ_U30 (file->n_nssets, bits);
+  SWFDEC_LOG ("%u namespace sets", file->n_nssets);
   if (file->n_nssets) {
     file->nssets = swfdec_as_context_try_new (context, SwfdecAbcNsSet *, file->n_nssets);
     if (file->nssets == NULL) {
@@ -299,6 +305,7 @@ swfdec_abc_file_parse_constants (SwfdecAbcFile *file, SwfdecBits *bits)
 
   /* read all multinames */
   READ_U30 (file->n_multinames, bits);
+  SWFDEC_LOG ("%u multinames", file->n_multinames);
   if (file->n_multinames) {
     guint nsid, nameid;
     file->multinames = swfdec_as_context_try_new (context, SwfdecAbcMultiname, file->n_multinames);
@@ -536,6 +543,7 @@ swfdec_abc_file_parse_traits (SwfdecAbcFile *file, SwfdecAbcTraits *traits, Swfd
 	      THROW (file, "The ABC data is corrupt, attempt to read out of bounds.");
 	    }
 	  } else {
+	    SwfdecAbcTraitType ttype = type == 2 ? SWFDEC_ABC_TRAIT_GET : SWFDEC_ABC_TRAIT_SET;
 	    /* getter or setter */
 	    found = swfdec_abc_traits_get_trait (traits, trait->ns, trait->name);
 	    if (found)
@@ -544,14 +552,12 @@ swfdec_abc_file_parse_traits (SwfdecAbcFile *file, SwfdecAbcTraits *traits, Swfd
 	    if (bind == SWFDEC_ABC_BINDING_NONE) {
 	      if (trait->override)
 		THROW (file, "Illegal override of %s in %s.", trait->name, traits->name);
-	      trait->type = SWFDEC_ABC_BINDING_NEW (type == 2 ? 
-		  SWFDEC_ABC_TRAIT_GET : SWFDEC_ABC_TRAIT_SET, n_methods);
+	      trait->type = SWFDEC_ABC_BINDING_NEW (ttype, n_methods);
 	      n_methods += 2;
 	    } else if (SWFDEC_ABC_BINDING_IS_ACCESSOR (bind)) {
-	      if (!trait->override)
+	      if (trait->override != ((SWFDEC_ABC_BINDING_GET_TYPE (bind) & ttype) == ttype))
 		THROW (file, "Illegal override of %s in %s.", trait->name, traits->name);
-	      trait->type = SWFDEC_ABC_BINDING_NEW (SWFDEC_ABC_BINDING_GET_TYPE (bind) | 
-		  (type == 2 ? SWFDEC_ABC_TRAIT_GET : SWFDEC_ABC_TRAIT_SET),
+	      trait->type = SWFDEC_ABC_BINDING_NEW (SWFDEC_ABC_BINDING_GET_TYPE (bind) | ttype,
 		  SWFDEC_ABC_BINDING_GET_ID (bind));
 	    } else {
 	      THROW (file, "The ABC data is corrupt, attempt to read out of bounds.");
@@ -587,6 +593,7 @@ swfdec_abc_file_parse_methods (SwfdecAbcFile *file, SwfdecBits *bits)
   guint i;
 
   READ_U30 (file->n_functions, bits);
+  SWFDEC_LOG ("%u methods", file->n_functions);
   if (file->n_functions) {
     gboolean param_names, optional, native;
     file->functions = swfdec_as_context_try_new (context, SwfdecAbcFunction *, file->n_functions);
@@ -676,7 +683,7 @@ swfdec_abc_file_skip_metadata (SwfdecAbcFile *file, SwfdecBits *bits)
   for (i = 0; i < count; i++) {
     READ_U30 (ignore, bits);
     READ_U30 (count2, bits);
-    for (j = 0; j < count; j++) {
+    for (j = 0; j < count2; j++) {
       READ_U30 (ignore, bits); /* key */
       READ_U30 (ignore, bits); /* value */
     }
@@ -754,6 +761,7 @@ swfdec_abc_file_parse_instances (SwfdecAbcFile *file, SwfdecBits *bits)
   guint i;
 
   READ_U30 (file->n_classes, bits);
+  SWFDEC_LOG ("%u classes", file->n_classes);
   if (file->n_classes) {
     file->instances = swfdec_as_context_try_new (context, SwfdecAbcFunction *, file->n_classes);
     file->classes = swfdec_as_context_try_new (context, SwfdecAbcFunction *, file->n_classes);
