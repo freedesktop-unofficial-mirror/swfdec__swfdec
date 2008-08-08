@@ -66,6 +66,7 @@ struct _SwfdecSwfDecoder
 
   gboolean		use_network;	/* allow network or local access */
   gboolean		has_metadata;	/* TRUE if this file contains metadata */
+  gboolean		use_abc;	/* TRUE if this file uses Actionscript 3 */
   gboolean		protection;   	/* TRUE is this file is protected and may not be edited */
   char *		password;     	/* MD5'd password to open for editing or NULL if may not be opened */
   char *		metadata;	/* NULL if unset or contents of Metadata tag (supposed to be RDF) */

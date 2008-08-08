@@ -99,7 +99,8 @@ struct _SwfdecAsContextClass {
 
 GType		swfdec_as_context_get_type	(void);
 
-void		swfdec_as_context_startup     	(SwfdecAsContext *	context);
+void		swfdec_as_context_startup     	(SwfdecAsContext *	context,
+						 gboolean		abc);
 
 gboolean	swfdec_as_context_is_aborted	(SwfdecAsContext *	context);
 gboolean	swfdec_as_context_is_constructing

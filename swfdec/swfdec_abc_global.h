@@ -48,6 +48,8 @@ struct _SwfdecAbcGlobalClass {
 
 GType			swfdec_abc_global_get_type	(void);
 
+SwfdecAsObject *	swfdec_abc_global_new		(SwfdecAsContext *		context);
+
 void			swfdec_abc_global_add_traits	(SwfdecAbcGlobal *		global,
 							 SwfdecAbcTraits *		traits);
 SwfdecAbcTraits *	swfdec_abc_global_get_traits	(SwfdecAbcGlobal *		global,

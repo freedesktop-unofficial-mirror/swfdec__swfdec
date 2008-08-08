@@ -870,10 +870,11 @@ swfdec_abc_file_new (SwfdecAsContext *context, SwfdecBits *bits)
   guint major, minor;
 
   g_return_val_if_fail (SWFDEC_IS_AS_CONTEXT (context), NULL);
+  g_return_val_if_fail (SWFDEC_IS_ABC_GLOBAL (context->global), NULL);
   g_return_val_if_fail (bits != NULL, NULL);
 
   file = g_object_new (SWFDEC_TYPE_ABC_FILE, "context", context, NULL);
-  file->global = g_object_new (SWFDEC_TYPE_ABC_GLOBAL, "context", context, NULL);
+  file->global = SWFDEC_ABC_GLOBAL (context->global);
 
   minor = swfdec_bits_get_u16 (bits);
   major = swfdec_bits_get_u16 (bits);

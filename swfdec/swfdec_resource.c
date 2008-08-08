@@ -80,15 +80,22 @@ swfdec_resource_stream_target_image (SwfdecResource *instance)
     SwfdecSandbox *old_sandbox;
 
     old_sandbox = instance->sandbox;
-    instance->sandbox = swfdec_sandbox_get_for_url (player,
-	swfdec_loader_get_url (instance->loader), instance->version,
-	SWFDEC_SWF_DECODER (instance->decoder)->use_network);
+    if (dec->use_abc) {
+      instance->sandbox = swfdec_sandbox_get_for_abc (player,
+	  swfdec_loader_get_url (instance->loader), instance->version,
+	  dec->use_network);
+    } else {
+      instance->sandbox = swfdec_sandbox_get_for_url (player,
+	  swfdec_loader_get_url (instance->loader), instance->version,
+	  dec->use_network);
+    }
     if (instance->sandbox) {
       movie->sprite = dec->main_sprite;
       g_assert (movie->sprite->parse_frame > 0);
       movie->n_frames = movie->sprite->n_frames;
       swfdec_movie_invalidate_last (SWFDEC_MOVIE (movie));
-      swfdec_as_object_set_constructor (SWFDEC_AS_OBJECT (movie), instance->sandbox->MovieClip);
+      if (!swfdec_sandbox_is_abc (instance->sandbox))
+	swfdec_as_object_set_constructor (SWFDEC_AS_OBJECT (movie), instance->sandbox->MovieClip);
       if (swfdec_resource_is_root (instance)) {
 	swfdec_player_start_ticking (player);
 	swfdec_movie_initialize (SWFDEC_MOVIE (movie));
@@ -99,7 +106,7 @@ swfdec_resource_stream_target_image (SwfdecResource *instance)
 	  swfdec_url_get_url (swfdec_loader_get_url (instance->loader)));
       swfdec_stream_set_target (SWFDEC_STREAM (instance->loader), NULL);
       instance->sandbox = old_sandbox;
-      /* FIXME: anyting else on the movie we need to clear? */
+      /* FIXME: anything else on the movie we need to clear? */
     }
   } else {
     g_assert_not_reached ();

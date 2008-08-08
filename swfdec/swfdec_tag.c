@@ -261,7 +261,9 @@ tag_func_file_attributes (SwfdecSwfDecoder *s, guint tag)
     SWFDEC_INFO ("reserved bits (1) aren't 0");
   s->has_metadata = swfdec_bits_getbit (&s->b);
   SWFDEC_LOG ("  has metadata: %d", s->has_metadata);
-  if (swfdec_bits_getbits (&s->b, 3))
+  s->use_abc = swfdec_bits_getbit (&s->b);
+  SWFDEC_LOG ("  use ABC: %d", s->use_abc);
+  if (swfdec_bits_getbits (&s->b, 2))
     SWFDEC_INFO ("reserved bits (2) aren't 0");
   s->use_network = swfdec_bits_getbit (&s->b);
   SWFDEC_LOG ("  use network: %d", s->use_network);

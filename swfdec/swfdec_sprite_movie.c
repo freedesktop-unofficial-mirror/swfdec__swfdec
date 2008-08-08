@@ -493,9 +493,15 @@ swfdec_sprite_movie_perform_one_action (SwfdecSpriteMovie *movie, guint tag, Swf
       return TRUE;
     case SWFDEC_TAG_DOABC:
       {
+	SwfdecSandbox *sandbox;
 	SwfdecAbcFile *file;
 	guint flags;
 	char *name;
+	sandbox = mov->resource->sandbox;
+	if (!swfdec_sandbox_is_abc (sandbox)) {
+	  SWFDEC_ERROR ("DoAbc tag in non-ABC sandbox");
+	  return TRUE;
+	}
 	if (!first_time)
 	  return TRUE;
 	flags = swfdec_bits_get_u32 (&bits);
@@ -507,7 +513,9 @@ swfdec_sprite_movie_perform_one_action (SwfdecSpriteMovie *movie, guint tag, Swf
 	}
 	SWFDEC_LOG ("  name: %s", name);
 	g_free (name);
+	swfdec_sandbox_use (sandbox);
 	file = swfdec_abc_file_new (SWFDEC_AS_CONTEXT (player), &bits);
+	swfdec_sandbox_unuse (sandbox);
       }
       return TRUE;
     case SWFDEC_TAG_SOUNDSTREAMHEAD:

@@ -53,6 +53,7 @@ struct _SwfdecSandbox
   SwfdecURL *		url;			/* URL this sandbox acts for */
   guint			as_version;		/* Actionscript version */
 
+  /* AS 1 + AS 2 */
   /* global cached objects from context */
   SwfdecAsObject *	Function;		/* Function */
   SwfdecAsObject *	Function_prototype;	/* Function.prototype */
@@ -62,6 +63,9 @@ struct _SwfdecSandbox
   /* global player objects */
   SwfdecAsObject *	MovieClip;		/* MovieClip object */
   SwfdecAsObject *	Video;			/* Video object */
+
+  /* ABC */
+  SwfdecAsObject *	global;			/* the global ABC object */
 };
 
 struct _SwfdecSandboxClass
@@ -75,10 +79,16 @@ SwfdecSandbox *		swfdec_sandbox_get_for_url	(SwfdecPlayer *	  	player,
 							 const SwfdecURL *	url,
 							 guint			flash_version,
 							 gboolean		allow_network);
+SwfdecSandbox *		swfdec_sandbox_get_for_abc	(SwfdecPlayer *		player,
+							 const SwfdecURL *	url,
+							 guint			flash_version,
+							 gboolean		allow_network);
 
+#define swfdec_sandbox_is_abc(sandbox) ((sandbox)->as_version > 2)
 void			swfdec_sandbox_use		(SwfdecSandbox *	sandbox);
 gboolean		swfdec_sandbox_try_use		(SwfdecSandbox *	sandbox);
 void			swfdec_sandbox_unuse		(SwfdecSandbox *	sandbox);
+
 
 G_END_DECLS
 #endif

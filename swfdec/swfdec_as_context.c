@@ -25,6 +25,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include "swfdec_as_context.h"
+#include "swfdec_abc_global.h"
 #include "swfdec_abc_internal.h"
 #include "swfdec_as_array.h"
 #include "swfdec_as_frame_internal.h"
@@ -1359,12 +1360,17 @@ swfdec_as_context_run_init_script (SwfdecAsContext *context, const guint8 *data,
 /**
  * swfdec_as_context_startup:
  * @context: a #SwfdecAsContext
+ * @abc: %TRUE to initialize for usage with ABC, %FALSE to initialize for old
+ *       Actionscript usage.
  *
  * Starts up the context. This function must be called before any Actionscript
  * is called on @context.
  **/
+/* FIXME: This sucks. We should support setting different global objects on the
+ * context with a proper API.
+ */
 void
-swfdec_as_context_startup (SwfdecAsContext *context)
+swfdec_as_context_startup (SwfdecAsContext *context, gboolean abc)
 {
   g_return_if_fail (SWFDEC_IS_AS_CONTEXT (context));
   g_return_if_fail (context->state == SWFDEC_AS_CONTEXT_NEW);
@@ -1372,19 +1378,24 @@ swfdec_as_context_startup (SwfdecAsContext *context)
   if (context->cur == NULL &&
       !swfdec_as_stack_push_segment (context))
     return;
-  if (context->global == NULL)
-    context->global = swfdec_as_object_new_empty (context);
-  /* init the two internal functions */
-  /* FIXME: remove them for normal contexts? */
-  swfdec_player_preinit_global (context);
-  /* get the necessary objects up to define objects and functions sanely */
-  swfdec_as_function_init_context (context);
-  swfdec_as_object_init_context (context);
-  /* define the global object and other important ones */
-  swfdec_as_context_init_global (context);
+  if (abc) {
+    if (context->global == NULL)
+      context->global = swfdec_abc_global_new (context);
+  } else {
+    if (context->global == NULL)
+      context->global = swfdec_as_object_new_empty (context);
+    /* init the two internal functions */
+    /* FIXME: remove them for normal contexts? */
+    swfdec_player_preinit_global (context);
+    /* get the necessary objects up to define objects and functions sanely */
+    swfdec_as_function_init_context (context);
+    swfdec_as_object_init_context (context);
+    /* define the global object and other important ones */
+    swfdec_as_context_init_global (context);
 
-  /* run init script */
-  swfdec_as_context_run_init_script (context, swfdec_as_initialize, sizeof (swfdec_as_initialize), 8);
+    /* run init script */
+    swfdec_as_context_run_init_script (context, swfdec_as_initialize, sizeof (swfdec_as_initialize), 8);
+  }
 
   if (context->state == SWFDEC_AS_CONTEXT_NEW)
     context->state = SWFDEC_AS_CONTEXT_RUNNING;

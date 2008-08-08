@@ -77,6 +77,18 @@ swfdec_abc_global_init (SwfdecAbcGlobal *global)
   global->traits = g_ptr_array_new ();
 }
 
+SwfdecAsObject *
+swfdec_abc_global_new (SwfdecAsContext *context)
+{
+  SwfdecAbcGlobal *global;
+
+  g_return_val_if_fail (SWFDEC_IS_AS_CONTEXT (context), NULL);
+
+  global = g_object_new (SWFDEC_TYPE_ABC_GLOBAL, "context", context, NULL);
+
+  return SWFDEC_AS_OBJECT (global);
+}
+
 void
 swfdec_abc_global_add_traits (SwfdecAbcGlobal *global, SwfdecAbcTraits *traits)
 {
