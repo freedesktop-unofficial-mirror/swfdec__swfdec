@@ -25,6 +25,7 @@
 
 #include <swfdec/swfdec.h>
 #include <swfdec/swfdec_abc_file.h>
+#include <swfdec/swfdec_abc_global.h>
 #include <swfdec/swfdec_bits.h>
 
 static void
@@ -83,6 +84,7 @@ main (int argc, char **argv)
   }
 
   cx = g_object_new (SWFDEC_TYPE_AS_CONTEXT, NULL);
+  cx->global = swfdec_abc_global_new (cx);
   offsets = g_ptr_array_new ();
   for (i = 0; i < buffer->length - 3; i++) {
     if (buffer->data[i] != 0x10 ||
