@@ -389,6 +389,8 @@ swfdec_abc_file_parse_method (SwfdecAbcFile *file, SwfdecBits *bits, SwfdecAbcTr
       THROW (file, "Function %s has already been bound to %s.", file->functions[id]->name,
 	  file->functions[id]->bound_traits->name);
     }
+    g_assert (traits->construct == NULL);
+    traits->construct = file->functions[id];
     SWFDEC_LOG ("  binding method %u to traits %s", id, traits->name);
   }
   if (ret)
@@ -402,13 +404,11 @@ swfdec_abc_file_parse_traits (SwfdecAbcFile *file, SwfdecAbcTraits *traits, Swfd
   SwfdecAsContext *context = swfdec_gc_object_get_context (file);
   SwfdecAbcTraits *base = traits->base;
   guint i, n_slots, n_methods, n_traits;
-  SwfdecAbcNamespace *ns;
-  const char *name;
   gboolean early, metadata;
 
   READ_U30 (n_traits, bits);
   if (n_traits) {
-    traits->traits = swfdec_as_context_try_new (context, SwfdecAbcTraits, traits->n_traits);
+    traits->traits = swfdec_as_context_try_new (context, SwfdecAbcTrait, n_traits);
     if (traits->traits == NULL)
       return FALSE;
     traits->n_traits = n_traits;
@@ -432,7 +432,7 @@ swfdec_abc_file_parse_traits (SwfdecAbcFile *file, SwfdecAbcTraits *traits, Swfd
   for (i = 0; i < n_traits; i++) {
     SwfdecAbcTrait *trait = &traits->traits[i];
     guint type;
-    if (!swfdec_abc_file_parse_qname (file, bits, &ns, &name))
+    if (!swfdec_abc_file_parse_qname (file, bits, &trait->ns, &trait->name))
       return FALSE;
 
     /* reserved = */ swfdec_bits_getbit (bits);
@@ -499,8 +499,12 @@ swfdec_abc_file_parse_traits (SwfdecAbcFile *file, SwfdecAbcTraits *traits, Swfd
 	  SwfdecAbcFunction *fun;
 	  READ_U30 (ignore, bits);
 	  SWFDEC_LOG ("    display id = %u", ignore);
-	  if (!swfdec_abc_file_parse_method (file, bits, traits, &fun))
+	  if (!swfdec_abc_file_parse_method (file, bits, NULL, &fun))
 	    return FALSE;
+	  if (!swfdec_abc_function_bind (fun, traits)) {
+	    THROW (file, "Function %s has already been bound to %s.", fun->name,
+		fun->bound_traits->name);
+	  }
 
 #if 0
 	  // only export one name for an accessor 
