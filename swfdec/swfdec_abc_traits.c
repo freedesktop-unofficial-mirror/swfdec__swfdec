@@ -35,8 +35,9 @@ swfdec_abc_traits_dispose (GObject *object)
   SwfdecAsContext *context = swfdec_gc_object_get_context (traits);
 
   if (traits->n_traits) {
-    swfdec_as_context_unuse_mem (context, traits->n_traits * sizeof (SwfdecAbcTrait));
-    g_free (traits->traits);
+    swfdec_as_context_free (context, traits->n_traits * sizeof (SwfdecAbcTrait), traits->traits);
+    traits->traits = NULL;
+    traits->n_traits = 0;
   }
 
   G_OBJECT_CLASS (swfdec_abc_traits_parent_class)->dispose (object);
