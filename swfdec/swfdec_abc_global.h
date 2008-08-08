@@ -40,6 +40,7 @@ struct _SwfdecAbcGlobal {
   SwfdecAsObject	object;
 
   GPtrArray *		traits;		/* list of all traits - FIXME: needs fast index by ns/name */
+  GArray *		scripts;	/* list of all scripts - FIXME: needs fast index by ns/name */
 };
 
 struct _SwfdecAbcGlobalClass {
@@ -58,6 +59,11 @@ SwfdecAbcTraits *	swfdec_abc_global_get_traits	(SwfdecAbcGlobal *		global,
 SwfdecAbcTraits *	swfdec_abc_global_get_traits_for_multiname
 							(SwfdecAbcGlobal *		global,
 							 const SwfdecAbcMultiname *	mn);
+void	  		swfdec_abc_global_add_script	(SwfdecAbcGlobal *		global,
+							 SwfdecAbcNamespace *		ns,
+							 const char *			name,
+							 SwfdecAbcFunction *		script,
+							 gboolean			override);
 
 
 G_END_DECLS

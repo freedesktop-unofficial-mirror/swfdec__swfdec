@@ -27,16 +27,16 @@
 #include <math.h>
 
 #include "swfdec_abc_global.h"
+#include "swfdec_abc_function.h"
 #include "swfdec_as_context.h"
-#include "swfdec_as_frame_internal.h"
-#include "swfdec_as_function.h"
-#include "swfdec_as_object.h"
-#include "swfdec_as_strings.h"
-#include "swfdec_as_internal.h"
-#include "swfdec_as_native_function.h"
-#include "swfdec_system.h"
-#include "swfdec_player_internal.h"
 #include "swfdec_debug.h"
+
+typedef struct _SwfdecAbcGlobalScript SwfdecAbcGlobalScript;
+struct _SwfdecAbcGlobalScript {
+  SwfdecAbcNamespace *	ns;
+  const char *		name;
+  SwfdecAbcFunction *	script;
+};
 
 G_DEFINE_TYPE (SwfdecAbcGlobal, swfdec_abc_global, SWFDEC_TYPE_AS_OBJECT)
 
@@ -46,6 +46,7 @@ swfdec_abc_global_dispose (GObject *object)
   SwfdecAbcGlobal *global = SWFDEC_ABC_GLOBAL (object);
 
   g_ptr_array_free (global->traits, TRUE);
+  g_array_free (global->scripts, TRUE);
 
   G_OBJECT_CLASS (swfdec_abc_global_parent_class)->dispose (object);
 }
@@ -75,6 +76,7 @@ static void
 swfdec_abc_global_init (SwfdecAbcGlobal *global)
 {
   global->traits = g_ptr_array_new ();
+  global->scripts = g_array_new (FALSE, FALSE, sizeof (SwfdecAbcGlobalScript));
 }
 
 SwfdecAsObject *
@@ -144,4 +146,39 @@ swfdec_abc_global_get_traits_for_multiname (SwfdecAbcGlobal *global,
     }
   }
   return ret;
+}
+
+static SwfdecAbcGlobalScript *
+swfdec_abc_global_find_script (SwfdecAbcGlobal *global, SwfdecAbcNamespace *ns,
+    const char *name)
+{
+  guint i;
+
+  for (i = 0; i < global->scripts->len; i++) {
+    SwfdecAbcGlobalScript *script = &g_array_index (global->scripts, SwfdecAbcGlobalScript, i);
+    if (script->ns == ns && script->name == name)
+      return script;
+  }
+  return NULL;
+}
+
+void
+swfdec_abc_global_add_script (SwfdecAbcGlobal *global, SwfdecAbcNamespace *ns,
+    const char *name, SwfdecAbcFunction *script, gboolean override)
+{
+  SwfdecAbcGlobalScript *found;
+
+  g_return_if_fail (SWFDEC_IS_ABC_GLOBAL (global));
+  g_return_if_fail (SWFDEC_IS_ABC_NAMESPACE (ns));
+  g_return_if_fail (name != NULL);
+  g_return_if_fail (SWFDEC_IS_ABC_FUNCTION (script));
+
+  found = swfdec_abc_global_find_script (global, ns, name);
+  if (found) {
+    if (override)
+      found->script = script;
+  } else {
+    SwfdecAbcGlobalScript add = { ns, name, script };
+    g_array_append_val (global->scripts, add);
+  }
 }

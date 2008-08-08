@@ -851,16 +851,48 @@ swfdec_abc_file_parse_classes (SwfdecAbcFile *file, SwfdecBits *bits)
 }
 
 static gboolean
+swfdec_abc_file_parse_scripts (SwfdecAbcFile *file, SwfdecBits *bits)
+{
+  SwfdecAsContext *context = swfdec_gc_object_get_context (file);
+  SwfdecAbcTraits *traits;
+  SwfdecAbcFunction *fun;
+  guint i, j, n_scripts;
+
+  READ_U30 (n_scripts, bits);
+  SWFDEC_LOG ("%u scripts ", n_scripts);
+  for (i = 0; i < n_scripts; i++) {
+    SWFDEC_LOG ("script %u", i);
+    traits = g_object_new (SWFDEC_TYPE_ABC_TRAITS, "context", context, NULL);
+    traits->pool = file;
+    traits->final = TRUE;
+    traits->ns = context->public_ns;
+    traits->name = SWFDEC_AS_STR_global;
+    /* FIXME: traits->base = OBJECT_TYPE */
+    if (!swfdec_abc_file_parse_method (file, bits, traits, &fun))
+      return FALSE;
+    traits->construct = fun;
+    if (!swfdec_abc_file_parse_traits (file, traits, bits))
+      return FALSE;
+    for (j = 0; j < traits->n_traits; j++) {
+      SwfdecAbcTrait *trait = &traits->traits[j];
+      if (trait->type == SWFDEC_ABC_TRAIT_NONE)
+	continue;
+      swfdec_abc_global_add_script (file->global, trait->ns, trait->name, fun, 
+	  i + 1 == n_scripts);
+    }
+  }
+  return TRUE;
+}
+
+static gboolean
 swfdec_abc_file_parse (SwfdecAbcFile *file, SwfdecBits *bits)
 {
-  if (swfdec_abc_file_parse_constants (file, bits) &&
+  return swfdec_abc_file_parse_constants (file, bits) &&
       swfdec_abc_file_parse_methods (file, bits) &&
       swfdec_abc_file_skip_metadata (file, bits) &&
       swfdec_abc_file_parse_instances (file, bits) &&
-      swfdec_abc_file_parse_classes(file, bits))
-    return TRUE;
-
-  return FALSE;
+      swfdec_abc_file_parse_classes (file, bits) &&
+      swfdec_abc_file_parse_scripts (file, bits);
 }
 
 SwfdecAbcFile *
