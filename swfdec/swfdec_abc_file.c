@@ -561,24 +561,33 @@ swfdec_abc_file_parse_traits (SwfdecAbcFile *file, SwfdecAbcTraits *traits, Swfd
 	  } else {
 	    SwfdecAbcTraitType ttype = type == 2 ? SWFDEC_ABC_TRAIT_GET : SWFDEC_ABC_TRAIT_SET;
 	    /* getter or setter */
-	    found = swfdec_abc_traits_get_trait (traits, trait->ns, trait->name);
-	    if (found)
-	      bind = found->type;
 
+	    /* check override */
 	    if (bind == SWFDEC_ABC_BINDING_NONE) {
 	      if (trait->override)
 		THROW (file, "Illegal override of %s in %s.", trait->name, traits->name);
+	    } else if (SWFDEC_ABC_BINDING_IS_ACCESSOR (bind)) {
+	      if ((trait->override ? TRUE : FALSE) != ((SWFDEC_ABC_BINDING_GET_TYPE (bind) & ttype) == ttype))
+		THROW (file, "Illegal override of %s in %s.", trait->name, traits->name);
+	      SWFDEC_LOG ("  method: %u (override)", SWFDEC_ABC_BINDING_GET_ID (bind));
+	    } else {
+	      THROW (file, "The ABC data is corrupt, attempt to read out of bounds.");
+	    }
+
+	    /* try to find own trait */
+	    found = swfdec_abc_traits_get_trait (traits, trait->ns, trait->name);
+	    if (found) {
+	      /* FIXME: This is kinda (read: very) hacky */
+	      ((SwfdecAbcTrait *) found)->type = SWFDEC_ABC_BINDING_NEW (SWFDEC_ABC_TRAIT_GETSET, 
+		  SWFDEC_ABC_BINDING_GET_ID (found->type));
+	      SWFDEC_LOG ("  method: %u (reuse)", SWFDEC_ABC_BINDING_GET_ID (found->type));
+	    } else if (bind == SWFDEC_ABC_BINDING_NONE) {
 	      trait->type = SWFDEC_ABC_BINDING_NEW (ttype, n_methods);
 	      SWFDEC_LOG ("  method: %u (new)", n_methods);
 	      n_methods += 2;
-	    } else if (SWFDEC_ABC_BINDING_IS_ACCESSOR (bind)) {
-	      if (trait->override != ((SWFDEC_ABC_BINDING_GET_TYPE (bind) & ttype) == ttype))
-		THROW (file, "Illegal override of %s in %s.", trait->name, traits->name);
-	      SWFDEC_LOG ("  method: %u (override)", SWFDEC_ABC_BINDING_GET_ID (bind));
+	    } else {
 	      trait->type = SWFDEC_ABC_BINDING_NEW (SWFDEC_ABC_BINDING_GET_TYPE (bind) | ttype,
 		  SWFDEC_ABC_BINDING_GET_ID (bind));
-	    } else {
-	      THROW (file, "The ABC data is corrupt, attempt to read out of bounds.");
 	    }
 	  }
 	}
@@ -722,6 +731,7 @@ swfdec_abc_file_parse_instance (SwfdecAbcFile *file, guint instance_id, SwfdecBi
   traits->pool = file;
   if (!swfdec_abc_file_parse_qname (file, bits, &traits->ns, &traits->name))
     return FALSE;
+  SWFDEC_LOG ("  name: %s::%s", traits->ns->uri, traits->name);
   
   READ_U30 (id, bits);
   /* id == 0 means no base traits */
@@ -739,7 +749,11 @@ swfdec_abc_file_parse_instance (SwfdecAbcFile *file, guint instance_id, SwfdecBi
     if (base->interface || traits->interface) {
       THROW (file, "Class %s cannot extend %s.", file->multinames[id].name, base->name);
     }
-  } 
+    traits->base = base;
+    SWFDEC_LOG ("  base: %s::%s", base->ns->uri, base->name);
+  } else {
+    SWFDEC_LOG ("  no base type");
+  }
   /* reserved = */ swfdec_bits_getbits (bits, 4);
   protected_ns = swfdec_bits_getbit (bits);
   traits->interface = swfdec_bits_getbit (bits);
@@ -814,6 +828,7 @@ swfdec_abc_file_parse_classes (SwfdecAbcFile *file, SwfdecBits *bits)
     for (i = 0; i < file->n_classes; i++) {
       SwfdecAbcTraits *traits;
 
+      SWFDEC_LOG ("class %u", i);
       traits = g_object_new (SWFDEC_TYPE_ABC_TRAITS, "context", context, NULL);
       traits->pool = file;
 
