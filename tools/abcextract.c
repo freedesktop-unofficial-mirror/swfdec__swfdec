@@ -39,7 +39,7 @@ extract (SwfdecAsContext *cx, SwfdecBuffer *buffer, gsize offset)
   swfdec_bits_skip_bytes (&bits, offset);
   file = swfdec_abc_file_new (cx, &bits);
   if (file) {
-    g_print ("  SUCCESS\n");
+    g_print ("  SUCCESS (%u bytes)\n", bits.ptr - buffer->data - offset);
   } else {
     g_print ("  failed\n");
   }

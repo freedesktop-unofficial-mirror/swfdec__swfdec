@@ -70,7 +70,7 @@ struct _SwfdecAbcFunction {
   SwfdecAbcTraits *	bound_traits;		/* traits of objects we construct or NULL */
   
   /* native functions only */
-  GCallback *		native;			/* SwfdecAsNative for now - will become native when we can marhsal */
+  GCallback		native;			/* SwfdecAsNative for now - will become native when we can marhsal */
   /* functions with body only */
   SwfdecBuffer *	code;			/* the code to be executed */
   guint			stack;			/* max number of values on stack */
