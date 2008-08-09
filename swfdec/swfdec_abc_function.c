@@ -35,8 +35,18 @@ swfdec_abc_function_dispose (GObject *object)
   SwfdecAsContext *context = swfdec_gc_object_get_context (object);
 
   if (fun->n_args) {
-    swfdec_as_context_unuse_mem (context, fun->n_args * sizeof (SwfdecAbcFunctionArgument));
-    g_free (fun->args);
+    swfdec_as_context_free (context, fun->n_args * sizeof (SwfdecAbcFunctionArgument), fun->args);
+    fun->args = NULL;
+    fun->n_args = 0;
+  }
+  if (fun->n_exceptions) {
+    swfdec_as_context_free (context, fun->n_exceptions * sizeof (SwfdecAbcException), fun->exceptions);
+    fun->exceptions = NULL;
+    fun->n_exceptions = 0;
+  }
+  if (fun->code) {
+    swfdec_buffer_unref (fun->code);
+    fun->code = NULL;
   }
 
   G_OBJECT_CLASS (swfdec_abc_function_parent_class)->dispose (object);
@@ -67,3 +77,12 @@ swfdec_abc_function_bind (SwfdecAbcFunction *fun, SwfdecAbcTraits *traits)
   fun->bound_traits = traits;
   return TRUE;
 }
+
+gboolean
+swfdec_abc_function_is_native (SwfdecAbcFunction *fun)
+{
+  g_return_val_if_fail (SWFDEC_IS_ABC_FUNCTION (fun), FALSE);
+  
+  return fun->native != NULL;
+}
+

@@ -635,9 +635,9 @@ swfdec_abc_file_parse_methods (SwfdecAbcFile *file, SwfdecBits *bits)
       READ_U30 (len, bits);
       SWFDEC_LOG ("  function %u:", i);
       if (len) {
-	if (!swfdec_as_context_try_use_mem (context, len * sizeof (SwfdecAbcFunctionArgument)))
+	fun->args = swfdec_as_context_try_new (context, SwfdecAbcFunctionArgument, len);
+	if (fun->args == NULL)
 	  return FALSE;
-	fun->args = g_new0 (SwfdecAbcFunctionArgument, len);
 	fun->n_args = len;
       }
       READ_U30 (id, bits);
@@ -885,6 +885,78 @@ swfdec_abc_file_parse_scripts (SwfdecAbcFile *file, SwfdecBits *bits)
 }
 
 static gboolean
+swfdec_abc_file_parse_bodies (SwfdecAbcFile *file, SwfdecBits *bits)
+{
+  SwfdecAsContext *context = swfdec_gc_object_get_context (file);
+  SwfdecAbcTraits *traits;
+  SwfdecAbcFunction *fun;
+  guint i, j, max_scope, min_scope, n_bodies, size;
+
+  READ_U30 (n_bodies, bits);
+  SWFDEC_LOG ("%u bodies", n_bodies);
+  for (i = 0; i < n_bodies; i++) {
+    SWFDEC_LOG ("body %u", i);
+    if (!swfdec_abc_file_parse_method (file, bits, NULL, &fun))
+      return FALSE;
+    if (swfdec_abc_function_is_native (fun))
+      THROW (file, "Native method %u has illegal method body.", fun - file->functions[0]);
+    if (fun->bound_traits && fun->bound_traits->interface)
+      THROW (file, "Interface method %u has illegal method body.", fun - file->functions[0]);
+    if (fun->code != NULL)
+      THROW (file, "Method %u has a duplicate method body.", fun - file->functions[0]);
+
+    READ_U30 (fun->stack, bits);
+    SWFDEC_LOG ("  stack: %u", fun->stack);
+    READ_U30 (fun->locals, bits);
+    if (fun->n_args >= fun->locals)
+      THROW (file, "The ABC data is corrupt, attempt to read out of bounds.");
+    SWFDEC_LOG ("  locals: %u", fun->locals);
+    READ_U30 (min_scope, bits);
+    READ_U30 (max_scope, bits);
+    if (min_scope > max_scope)
+      THROW (file, "The ABC data is corrupt, attempt to read out of bounds.");
+    fun->scope = max_scope - min_scope;
+    SWFDEC_LOG ("  scope: %u (%u - %u)", fun->scope, min_scope, max_scope);
+    READ_U30 (size, bits);
+    if (size == 0)
+      THROW (file, "Invalid code_length=0.");
+    SWFDEC_LOG ("  code: %u bytes", size);
+    fun->code = swfdec_bits_get_buffer (bits, size);
+    if (fun->code == NULL)
+      THROW (file, "The ABC data is corrupt, attempt to read out of bounds.");
+
+    READ_U30 (fun->n_exceptions, bits);
+    SWFDEC_LOG ("  exceptions: %u", fun->n_exceptions);
+    if (fun->n_exceptions) {
+      fun->exceptions = swfdec_as_context_try_new (context, SwfdecAbcException, fun->n_exceptions);
+      if (fun->exceptions == NULL) {
+	fun->n_exceptions = 0;
+	return FALSE;
+      }
+      for (j = 0; j < fun->n_exceptions; j++) {
+	SwfdecAbcException *ex = &fun->exceptions[j];
+	READ_U30 (ex->from, bits);
+	READ_U30 (ex->to, bits);
+	READ_U30 (ex->target, bits);
+	READ_U30 (ex->type, bits);
+	READ_U30 (ex->var, bits);
+      }
+    }
+
+    traits = g_object_new (SWFDEC_TYPE_ABC_TRAITS, "context", context, NULL);
+    traits->pool = file;
+    traits->final = TRUE;
+    traits->ns = context->public_ns;
+    traits->name = SWFDEC_AS_STR_EMPTY;
+    /* FIXME: traits->base = OBJECT_TYPE */
+    if (!swfdec_abc_file_parse_traits (file, traits, bits))
+      return FALSE;
+    fun->activation = traits;
+  }
+  return TRUE;
+}
+
+static gboolean
 swfdec_abc_file_parse (SwfdecAbcFile *file, SwfdecBits *bits)
 {
   return swfdec_abc_file_parse_constants (file, bits) &&
@@ -892,7 +964,8 @@ swfdec_abc_file_parse (SwfdecAbcFile *file, SwfdecBits *bits)
       swfdec_abc_file_skip_metadata (file, bits) &&
       swfdec_abc_file_parse_instances (file, bits) &&
       swfdec_abc_file_parse_classes (file, bits) &&
-      swfdec_abc_file_parse_scripts (file, bits);
+      swfdec_abc_file_parse_scripts (file, bits) &&
+      swfdec_abc_file_parse_bodies (file, bits);
 }
 
 SwfdecAbcFile *

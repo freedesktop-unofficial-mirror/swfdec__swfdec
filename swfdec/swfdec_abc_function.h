@@ -22,12 +22,14 @@
 
 #include <swfdec/swfdec_abc_types.h>
 #include <swfdec/swfdec_as_function.h>
+#include <swfdec/swfdec_buffer.h>
 
 G_BEGIN_DECLS
 
 //typedef struct _SwfdecAbcFunction SwfdecAbcFunction;
 typedef struct _SwfdecAbcFunctionClass SwfdecAbcFunctionClass;
 typedef struct _SwfdecAbcFunctionArgument SwfdecAbcFunctionArgument;
+typedef struct _SwfdecAbcException SwfdecAbcException;
 
 #define SWFDEC_TYPE_ABC_FUNCTION                    (swfdec_abc_function_get_type())
 #define SWFDEC_IS_ABC_FUNCTION(obj)                 (G_TYPE_CHECK_INSTANCE_TYPE ((obj), SWFDEC_TYPE_ABC_FUNCTION))
@@ -41,6 +43,14 @@ struct _SwfdecAbcFunctionArgument {
   const char *		name;			/* name of argument or NULL if not given or read error */
   guint			default_index;		/* index of default value */
   guint8		default_type;		/* type of default value */
+};
+
+struct _SwfdecAbcException {
+  guint			from;
+  guint			to;
+  guint			target;
+  guint			type;
+  guint			var;
 };
 
 struct _SwfdecAbcFunction {
@@ -58,6 +68,17 @@ struct _SwfdecAbcFunction {
   SwfdecAbcFunctionArgument *args;		/* n_args arguments */ 
 
   SwfdecAbcTraits *	bound_traits;		/* traits of objects we construct or NULL */
+  
+  /* native functions only */
+  GCallback *		native;			/* SwfdecAsNative for now - will become native when we can marhsal */
+  /* functions with body only */
+  SwfdecBuffer *	code;			/* the code to be executed */
+  guint			stack;			/* max number of values on stack */
+  guint			scope;			/* number of scope values necessary */
+  guint			locals;			/* number of local variables */
+  SwfdecAbcTraits *	activation;		/* traits of activation object */
+  guint			n_exceptions;		/* number of exceptions */
+  SwfdecAbcException *	exceptions;		/* the exceptions */
 };
 
 struct _SwfdecAbcFunctionClass {
@@ -68,6 +89,7 @@ GType			swfdec_abc_function_get_type	(void);
 
 gboolean		swfdec_abc_function_bind	(SwfdecAbcFunction *	fun,
 							 SwfdecAbcTraits *	traits);
+gboolean		swfdec_abc_function_is_native	(SwfdecAbcFunction *	fun);
 
 
 G_END_DECLS
