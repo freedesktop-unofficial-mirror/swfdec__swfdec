@@ -151,6 +151,8 @@ struct _SwfdecPlayerPrivate
   /* iterating */
   GList *		actors;			/* list of all SwfdecActor instances active in this player */
   SwfdecRingBuffer *	actions[SWFDEC_PLAYER_N_ACTION_QUEUES]; /* all actions we've queued up so far */
+  SwfdecRingBuffer *    abc_constructors;	/* constructors from ABC */
+  SwfdecRingBuffer *    abc_frames;		/* frame actions from ABC */
 
   /* security */
   GSList *		sandboxes;		/* all existing sandboxes */
@@ -230,6 +232,9 @@ void		swfdec_player_add_action_script	(SwfdecPlayer *		player,
 						 guint			importance);
 void		swfdec_player_remove_all_actions (SwfdecPlayer *      	player,
 						 SwfdecActor *		actor);
+void		swfdec_player_queue_abc_constructor
+						(SwfdecPlayer *      	player,
+						 SwfdecMovie *		movie);
 
 void		swfdec_player_set_background_color
 						(SwfdecPlayer *		player,

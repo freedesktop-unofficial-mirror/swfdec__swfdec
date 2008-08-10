@@ -21,6 +21,7 @@
 #define _SWFDEC_MOVIE_H_
 
 #include <glib-object.h>
+#include <swfdec/swfdec_abc_object.h>
 #include <swfdec/swfdec_as_object.h>
 #include <swfdec/swfdec_color.h>
 #include <swfdec/swfdec.h>
@@ -125,7 +126,8 @@ struct _SwfdecMovie {
   int			depth;			/* depth of movie (equals content->depth unless explicitly set) */
   SwfdecMovieCacheState	cache_state;		/* whether we are up to date */
   SwfdecMovieState	state;			/* state the movie is in */
-  GSList		*variable_listeners;	/* textfield's listening to changes in variables - SwfdecMovieVariableListener */
+  GSList *		variable_listeners;	/* textfield's listening to changes in variables - SwfdecMovieVariableListener */
+  SwfdecAbcObject *	abc;			/* the ABC scripting object we're using or NULL if none (yet) */
 
   /* static properties (set by PlaceObject tags) */
   const char *		original_name;		/* the original name - GC'd and static */

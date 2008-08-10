@@ -141,18 +141,21 @@ static GObject *
 swfdec_actor_constructor (GType type, guint n_construct_properties,
     GObjectConstructParam *construct_properties)
 {
+  SwfdecPlayer *player;
   SwfdecPlayerPrivate *priv;
   GObject *object;
 
   object = G_OBJECT_CLASS (swfdec_actor_parent_class)->constructor (type, 
       n_construct_properties, construct_properties);
 
-  priv = SWFDEC_PLAYER (swfdec_gc_object_get_context (object))->priv;
+  player = SWFDEC_PLAYER (swfdec_gc_object_get_context (object));
+  priv = player->priv;
   /* NB: adding to the movies list happens before swfdec_movie_initialize().
    * swfdec_movie_initialize() does a gotoAndPlay(0) for Sprites which can
    * cause new movies to be created (and added to this list).
    */
   priv->actors = g_list_prepend (priv->actors, object);
+  swfdec_player_queue_abc_constructor (player, SWFDEC_MOVIE (object));
 
   return object;
 }

@@ -518,6 +518,28 @@ swfdec_sprite_movie_perform_one_action (SwfdecSpriteMovie *movie, guint tag, Swf
 	swfdec_sandbox_unuse (sandbox);
       }
       return TRUE;
+    case SWFDEC_TAG_SYMBOLCLASS:
+      {
+	SwfdecSandbox *sandbox = mov->resource->sandbox;
+	guint version = mov->resource->version;
+	guint n_symbols, i;
+	if (!swfdec_sandbox_is_abc (sandbox)) {
+	  SWFDEC_ERROR ("SymbolClass tag in non-ABC sandbox");
+	  return TRUE;
+	}
+	if (!first_time)
+	  return TRUE;
+	SWFDEC_LOG ("SymbolClass");
+	n_symbols = swfdec_bits_get_u16 (&bits);
+	SWFDEC_LOG ("  symbols: %u", n_symbols);
+	for (i = 0; i < n_symbols; i++) {
+	  guint id = swfdec_bits_get_u16 (&bits);
+	  char *s = swfdec_bits_get_string (&bits, version);
+	  SWFDEC_LOG ("  %u => %s", id, s);
+	  swfdec_resource_add_abc_class (mov->resource, id, s);
+	}
+      }
+      return TRUE;
     case SWFDEC_TAG_SOUNDSTREAMHEAD:
     case SWFDEC_TAG_SOUNDSTREAMHEAD2:
       /* ignore, those are handled by the sound stream */

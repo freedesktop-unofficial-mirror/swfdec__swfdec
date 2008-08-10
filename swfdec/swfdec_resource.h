@@ -57,6 +57,7 @@ struct _SwfdecResource
 
   GHashTable *		exports;	/* string->SwfdecCharacter mapping of exported characters */
   GHashTable *		export_names;	/* SwfdecCharacter->string mapping of exported characters */
+  GHashTable *		abc_classes;	/* SwfdecCharacterID->string mapping of exported characters */
 
   /* only used while loading */
   SwfdecResourceState	state;		/* state we're in (for determining callbacks */
@@ -84,6 +85,11 @@ gpointer	swfdec_resource_get_export		(SwfdecResource *	root,
 							 const char *		name);
 const char *	swfdec_resource_get_export_name    	(SwfdecResource *	root,
 							 SwfdecCharacter *	character);
+void		swfdec_resource_add_abc_class		(SwfdecResource *	resource,
+							 guint			char_id,
+							 char *			s);
+const char *	swfdec_resource_get_abc_class		(SwfdecResource *	resource,
+							 SwfdecMovie *		movie);
 
 gboolean      	swfdec_resource_load_movie		(SwfdecPlayer *		player,
 							 const SwfdecAsValue *	target, 

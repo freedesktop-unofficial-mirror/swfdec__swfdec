@@ -94,7 +94,9 @@ swfdec_resource_stream_target_image (SwfdecResource *instance)
       g_assert (movie->sprite->parse_frame > 0);
       movie->n_frames = movie->sprite->n_frames;
       swfdec_movie_invalidate_last (SWFDEC_MOVIE (movie));
-      if (!swfdec_sandbox_is_abc (instance->sandbox))
+      if (swfdec_sandbox_is_abc (instance->sandbox))
+	swfdec_player_queue_abc_constructor (player, SWFDEC_MOVIE (movie));
+      else
 	swfdec_as_object_set_constructor (SWFDEC_AS_OBJECT (movie), instance->sandbox->MovieClip);
       if (swfdec_resource_is_root (instance)) {
 	swfdec_player_start_ticking (player);
@@ -408,6 +410,7 @@ swfdec_resource_dispose (GObject *object)
   g_free (resource->variables);
   g_hash_table_destroy (resource->exports);
   g_hash_table_destroy (resource->export_names);
+  g_hash_table_destroy (resource->abc_classes);
 
   G_OBJECT_CLASS (swfdec_resource_parent_class)->dispose (object);
 }
@@ -430,6 +433,8 @@ swfdec_resource_init (SwfdecResource *instance)
       swfdec_str_case_equal, g_free, g_object_unref);
   instance->export_names = g_hash_table_new_full (g_direct_hash, g_direct_equal, 
       g_object_unref, g_free);
+  instance->abc_classes = g_hash_table_new_full (g_direct_hash, g_direct_equal, 
+      NULL, g_free);
 }
 
 static void
@@ -764,3 +769,39 @@ swfdec_resource_emit_on_load_init (SwfdecResource *resource)
   resource->clip_loader_sandbox = NULL;
   return TRUE;
 }
+
+void
+swfdec_resource_add_abc_class (SwfdecResource *resource, guint char_id,
+    char *s)
+{
+  g_return_if_fail (SWFDEC_IS_RESOURCE (resource));
+  g_return_if_fail (swfdec_sandbox_is_abc (resource->sandbox));
+  g_return_if_fail (s != NULL);
+
+  g_hash_table_insert (resource->abc_classes, GUINT_TO_POINTER (char_id), s);
+}
+
+const char *
+swfdec_resource_get_abc_class (SwfdecResource *resource,
+    SwfdecMovie *movie)
+{
+  const char *ret;
+
+  g_return_val_if_fail (SWFDEC_IS_RESOURCE (resource), NULL);
+  g_return_val_if_fail (swfdec_sandbox_is_abc (resource->sandbox), NULL);
+  g_return_val_if_fail (SWFDEC_IS_MOVIE (movie), NULL);
+
+  if (movie->parent == NULL) {
+    ret = g_hash_table_lookup (resource->abc_classes, 0);
+  } else if (movie->graphic) {
+    ret = g_hash_table_lookup (resource->abc_classes, 
+	GUINT_TO_POINTER (SWFDEC_CHARACTER (movie->graphic)->id));
+  } else {
+    ret = NULL;
+  }
+  if (ret)
+    return ret;
+  SWFDEC_FIXME ("return proper class here");
+  return "MovieClip";
+}
+

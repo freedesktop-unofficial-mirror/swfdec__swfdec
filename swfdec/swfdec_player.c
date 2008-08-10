@@ -527,6 +527,53 @@ swfdec_player_do_action (SwfdecPlayer *player)
 }
 
 static void
+swfdec_player_perform_abc (SwfdecPlayer *player)
+{
+  SwfdecPlayerPrivate *priv = player->priv;
+  SwfdecMovie **entry, *movie;
+  const char *class_name;
+
+  do {
+    entry = swfdec_ring_buffer_pop (priv->abc_constructors);
+    if (entry == NULL)
+      return;
+    movie = *entry;
+    if (movie->state != SWFDEC_MOVIE_STATE_DESTROYED)
+      break;
+    g_object_unref (movie);
+  } while (TRUE);
+
+  g_object_unref (movie);
+  g_assert (movie->abc == NULL);
+  class_name = swfdec_resource_get_abc_class (movie->resource, movie);
+  SWFDEC_ERROR ("run constructor %s for movie %s\n", class_name, movie->name);
+}
+
+void
+swfdec_player_queue_abc_constructor (SwfdecPlayer *player, SwfdecMovie *movie)
+{
+  SwfdecPlayerPrivate *priv;
+  SwfdecMovie **entry;
+
+  g_return_if_fail (SWFDEC_IS_PLAYER (player));
+  g_return_if_fail (SWFDEC_MOVIE (movie));
+
+  if (movie->resource->sandbox == NULL ||
+      !swfdec_sandbox_is_abc (movie->resource->sandbox))
+    return;
+
+  priv = player->priv;
+  entry = swfdec_ring_buffer_push (priv->abc_constructors);
+  if (entry == NULL) {
+    swfdec_ring_buffer_set_size (priv->abc_constructors,
+	swfdec_ring_buffer_get_size (priv->abc_constructors) + 16);
+    entry = swfdec_ring_buffer_push (priv->abc_constructors);
+    g_assert (entry);
+  }
+  *entry = g_object_ref (movie);
+}
+
+static void
 swfdec_player_perform_external_actions (SwfdecPlayer *player)
 {
   SwfdecPlayerExternalAction *action;
@@ -1076,6 +1123,8 @@ swfdec_player_dispose (GObject *object)
   for (i = 0; i < SWFDEC_PLAYER_N_ACTION_QUEUES; i++) {
     swfdec_ring_buffer_free (priv->actions[i]);
   }
+  swfdec_ring_buffer_free (priv->abc_constructors);
+  swfdec_ring_buffer_free (priv->abc_frames);
   g_assert (priv->actors == NULL);
   g_assert (priv->audio == NULL);
   g_slist_free (priv->sandboxes);
@@ -1826,6 +1875,8 @@ swfdec_player_perform_actions (SwfdecPlayer *player)
   g_return_if_fail (SWFDEC_IS_PLAYER (player));
 
   while (swfdec_player_do_action (player));
+
+  swfdec_player_perform_abc (player);
 }
 
 /* used for breakpoints */
@@ -2353,6 +2404,8 @@ swfdec_player_init (SwfdecPlayer *player)
   for (i = 0; i < SWFDEC_PLAYER_N_ACTION_QUEUES; i++) {
     priv->actions[i] = swfdec_ring_buffer_new_for_type (SwfdecPlayerAction, 16);
   }
+  priv->abc_constructors = swfdec_ring_buffer_new_for_type (SwfdecMovie *, 16);
+  priv->abc_frames = swfdec_ring_buffer_new_for_type (SwfdecMovie *, 16);
   priv->external_actions = swfdec_ring_buffer_new_for_type (SwfdecPlayerExternalAction, 8);
   // Big cache is required to allow images in the sizes of 3000x2000
   priv->cache = swfdec_cache_new (32 * 1024 * 1024);
