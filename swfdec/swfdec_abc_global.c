@@ -38,7 +38,7 @@ struct _SwfdecAbcGlobalScript {
   SwfdecAbcFunction *	script;
 };
 
-G_DEFINE_TYPE (SwfdecAbcGlobal, swfdec_abc_global, SWFDEC_TYPE_AS_OBJECT)
+G_DEFINE_TYPE (SwfdecAbcGlobal, swfdec_abc_global, SWFDEC_TYPE_ABC_OBJECT)
 
 static void
 swfdec_abc_global_dispose (GObject *object)

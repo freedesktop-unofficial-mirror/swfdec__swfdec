@@ -20,8 +20,8 @@
 #ifndef _SWFDEC_ABC_GLOBAL_H_
 #define _SWFDEC_ABC_GLOBAL_H_
 
-#include <swfdec/swfdec_as_object.h>
 #include <swfdec/swfdec_abc_multiname.h>
+#include <swfdec/swfdec_abc_object.h>
 #include <swfdec/swfdec_abc_traits.h>
 
 G_BEGIN_DECLS
@@ -37,14 +37,14 @@ typedef struct _SwfdecAbcGlobalClass SwfdecAbcGlobalClass;
 #define SWFDEC_ABC_GLOBAL_GET_CLASS(obj)          (G_TYPE_INSTANCE_GET_CLASS ((obj), SWFDEC_TYPE_ABC_GLOBAL, SwfdecAbcGlobalClass))
 
 struct _SwfdecAbcGlobal {
-  SwfdecAsObject	object;
+  SwfdecAbcObject	object;
 
   GPtrArray *		traits;		/* list of all traits - FIXME: needs fast index by ns/name */
   GArray *		scripts;	/* list of all scripts - FIXME: needs fast index by ns/name */
 };
 
 struct _SwfdecAbcGlobalClass {
-  SwfdecAsObjectClass	object_class;
+  SwfdecAbcObjectClass	object_class;
 };
 
 GType			swfdec_abc_global_get_type	(void);
