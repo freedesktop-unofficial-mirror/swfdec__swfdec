@@ -29,7 +29,33 @@
 #include <swfdec/swfdec_bits.h>
 
 static void
-extract (SwfdecAsContext *cx, SwfdecBuffer *buffer, gsize offset)
+write_data (guint8 *data, guint len)
+{
+  guint i;
+
+  for (i = 0; i < len; i++) {
+    switch (i % 16) {
+      case 0:
+	if (i == 0)
+	  g_print ("  0x%02X", data[i]);
+	else
+	  g_print (",\n  0x%02X", data[i]);
+	break;
+      case 4:
+      case 8:
+      case 12:
+	g_print (",  0x%02X", data[i]);
+	break;
+      default:
+	g_print (", 0x%02X", data[i]);
+	break;
+    }
+  }
+  g_print ("\n");
+}
+
+static void
+extract (SwfdecAsContext *cx, SwfdecBuffer *buffer, gsize offset, gboolean dump)
 {
   SwfdecAbcFile *file;
   SwfdecBits bits;
@@ -43,13 +69,19 @@ extract (SwfdecAsContext *cx, SwfdecBuffer *buffer, gsize offset)
   } else {
     g_print ("  failed\n");
   }
+
+  if (dump) {
+    write_data (buffer->data + offset, bits.ptr - buffer->data - offset);
+  }
 }
 
 int
 main (int argc, char **argv)
 {
   char **filenames = NULL;
+  gboolean dump = FALSE;
   const GOptionEntry entries[] = {
+    { "dump", 'd', 0, G_OPTION_ARG_NONE, &dump, "dump the extracted ABC data", NULL },
     { G_OPTION_REMAINING, '\0', 0, G_OPTION_ARG_FILENAME_ARRAY, &filenames, NULL, "<INPUT FILE>" },
     { NULL }
   };
@@ -98,7 +130,7 @@ main (int argc, char **argv)
 
   if (filenames[1] == NULL) {
     for (i = 0; i < offsets->len; i++) {
-      extract (cx, buffer, GPOINTER_TO_SIZE (g_ptr_array_index (offsets, i)));
+      extract (cx, buffer, GPOINTER_TO_SIZE (g_ptr_array_index (offsets, i)), dump);
     }
   } else {
     for (i = 1; filenames[i]; i++) {
@@ -108,7 +140,7 @@ main (int argc, char **argv)
 	    id, offsets->len);
 	return 1;
       }
-      extract (cx, buffer, GPOINTER_TO_SIZE (g_ptr_array_index (offsets, id)));
+      extract (cx, buffer, GPOINTER_TO_SIZE (g_ptr_array_index (offsets, id)), dump);
     }
   }
 
