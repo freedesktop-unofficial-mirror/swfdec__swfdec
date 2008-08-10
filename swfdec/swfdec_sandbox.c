@@ -1,5 +1,5 @@
 /* Swfdec
- * Copyright (C) 2007 Benjamin Otte <otte@gnome.org>
+ * Copyright (C) 2007-2008 Benjamin Otte <otte@gnome.org>
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -22,9 +22,11 @@
 #endif
 
 #include "swfdec_sandbox.h"
+#include "swfdec_abc_file.h"
 #include "swfdec_as_internal.h"
 #include "swfdec_debug.h"
 #include "swfdec_initialize.h"
+#include "swfdec_initialize_abc.h"
 #include "swfdec_internal.h"
 #include "swfdec_player_internal.h"
 
@@ -126,10 +128,13 @@ static void
 swfdec_sandbox_initialize_abc (SwfdecSandbox *sandbox, guint version)
 {
   SwfdecAsContext *context = swfdec_gc_object_get_context (sandbox);
+  SwfdecBits bits;
 
   swfdec_as_context_startup (context, TRUE);
 
   sandbox->global = context->global;
+  swfdec_bits_init_data (&bits, swfdec_initialize_abc, sizeof (swfdec_initialize_abc));
+  swfdec_abc_file_new (context, &bits);
   swfdec_sandbox_unuse (sandbox);
 }
 

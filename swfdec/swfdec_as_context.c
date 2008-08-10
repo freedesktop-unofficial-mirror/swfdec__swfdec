@@ -25,7 +25,9 @@
 #include <string.h>
 #include <stdlib.h>
 #include "swfdec_as_context.h"
+#include "swfdec_abc_file.h"
 #include "swfdec_abc_global.h"
+#include "swfdec_abc_initialize.h"
 #include "swfdec_abc_internal.h"
 #include "swfdec_as_array.h"
 #include "swfdec_as_frame_internal.h"
@@ -1379,8 +1381,11 @@ swfdec_as_context_startup (SwfdecAsContext *context, gboolean abc)
       !swfdec_as_stack_push_segment (context))
     return;
   if (abc) {
+    SwfdecBits bits;
     if (context->global == NULL)
       context->global = swfdec_abc_global_new (context);
+    swfdec_bits_init_data (&bits, swfdec_abc_initialize, sizeof (swfdec_abc_initialize));
+    swfdec_abc_file_new (context, &bits);
   } else {
     if (context->global == NULL)
       context->global = swfdec_as_object_new_empty (context);

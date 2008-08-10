@@ -234,6 +234,7 @@ noinst_HEADERS = \
 	swfdec_abc_file.h \
 	swfdec_abc_function.h \
 	swfdec_abc_global.h \
+	swfdec_abc_initialize.h \
 	swfdec_abc_multiname.h \
 	swfdec_abc_ns_set.h \
 	swfdec_abc_object.h \
@@ -296,6 +297,7 @@ noinst_HEADERS = \
 	swfdec_image.h \
 	swfdec_image_decoder.h \
 	swfdec_initialize.h \
+	swfdec_initialize_abc.h \
 	swfdec_internal.h \
 	swfdec_interval.h \
 	swfdec_load_object.h \
