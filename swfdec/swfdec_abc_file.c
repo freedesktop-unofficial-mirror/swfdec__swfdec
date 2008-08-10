@@ -600,7 +600,7 @@ swfdec_abc_file_parse_traits (SwfdecAbcFile *file, SwfdecAbcTraits *traits, Swfd
       guint ignore, j, count;
       READ_U30 (count, bits);
   
-      SWFDEC_FIXME ("parse metadata, in particular \"NeedsDxns\"");
+      SWFDEC_INFO ("parse metadata, in particular \"NeedsDxns\"");
       for (j = 0; j < count; j++) {
 	READ_U30 (ignore, bits);
       }
