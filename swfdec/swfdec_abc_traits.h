@@ -89,6 +89,7 @@ struct _SwfdecAbcTraits {
   SwfdecAbcTraits *		instance_traits;/* traits for instances we construct or NULL */
   SwfdecAbcFunction *		construct;	/* constructor for objects of these traits or NULL */
   SwfdecAbcNamespace *		protected_ns;	/* protected namespace */
+  GType				(* type_func)	(void);	/* get_type function for the object type we create */
 
   SwfdecAbcTrait *		traits;		/* the traits we have */
   guint				n_traits;	/* number of traits */
@@ -99,6 +100,7 @@ struct _SwfdecAbcTraits {
   gboolean			sealed:1;	/* cannot add properties to object */
   gboolean			final:1;	/* no derived traits */
   gboolean			interface:1;	/* traits describe an interface */
+  gboolean			resolved:1;	/* types are resolved */
 };
 
 struct _SwfdecAbcTraitsClass {
@@ -108,6 +110,7 @@ struct _SwfdecAbcTraitsClass {
 GType			swfdec_abc_traits_get_type		(void) G_GNUC_CONST;
 
 gboolean		swfdec_abc_traits_allow_early_binding	(SwfdecAbcTraits *	traits);
+gboolean		swfdec_abc_traits_resolve		(SwfdecAbcTraits *	traits);
 
 const SwfdecAbcTrait *	swfdec_abc_traits_get_trait		(SwfdecAbcTraits *	traits,
 								 SwfdecAbcNamespace *	ns,

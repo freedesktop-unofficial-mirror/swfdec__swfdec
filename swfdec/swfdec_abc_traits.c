@@ -23,6 +23,7 @@
 
 #include "swfdec_abc_traits.h"
 #include "swfdec_abc_namespace.h"
+#include "swfdec_abc_object.h"
 #include "swfdec_as_context.h"
 #include "swfdec_debug.h"
 
@@ -72,8 +73,9 @@ swfdec_abc_traits_class_init (SwfdecAbcTraitsClass *klass)
 }
 
 static void
-swfdec_abc_traits_init (SwfdecAbcTraits *date)
+swfdec_abc_traits_init (SwfdecAbcTraits *traits)
 {
+  traits->type_func = swfdec_abc_object_get_type;
 }
 
 gboolean
@@ -89,6 +91,19 @@ swfdec_abc_traits_allow_early_binding (SwfdecAbcTraits *traits)
       return FALSE;
   } while ((traits = traits->base) != NULL);
   g_return_val_if_reached (FALSE);
+}
+
+gboolean
+swfdec_abc_traits_resolve (SwfdecAbcTraits *traits)
+{
+  g_return_val_if_fail (SWFDEC_IS_ABC_TRAITS (traits), FALSE);
+  
+  if (traits->resolved)
+    return TRUE;
+
+  SWFDEC_FIXME ("resolve traits");
+  traits->resolved = TRUE;
+  return TRUE;
 }
 
 const SwfdecAbcTrait *
