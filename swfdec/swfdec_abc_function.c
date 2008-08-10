@@ -26,7 +26,7 @@
 #include "swfdec_as_context.h"
 #include "swfdec_debug.h"
 
-G_DEFINE_TYPE (SwfdecAbcFunction, swfdec_abc_function, SWFDEC_TYPE_AS_FUNCTION)
+G_DEFINE_TYPE (SwfdecAbcFunction, swfdec_abc_function, SWFDEC_TYPE_GC_OBJECT)
 
 static void
 swfdec_abc_function_dispose (GObject *object)

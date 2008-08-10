@@ -54,7 +54,7 @@ struct _SwfdecAbcException {
 };
 
 struct _SwfdecAbcFunction {
-  SwfdecAsFunction	function;
+  SwfdecGcObject	object;
 
   const char *		name;			/* gc'd name of the function or NULL if unnamed */
   gboolean		verified:1;		/* function body has been verified */
@@ -82,7 +82,7 @@ struct _SwfdecAbcFunction {
 };
 
 struct _SwfdecAbcFunctionClass {
-  SwfdecAsFunctionClass	function_class;
+  SwfdecGcObjectClass	object_class;
 };
 
 GType			swfdec_abc_function_get_type	(void);
