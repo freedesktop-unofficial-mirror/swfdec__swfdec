@@ -17,8 +17,8 @@
  * Boston, MA  02110-1301  USA
  */
 
-#include <swfdec/swfdec_abc_namespace.h>
 #include <swfdec/swfdec_abc_ns_set.h>
+#include <swfdec/swfdec_abc_types.h>
 
 #ifndef _SWFDEC_ABC_MULTINAME_H_
 #define _SWFDEC_ABC_MULTINAME_H_
@@ -27,7 +27,7 @@ G_BEGIN_DECLS
 
 #define SWFDEC_ABC_MULTINAME_ANY GUINT_TO_POINTER (1)
 
-typedef struct _SwfdecAbcMultiname SwfdecAbcMultiname;
+//typedef struct _SwfdecAbcMultiname SwfdecAbcMultiname;
 struct _SwfdecAbcMultiname {
   const char *		name;		/* gc-collected name, MULTINAME_ANY or NULL if unknown */
   SwfdecAbcNamespace *	ns;		/* namespace, MULTINAME_ANY or NULL if none */
@@ -38,6 +38,9 @@ void			swfdec_abc_multiname_init		(SwfdecAbcMultiname *		multi,
 								 const char *			name,
 								 SwfdecAbcNamespace *		ns,
 								 SwfdecAbcNsSet *		set);
+void			swfdec_abc_multiname_init_from_string	(SwfdecAbcMultiname *		multi,
+								 SwfdecAsContext *		context,
+								 const char *			string);
 
 #define swfdec_abc_multiname_is_qualified(mn) ((mn)->name > (const char *) SWFDEC_ABC_MULTINAME_ANY \
     && (mn)->ns > (SwfdecAbcNamespace *) SWFDEC_ABC_MULTINAME_ANY)
@@ -47,6 +50,8 @@ void			swfdec_abc_multiname_init		(SwfdecAbcMultiname *		multi,
     swfdec_abc_ns_set_get_n_namespaces ((mn)->nsset) : 1)
 SwfdecAbcNamespace *	swfdec_abc_multiname_get_namespace	(const SwfdecAbcMultiname *	mn,
 								 guint				i);
+gboolean		swfdec_abc_multiname_contains_namespace	(const SwfdecAbcMultiname *     mn,
+								 SwfdecAbcNamespace *		ns);
 
 
 G_END_DECLS

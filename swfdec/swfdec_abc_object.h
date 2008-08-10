@@ -21,7 +21,7 @@
 #define _SWFDEC_ABC_OBJECT_H_
 
 #include <swfdec/swfdec_as_object.h>
-#include <swfdec/swfdec_abc_traits.h>
+#include <swfdec/swfdec_abc_types.h>
 
 G_BEGIN_DECLS
 
@@ -39,6 +39,7 @@ struct _SwfdecAbcObject {
   SwfdecAsObject	object;
 
   SwfdecAbcTraits *	traits;		/* the traits that created us */
+  SwfdecAsValue *	slots;		/* traits->n_slots values */
 };
 
 struct _SwfdecAbcObjectClass {
@@ -47,8 +48,12 @@ struct _SwfdecAbcObjectClass {
 
 GType			swfdec_abc_object_get_type	(void);
 
-SwfdecAbcObject *	swfdec_abc_object_new		(SwfdecAsContext *	context,
-							 SwfdecAbcTraits *	traits);
+SwfdecAbcObject *	swfdec_abc_object_new		(SwfdecAsContext *		context,
+							 SwfdecAbcTraits *		traits);
+
+gboolean		swfdec_abc_object_get_variable	(SwfdecAbcObject *		object,
+							 const SwfdecAbcMultiname *	mn,
+							 SwfdecAsValue *		value);
 
 
 G_END_DECLS

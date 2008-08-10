@@ -27,6 +27,7 @@ G_BEGIN_DECLS
 
 typedef struct _SwfdecAbcFile SwfdecAbcFile;
 typedef struct _SwfdecAbcFunction SwfdecAbcFunction;
+typedef struct _SwfdecAbcMultiname SwfdecAbcMultiname;
 typedef struct _SwfdecAbcTraits SwfdecAbcTraits;
 
 

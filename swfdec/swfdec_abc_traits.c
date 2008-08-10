@@ -22,10 +22,15 @@
 #endif
 
 #include "swfdec_abc_traits.h"
+#include "swfdec_abc_multiname.h"
 #include "swfdec_abc_namespace.h"
 #include "swfdec_abc_object.h"
 #include "swfdec_as_context.h"
+#include "swfdec_as_strings.h"
 #include "swfdec_debug.h"
+
+const SwfdecAbcTrait swfdec_abc_trait_ambiguous = { SWFDEC_ABC_TRAIT_NONE, 0,
+  NULL, SWFDEC_AS_STR_EMPTY, FALSE, FALSE, };
 
 G_DEFINE_TYPE (SwfdecAbcTraits, swfdec_abc_traits, SWFDEC_TYPE_GC_OBJECT)
 
@@ -145,5 +150,29 @@ swfdec_abc_traits_find_trait (SwfdecAbcTraits *traits,
     traits = traits->base;
   } while (traits);
   return NULL;
+}
+
+const SwfdecAbcTrait *
+swfdec_abc_traits_find_trait_multi (SwfdecAbcTraits *traits,
+    const SwfdecAbcMultiname *mn)
+{
+  const SwfdecAbcTrait *trait, *found;
+  guint i;
+
+  g_return_val_if_fail (SWFDEC_IS_ABC_TRAITS (traits), NULL);
+  g_return_val_if_fail (mn != NULL, NULL);
+
+  found = NULL;
+  for (i = 0; i < swfdec_abc_multiname_get_n_namespaces (mn); i++) {
+    trait = swfdec_abc_traits_find_trait (traits, 
+	swfdec_abc_multiname_get_namespace (mn, i), traits->name);
+    if (trait == NULL)
+      continue;
+    if (found == NULL)
+      found = trait;
+    else
+      return SWFDEC_ABC_TRAIT_AMBIGUOUS;
+  }
+  return found;
 }
 

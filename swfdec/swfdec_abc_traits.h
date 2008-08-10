@@ -78,6 +78,8 @@ struct _SwfdecAbcTrait {
     }				slot;
   };
 };
+extern const SwfdecAbcTrait swfdec_abc_trait_ambiguous;
+#define SWFDEC_ABC_TRAIT_AMBIGUOUS (&swfdec_abc_trait_ambiguous)
 
 struct _SwfdecAbcTraits {
   SwfdecGcObject		object;
@@ -118,6 +120,8 @@ const SwfdecAbcTrait *	swfdec_abc_traits_get_trait		(SwfdecAbcTraits *	traits,
 const SwfdecAbcTrait *	swfdec_abc_traits_find_trait		(SwfdecAbcTraits *	traits,
 								 SwfdecAbcNamespace *	ns,
 								 const char *		name);
+const SwfdecAbcTrait *	swfdec_abc_traits_find_trait_multi	(SwfdecAbcTraits *	traits,
+								 const SwfdecAbcMultiname *multi);
 
 
 G_END_DECLS
