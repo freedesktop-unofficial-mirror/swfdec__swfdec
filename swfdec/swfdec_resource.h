@@ -1,5 +1,5 @@
 /* Swfdec
- * Copyright (C) 2006-2007 Benjamin Otte <otte@gnome.org>
+ * Copyright (C) 2006-2008 Benjamin Otte <otte@gnome.org>
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -20,6 +20,7 @@
 #ifndef _SWFDEC_RESOURCE_H_
 #define _SWFDEC_RESOURCE_H_
 
+#include <swfdec/swfdec_abc_types.h>
 #include <swfdec/swfdec_player.h>
 #include <swfdec/swfdec_sandbox.h>
 #include <swfdec/swfdec_sprite_movie.h>
@@ -87,8 +88,8 @@ const char *	swfdec_resource_get_export_name    	(SwfdecResource *	root,
 							 SwfdecCharacter *	character);
 void		swfdec_resource_add_abc_class		(SwfdecResource *	resource,
 							 guint			char_id,
-							 char *			s);
-const char *	swfdec_resource_get_abc_class		(SwfdecResource *	resource,
+							 SwfdecAbcClass *	classp);
+SwfdecAbcClass *swfdec_resource_get_abc_class		(SwfdecResource *	resource,
 							 SwfdecMovie *		movie);
 
 gboolean      	swfdec_resource_load_movie		(SwfdecPlayer *		player,

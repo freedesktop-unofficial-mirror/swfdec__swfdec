@@ -123,6 +123,12 @@ const SwfdecAbcTrait *	swfdec_abc_traits_find_trait		(SwfdecAbcTraits *	traits,
 const SwfdecAbcTrait *	swfdec_abc_traits_find_trait_multi	(SwfdecAbcTraits *	traits,
 								 const SwfdecAbcMultiname *multi);
 
+gboolean		swfdec_abc_traits_is_traits		(SwfdecAbcTraits *	traits,
+								 SwfdecAbcTraits *	parent);
+/* FIXME: kinda wrong header */
+gboolean		swfdec_as_value_is_traits		(const SwfdecAsValue *	value,
+								 SwfdecAbcTraits *	traits);
+
 
 G_END_DECLS
 

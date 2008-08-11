@@ -1,6 +1,5 @@
 /* Swfdec
- * Copyright (C) 2007 Benjamin Otte <otte@gnome.org>
- *               2007 Pekka Lampila <pekka.lampila@iki.fi>
+ * Copyright (C) 2008 Benjamin Otte <otte@gnome.org>
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -27,8 +26,11 @@
 #include <math.h>
 
 #include "swfdec_abc_global.h"
+#include "swfdec_abc_file.h"
 #include "swfdec_abc_function.h"
+#include "swfdec_abc_initialize.h"
 #include "swfdec_as_context.h"
+#include "swfdec_as_strings.h"
 #include "swfdec_debug.h"
 
 typedef struct _SwfdecAbcGlobalScript SwfdecAbcGlobalScript;
@@ -79,16 +81,33 @@ swfdec_abc_global_init (SwfdecAbcGlobal *global)
   global->scripts = g_array_new (FALSE, FALSE, sizeof (SwfdecAbcGlobalScript));
 }
 
-SwfdecAsObject *
+void
 swfdec_abc_global_new (SwfdecAsContext *context)
 {
   SwfdecAbcGlobal *global;
+  SwfdecBits bits;
 
-  g_return_val_if_fail (SWFDEC_IS_AS_CONTEXT (context), NULL);
+  g_return_if_fail (SWFDEC_IS_AS_CONTEXT (context));
 
   global = g_object_new (SWFDEC_TYPE_ABC_GLOBAL, "context", context, NULL);
 
-  return SWFDEC_AS_OBJECT (global);
+  swfdec_bits_init_data (&bits, swfdec_abc_initialize, sizeof (swfdec_abc_initialize));
+  context->global = SWFDEC_AS_OBJECT (global);
+  global->file = swfdec_abc_file_new (context, &bits);
+
+  global->void_traits = g_object_new (SWFDEC_TYPE_ABC_TRAITS, "context", context, NULL);
+  global->void_traits->pool = global->file;
+  global->void_traits->ns = context->public_ns;
+  global->void_traits->name = SWFDEC_AS_STR_void;
+  global->void_traits->final = TRUE;
+  global->void_traits->resolved = TRUE;
+
+  global->null_traits = g_object_new (SWFDEC_TYPE_ABC_TRAITS, "context", context, NULL);
+  global->null_traits->pool = global->file;
+  global->null_traits->ns = context->public_ns;
+  global->null_traits->name = SWFDEC_AS_STR_null;
+  global->null_traits->final = TRUE;
+  global->null_traits->resolved = TRUE;
 }
 
 void
@@ -182,3 +201,26 @@ swfdec_abc_global_add_script (SwfdecAbcGlobal *global, SwfdecAbcNamespace *ns,
     g_array_append_val (global->scripts, add);
   }
 }
+
+SwfdecAbcTraits *
+swfdec_abc_global_get_builtin_traits (SwfdecAbcGlobal *global, guint id)
+{
+  g_return_val_if_fail (SWFDEC_IS_ABC_GLOBAL (global), NULL);
+  g_return_val_if_fail (global->file, NULL);
+
+  return global->file->classes[id];
+}
+
+gboolean
+swfdec_abc_global_get_script_variable (SwfdecAbcGlobal *global,
+    const SwfdecAbcMultiname *mn, SwfdecAsValue *value)
+{
+  g_return_val_if_fail (SWFDEC_IS_ABC_GLOBAL (global), FALSE);
+  g_return_val_if_fail (mn != NULL, FALSE);
+  g_return_val_if_fail (value != NULL, FALSE);
+
+  SWFDEC_FIXME ("global variables, please");
+  SWFDEC_AS_VALUE_SET_UNDEFINED (value);
+  return FALSE;
+}
+

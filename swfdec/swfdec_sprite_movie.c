@@ -24,7 +24,12 @@
 #include <strings.h>
 
 #include "swfdec_sprite_movie.h"
+#include "swfdec_abc_class.h"
 #include "swfdec_abc_file.h"
+#include "swfdec_abc_global.h"
+#include "swfdec_abc_internal.h"
+#include "swfdec_abc_multiname.h"
+#include "swfdec_abc_traits.h"
 #include "swfdec_as_internal.h"
 #include "swfdec_as_strings.h"
 #include "swfdec_audio_swf_stream.h"
@@ -522,6 +527,9 @@ swfdec_sprite_movie_perform_one_action (SwfdecSpriteMovie *movie, guint tag, Swf
       {
 	SwfdecSandbox *sandbox = mov->resource->sandbox;
 	guint version = mov->resource->version;
+	SwfdecAsContext *context = SWFDEC_AS_CONTEXT (player);
+	SwfdecAbcMultiname mn;
+	SwfdecAsValue val;
 	guint n_symbols, i;
 	if (!swfdec_sandbox_is_abc (sandbox)) {
 	  SWFDEC_ERROR ("SymbolClass tag in non-ABC sandbox");
@@ -536,7 +544,17 @@ swfdec_sprite_movie_perform_one_action (SwfdecSpriteMovie *movie, guint tag, Swf
 	  guint id = swfdec_bits_get_u16 (&bits);
 	  char *s = swfdec_bits_get_string (&bits, version);
 	  SWFDEC_LOG ("  %u => %s", id, s);
-	  swfdec_resource_add_abc_class (mov->resource, id, s);
+	  swfdec_sandbox_use (sandbox);
+	  swfdec_abc_multiname_init_from_string (&mn, context, s);
+	  swfdec_as_context_get_abc_variable (context, &mn, &val);
+	  if (swfdec_as_value_is_traits (&val, SWFDEC_ABC_CLASS_TRAITS (context))) {
+	    swfdec_resource_add_abc_class (mov->resource, id, 
+		SWFDEC_ABC_CLASS (SWFDEC_AS_VALUE_GET_OBJECT (&val)));
+	  } else {
+	    swfdec_as_context_throw_abc (context, SWFDEC_ABC_ERROR_REFERENCE,
+		"Class %s could not be found.", s);
+	  }
+	  swfdec_sandbox_unuse (sandbox);
 	}
       }
       return TRUE;

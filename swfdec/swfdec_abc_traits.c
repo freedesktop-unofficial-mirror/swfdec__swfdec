@@ -22,6 +22,7 @@
 #endif
 
 #include "swfdec_abc_traits.h"
+#include "swfdec_abc_global.h"
 #include "swfdec_abc_multiname.h"
 #include "swfdec_abc_namespace.h"
 #include "swfdec_abc_object.h"
@@ -176,3 +177,61 @@ swfdec_abc_traits_find_trait_multi (SwfdecAbcTraits *traits,
   return found;
 }
 
+gboolean
+swfdec_abc_traits_is_traits (SwfdecAbcTraits *traits, SwfdecAbcTraits *parent)
+{
+  g_return_val_if_fail (SWFDEC_IS_ABC_TRAITS (traits), FALSE);
+  g_return_val_if_fail (SWFDEC_IS_ABC_TRAITS (parent), FALSE);
+
+  if (parent->interface) {
+    SWFDEC_FIXME ("implement");
+  } else {
+    do {
+      if (traits == parent)
+	return TRUE;
+      traits = traits->base;
+    } while (traits != NULL);
+  }
+  return FALSE;
+}
+
+gboolean
+swfdec_as_value_is_traits (const SwfdecAsValue *value, SwfdecAbcTraits *traits)
+{
+  SwfdecAsContext *context;
+
+  g_return_val_if_fail (value != NULL, FALSE);
+  g_return_val_if_fail (SWFDEC_IS_ABC_TRAITS (traits), FALSE);
+
+  context = swfdec_gc_object_get_context (traits);
+
+  switch (value->type) {
+    case SWFDEC_AS_TYPE_UNDEFINED:
+      return traits == SWFDEC_ABC_VOID_TRAITS (context);
+    case SWFDEC_AS_TYPE_NULL:
+      return traits == SWFDEC_ABC_NULL_TRAITS (context);
+    case SWFDEC_AS_TYPE_BOOLEAN:
+      return traits == SWFDEC_ABC_BOOLEAN_TRAITS (context);
+    case SWFDEC_AS_TYPE_NUMBER:
+      /* FIXME: support uint and int traits */
+      return traits == SWFDEC_ABC_NUMBER_TRAITS (context);
+    case SWFDEC_AS_TYPE_STRING:
+      return traits == SWFDEC_ABC_STRING_TRAITS (context);
+    case SWFDEC_AS_TYPE_NAMESPACE:
+      return traits == SWFDEC_ABC_NAMESPACE_TRAITS (context);
+    case SWFDEC_AS_TYPE_OBJECT:
+      {
+	SwfdecAsObject *o = SWFDEC_AS_VALUE_GET_OBJECT (value);
+	if (!SWFDEC_IS_ABC_OBJECT (o)) {
+	  SWFDEC_ERROR ("wtf? is_traits on a non-abc object?");
+	  return FALSE;
+	}
+	return swfdec_abc_traits_is_traits (SWFDEC_ABC_OBJECT (o)->traits,
+	    traits);
+      }
+    case SWFDEC_AS_TYPE_INT:
+    default:
+      g_assert_not_reached ();
+      return FALSE;
+  }
+}

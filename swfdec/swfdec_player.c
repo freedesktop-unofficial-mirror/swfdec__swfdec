@@ -27,6 +27,7 @@
 #include <stdlib.h>
 
 #include "swfdec_player_internal.h"
+#include "swfdec_abc_traits.h"
 #include "swfdec_as_frame_internal.h"
 #include "swfdec_as_strings.h"
 #include "swfdec_audio_internal.h"
@@ -531,7 +532,7 @@ swfdec_player_perform_abc (SwfdecPlayer *player)
 {
   SwfdecPlayerPrivate *priv = player->priv;
   SwfdecMovie **entry, *movie;
-  const char *class_name;
+  SwfdecAbcClass *classp;
 
   do {
     entry = swfdec_ring_buffer_pop (priv->abc_constructors);
@@ -545,8 +546,9 @@ swfdec_player_perform_abc (SwfdecPlayer *player)
 
   g_object_unref (movie);
   g_assert (movie->abc == NULL);
-  class_name = swfdec_resource_get_abc_class (movie->resource, movie);
-  SWFDEC_ERROR ("run constructor %s for movie %s\n", class_name, movie->name);
+  classp = swfdec_resource_get_abc_class (movie->resource, movie);
+  SWFDEC_ERROR ("run constructor %s for movie %s\n", 
+      classp ? SWFDEC_ABC_OBJECT (classp)->traits->name : "FIXME: THIS SHOULD NOT HAPPEN", movie->name);
 }
 
 void

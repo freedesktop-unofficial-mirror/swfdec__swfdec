@@ -20,6 +20,7 @@
 #ifndef _SWFDEC_ABC_INTERNAL_H_
 #define _SWFDEC_ABC_INTERNAL_H_
 
+#include <swfdec/swfdec_abc_global.h>
 #include <swfdec/swfdec_abc_namespace.h>
 #include <swfdec/swfdec_as_context.h>
 
@@ -56,6 +57,8 @@ SwfdecAbcNamespace *	swfdec_as_context_get_namespace		(SwfdecAsContext *	context
 								 SwfdecAbcNamespaceType	type,
 								 const char *		prefix,
 								 const char *		uri);
+#define swfdec_as_context_get_abc_variable(context, mn, value) \
+  swfdec_abc_global_get_script_variable (SWFDEC_ABC_GLOBAL (context->global), mn, value)
 
 
 G_END_DECLS

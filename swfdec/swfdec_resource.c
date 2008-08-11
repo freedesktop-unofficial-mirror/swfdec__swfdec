@@ -25,6 +25,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "swfdec_resource.h"
+#include "swfdec_abc_class.h"
 #include "swfdec_access.h"
 #include "swfdec_as_object.h"
 #include "swfdec_as_internal.h"
@@ -772,20 +773,20 @@ swfdec_resource_emit_on_load_init (SwfdecResource *resource)
 
 void
 swfdec_resource_add_abc_class (SwfdecResource *resource, guint char_id,
-    char *s)
+    SwfdecAbcClass *classp)
 {
   g_return_if_fail (SWFDEC_IS_RESOURCE (resource));
   g_return_if_fail (swfdec_sandbox_is_abc (resource->sandbox));
-  g_return_if_fail (s != NULL);
+  g_return_if_fail (SWFDEC_IS_ABC_CLASS (classp));
 
-  g_hash_table_insert (resource->abc_classes, GUINT_TO_POINTER (char_id), s);
+  g_hash_table_insert (resource->abc_classes, GUINT_TO_POINTER (char_id), classp);
 }
 
-const char *
+SwfdecAbcClass *
 swfdec_resource_get_abc_class (SwfdecResource *resource,
     SwfdecMovie *movie)
 {
-  const char *ret;
+  SwfdecAbcClass *ret;
 
   g_return_val_if_fail (SWFDEC_IS_RESOURCE (resource), NULL);
   g_return_val_if_fail (swfdec_sandbox_is_abc (resource->sandbox), NULL);
@@ -802,6 +803,7 @@ swfdec_resource_get_abc_class (SwfdecResource *resource,
   if (ret)
     return ret;
   SWFDEC_FIXME ("return proper class here");
-  return "MovieClip";
+  /* should be: get_builtin_class (magic) */
+  return NULL;
 }
 
