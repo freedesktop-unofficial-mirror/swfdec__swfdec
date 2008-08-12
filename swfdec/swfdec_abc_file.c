@@ -23,6 +23,7 @@
 
 #include "swfdec_abc_file.h"
 #include "swfdec_abc_internal.h"
+#include "swfdec_abc_script.h"
 #include "swfdec_abc_traits.h"
 #include "swfdec_as_strings.h"
 #include "swfdec_debug.h"
@@ -99,6 +100,9 @@ swfdec_abc_file_mark (SwfdecGcObject *object)
     if (file->classes[i])
       swfdec_gc_object_mark (file->classes[i]);
   }
+
+  if (file->main)
+    swfdec_gc_object_mark (file->main);
 
   SWFDEC_GC_OBJECT_CLASS (swfdec_abc_file_parent_class)->mark (object);
 }
@@ -854,6 +858,7 @@ static gboolean
 swfdec_abc_file_parse_scripts (SwfdecAbcFile *file, SwfdecBits *bits)
 {
   SwfdecAsContext *context = swfdec_gc_object_get_context (file);
+  SwfdecAbcScript *script = NULL;
   SwfdecAbcTraits *traits;
   SwfdecAbcFunction *fun;
   guint i, j, n_scripts;
@@ -873,14 +878,19 @@ swfdec_abc_file_parse_scripts (SwfdecAbcFile *file, SwfdecBits *bits)
     traits->construct = fun;
     if (!swfdec_abc_file_parse_traits (file, traits, bits))
       return FALSE;
+    script = g_object_new (SWFDEC_TYPE_ABC_SCRIPT, "context", context, NULL);
+    script->traits = traits;
     for (j = 0; j < traits->n_traits; j++) {
       SwfdecAbcTrait *trait = &traits->traits[j];
       if (trait->type == SWFDEC_ABC_TRAIT_NONE)
 	continue;
-      swfdec_abc_global_add_script (file->global, trait->ns, trait->name, fun, 
+      swfdec_abc_global_add_script (file->global, trait->ns, trait->name, script, 
 	  i + 1 == n_scripts);
     }
   }
+  if (script == 0)
+    THROW (file, "No entry point was found.");
+  file->main = script;
   return TRUE;
 }
 

@@ -28,7 +28,52 @@
 #include "swfdec_as_context.h"
 #include "swfdec_debug.h"
 
+enum {
+  PROP_0,
+  PROP_TRAITS
+};
+
 G_DEFINE_ABSTRACT_TYPE (SwfdecAbcObject, swfdec_abc_object, SWFDEC_TYPE_AS_OBJECT)
+
+static void
+swfdec_abc_object_get_property (GObject *object, guint param_id, GValue *value, 
+    GParamSpec * pspec)
+{
+  SwfdecAbcObject *abc = SWFDEC_ABC_OBJECT (object);
+
+  switch (param_id) {
+    case PROP_TRAITS:
+      g_value_set_object (value, abc->traits);
+      break;
+    default:
+      G_OBJECT_WARN_INVALID_PROPERTY_ID (object, param_id, pspec);
+      break;
+  }
+}
+
+static void
+swfdec_abc_object_set_property (GObject *object, guint param_id, const GValue *value, 
+    GParamSpec * pspec)
+{
+  SwfdecAbcObject *abc = SWFDEC_ABC_OBJECT (object);
+
+  switch (param_id) {
+    case PROP_TRAITS:
+      abc->traits = g_value_get_object (value);
+      g_object_ref (abc->traits);
+      /* traits must exist and be resolved - it's your job to ensure this */
+      g_assert (abc->traits != NULL);
+      g_assert (abc->traits->resolved);
+      /* we use the traits' context here, our context might not be assigned yet */
+      if (abc->traits->n_slots)
+	abc->slots = swfdec_as_context_new (swfdec_gc_object_get_context (abc->traits),
+	   SwfdecAsValue, abc->traits->n_slots);
+      break;
+    default:
+      G_OBJECT_WARN_INVALID_PROPERTY_ID (object, param_id, pspec);
+      break;
+  }
+}
 
 static void
 swfdec_abc_object_mark (SwfdecGcObject *gcobject)
@@ -50,6 +95,7 @@ swfdec_abc_object_dispose (GObject *gobject)
     swfdec_as_context_free (context, sizeof (SwfdecAsValue) * object->traits->n_slots, object->slots);
     object->slots = NULL;
   }
+  g_object_unref (object->traits);
 
   G_OBJECT_CLASS (swfdec_abc_object_parent_class)->dispose (gobject);
 }
@@ -61,6 +107,12 @@ swfdec_abc_object_class_init (SwfdecAbcObjectClass *klass)
   SwfdecGcObjectClass *gc_class = SWFDEC_GC_OBJECT_CLASS (klass);
 
   object_class->dispose = swfdec_abc_object_dispose;
+  object_class->get_property = swfdec_abc_object_get_property;
+  object_class->set_property = swfdec_abc_object_set_property;
+
+  g_object_class_install_property (object_class, PROP_TRAITS,
+      g_param_spec_object ("traits", "traits", "traits describing this object",
+	  SWFDEC_TYPE_ABC_TRAITS, G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 
   gc_class->mark = swfdec_abc_object_mark;
 }
@@ -71,19 +123,18 @@ swfdec_abc_object_init (SwfdecAbcObject *function)
 }
 
 SwfdecAbcObject *
-swfdec_abc_object_new (SwfdecAsContext *context, SwfdecAbcTraits *traits)
+swfdec_abc_object_new (SwfdecAbcTraits *traits)
 {
   SwfdecAbcObject *object;
 
-  g_return_val_if_fail (SWFDEC_IS_AS_CONTEXT (context), NULL);
   g_return_val_if_fail (SWFDEC_IS_ABC_TRAITS (traits), NULL);
 
   if (!swfdec_abc_traits_resolve (traits))
     return NULL;
 
-  object = g_object_new (traits->type_func (), "context", context, NULL);
-  object->traits = traits;
-  object->slots = swfdec_as_context_new (context, SwfdecAsValue, traits->n_slots);
+  object = g_object_new (traits->type_func (), 
+      "context", swfdec_gc_object_get_context (traits),
+      "traits", traits, NULL);
 
   return object;
 }

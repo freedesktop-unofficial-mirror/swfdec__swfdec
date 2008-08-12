@@ -29,6 +29,9 @@
 #include "swfdec_abc_file.h"
 #include "swfdec_abc_function.h"
 #include "swfdec_abc_initialize.h"
+#include "swfdec_abc_method.h"
+#include "swfdec_abc_script.h"
+#include "swfdec_abc_traits.h"
 #include "swfdec_as_context.h"
 #include "swfdec_as_strings.h"
 #include "swfdec_debug.h"
@@ -37,7 +40,7 @@ typedef struct _SwfdecAbcGlobalScript SwfdecAbcGlobalScript;
 struct _SwfdecAbcGlobalScript {
   SwfdecAbcNamespace *	ns;
   const char *		name;
-  SwfdecAbcFunction *	script;
+  SwfdecAbcScript *	script;
 };
 
 G_DEFINE_TYPE (SwfdecAbcGlobal, swfdec_abc_global, SWFDEC_TYPE_ABC_OBJECT)
@@ -84,30 +87,54 @@ swfdec_abc_global_init (SwfdecAbcGlobal *global)
 void
 swfdec_abc_global_new (SwfdecAsContext *context)
 {
+  SwfdecAbcTraits *traits;
   SwfdecAbcGlobal *global;
+  SwfdecAbcMethod *method;
+  SwfdecAsValue ret;
   SwfdecBits bits;
 
   g_return_if_fail (SWFDEC_IS_AS_CONTEXT (context));
 
-  global = g_object_new (SWFDEC_TYPE_ABC_GLOBAL, "context", context, NULL);
-
-  swfdec_bits_init_data (&bits, swfdec_abc_initialize, sizeof (swfdec_abc_initialize));
+  /* big cheat here: we use void traits for creation, so asserts dont trigger.
+   * We'll assign proper traits later */
+  traits = g_object_new (SWFDEC_TYPE_ABC_TRAITS, "context", context, NULL);
+  traits->pool = NULL;
+  traits->ns = context->public_ns;
+  traits->name = SWFDEC_AS_STR_void;
+  traits->final = TRUE;
+  traits->resolved = TRUE;
+  global = g_object_new (SWFDEC_TYPE_ABC_GLOBAL, "context", context, "traits", traits, NULL);
   context->global = SWFDEC_AS_OBJECT (global);
-  global->file = swfdec_abc_file_new (context, &bits);
 
-  global->void_traits = g_object_new (SWFDEC_TYPE_ABC_TRAITS, "context", context, NULL);
-  global->void_traits->pool = global->file;
-  global->void_traits->ns = context->public_ns;
-  global->void_traits->name = SWFDEC_AS_STR_void;
-  global->void_traits->final = TRUE;
-  global->void_traits->resolved = TRUE;
-
+  /* create builtin traits */
+  global->void_traits = traits;
   global->null_traits = g_object_new (SWFDEC_TYPE_ABC_TRAITS, "context", context, NULL);
   global->null_traits->pool = global->file;
   global->null_traits->ns = context->public_ns;
   global->null_traits->name = SWFDEC_AS_STR_null;
   global->null_traits->final = TRUE;
   global->null_traits->resolved = TRUE;
+
+  /* init default pool */
+  swfdec_bits_init_data (&bits, swfdec_abc_initialize, sizeof (swfdec_abc_initialize));
+  global->file = swfdec_abc_file_new (context, &bits);
+  /* must work and not throw exceptions */
+  g_assert (global->file);
+
+  /* set proper traits here */
+  traits = global->file->main->traits;
+  g_object_unref (SWFDEC_ABC_OBJECT (global)->traits);
+  SWFDEC_ABC_OBJECT (global)->traits = traits;
+  g_object_ref (traits);
+  g_assert (SWFDEC_ABC_OBJECT (global)->slots == NULL);
+  if (traits->n_slots)
+    SWFDEC_ABC_OBJECT (global)->slots = swfdec_as_context_new (context,
+       SwfdecAsValue, traits->n_slots);
+
+  /* run main script */
+  global->file->main->global = SWFDEC_ABC_OBJECT (global);
+  method = swfdec_abc_method_new (traits->construct, NULL);
+  swfdec_abc_method_call (method, SWFDEC_ABC_OBJECT (global), 0, NULL, &ret);
 }
 
 void
@@ -183,14 +210,14 @@ swfdec_abc_global_find_script (SwfdecAbcGlobal *global, SwfdecAbcNamespace *ns,
 
 void
 swfdec_abc_global_add_script (SwfdecAbcGlobal *global, SwfdecAbcNamespace *ns,
-    const char *name, SwfdecAbcFunction *script, gboolean override)
+    const char *name, SwfdecAbcScript *script, gboolean override)
 {
   SwfdecAbcGlobalScript *found;
 
   g_return_if_fail (SWFDEC_IS_ABC_GLOBAL (global));
   g_return_if_fail (SWFDEC_IS_ABC_NAMESPACE (ns));
   g_return_if_fail (name != NULL);
-  g_return_if_fail (SWFDEC_IS_ABC_FUNCTION (script));
+  g_return_if_fail (SWFDEC_IS_ABC_SCRIPT (script));
 
   found = swfdec_abc_global_find_script (global, ns, name);
   if (found) {

@@ -22,7 +22,7 @@
 
 #include <swfdec/swfdec_abc_multiname.h>
 #include <swfdec/swfdec_abc_object.h>
-#include <swfdec/swfdec_abc_traits.h>
+#include <swfdec/swfdec_abc_types.h>
 
 G_BEGIN_DECLS
 
@@ -100,10 +100,11 @@ SwfdecAbcTraits *	swfdec_abc_global_get_traits	(SwfdecAbcGlobal *		global,
 SwfdecAbcTraits *	swfdec_abc_global_get_traits_for_multiname
 							(SwfdecAbcGlobal *		global,
 							 const SwfdecAbcMultiname *	mn);
+
 void	  		swfdec_abc_global_add_script	(SwfdecAbcGlobal *		global,
 							 SwfdecAbcNamespace *		ns,
 							 const char *			name,
-							 SwfdecAbcFunction *		script,
+							 SwfdecAbcScript *		script,
 							 gboolean			override);
 
 gboolean		swfdec_abc_global_get_script_variable

@@ -65,6 +65,7 @@ struct _SwfdecAbcFile {
   SwfdecAbcTraits **	instances;   	/* instance infos for the defined classes */
   SwfdecAbcTraits **	classes;   	/* all the classes defined */
   guint			n_classes;   	/* number of classes */
+  SwfdecAbcScript *	main;		/* main script */
 };
 
 struct _SwfdecAbcFileClass {

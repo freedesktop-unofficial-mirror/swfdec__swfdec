@@ -25,7 +25,7 @@
 
 G_BEGIN_DECLS
 
-typedef struct _SwfdecAbcObject SwfdecAbcObject;
+//typedef struct _SwfdecAbcObject SwfdecAbcObject;
 typedef struct _SwfdecAbcObjectClass SwfdecAbcObjectClass;
 
 #define SWFDEC_TYPE_ABC_OBJECT                    (swfdec_abc_object_get_type())
@@ -38,7 +38,7 @@ typedef struct _SwfdecAbcObjectClass SwfdecAbcObjectClass;
 struct _SwfdecAbcObject {
   SwfdecAsObject	object;
 
-  SwfdecAbcTraits *	traits;		/* the traits that created us */
+  SwfdecAbcTraits *	traits;		/* the traits that created us - we have a ref so it stays alive until we dispose */
   SwfdecAsValue *	slots;		/* traits->n_slots values */
 };
 
@@ -48,8 +48,7 @@ struct _SwfdecAbcObjectClass {
 
 GType			swfdec_abc_object_get_type	(void);
 
-SwfdecAbcObject *	swfdec_abc_object_new		(SwfdecAsContext *		context,
-							 SwfdecAbcTraits *		traits);
+SwfdecAbcObject *	swfdec_abc_object_new		(SwfdecAbcTraits *		traits);
 
 gboolean		swfdec_abc_object_get_variable	(SwfdecAbcObject *		object,
 							 const SwfdecAbcMultiname *	mn,
