@@ -86,3 +86,10 @@ swfdec_abc_function_is_native (SwfdecAbcFunction *fun)
   return fun->native != NULL;
 }
 
+gboolean
+swfdec_abc_function_resolve (SwfdecAbcFunction *fun)
+{
+  g_return_val_if_fail (SWFDEC_IS_ABC_FUNCTION (fun), FALSE);
+  
+  return TRUE;
+}

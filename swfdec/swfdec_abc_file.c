@@ -643,6 +643,7 @@ swfdec_abc_file_parse_methods (SwfdecAbcFile *file, SwfdecBits *bits)
 	if (fun->args == NULL)
 	  return FALSE;
 	fun->n_args = len;
+	fun->min_args = len;
       }
       READ_U30 (id, bits);
       if (id == 0) {
@@ -685,7 +686,8 @@ swfdec_abc_file_parse_methods (SwfdecAbcFile *file, SwfdecBits *bits)
 	READ_U30 (len, bits);
 	if (len == 0 || len > fun->n_args)
 	  return FALSE;
-	for (j = fun->n_args - len; j < fun->n_args; j++) {
+	fun->min_args -= len;
+	for (j = fun->min_args; j < fun->n_args; j++) {
 	  READ_U30 (id, bits);
 	  fun->args[j].default_index = id;
 	  fun->args[j].default_type = swfdec_bits_get_u8 (bits);

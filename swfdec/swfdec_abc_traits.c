@@ -237,3 +237,56 @@ swfdec_as_value_is_traits (const SwfdecAsValue *value, SwfdecAbcTraits *traits)
       return FALSE;
   }
 }
+
+gboolean
+swfdec_abc_traits_coerce (SwfdecAbcTraits *traits, SwfdecAsValue *val)
+{
+  SwfdecAsContext *context;
+
+  g_return_val_if_fail (SWFDEC_IS_ABC_TRAITS (traits), FALSE);
+  g_return_val_if_fail (SWFDEC_IS_ABC_TRAITS (traits), FALSE);
+
+  context = swfdec_gc_object_get_context (traits);
+
+  if (traits == SWFDEC_ABC_BOOLEAN_TRAITS (context)) {
+    SWFDEC_AS_VALUE_SET_BOOLEAN (val,
+	swfdec_as_value_to_boolean (context, val));
+    return TRUE;
+  } else if (traits == SWFDEC_ABC_NUMBER_TRAITS (context)) {
+    SWFDEC_AS_VALUE_SET_NUMBER (val,
+	swfdec_as_value_to_number (context, val));
+    return TRUE;
+  } else if (traits == SWFDEC_ABC_INT_TRAITS (context)) {
+    SWFDEC_AS_VALUE_SET_INT (val,
+	swfdec_as_value_to_integer (context, val));
+    return TRUE;
+  } else if (traits == SWFDEC_ABC_NUMBER_TRAITS (context)) {
+    SWFDEC_AS_VALUE_SET_NUMBER (val,
+	(guint) swfdec_as_value_to_integer (context, val));
+    return TRUE;
+  } else if (traits == SWFDEC_ABC_STRING_TRAITS (context)) {
+    if (SWFDEC_AS_VALUE_IS_UNDEFINED (val) || SWFDEC_AS_VALUE_IS_NULL (val)) {
+      SWFDEC_AS_VALUE_SET_NULL (val);
+    } else {
+      SWFDEC_AS_VALUE_SET_STRING (val, 
+	  swfdec_as_value_to_string (context, val));
+    }
+    return TRUE;
+  } else if (traits == SWFDEC_ABC_OBJECT_TRAITS (context)) {
+    if (SWFDEC_AS_VALUE_IS_UNDEFINED (val)) {
+      SWFDEC_AS_VALUE_SET_NULL (val);
+    }
+    return TRUE;
+  }
+
+  if (SWFDEC_AS_VALUE_IS_UNDEFINED (val) || SWFDEC_AS_VALUE_IS_NULL (val)) {
+    if (traits == SWFDEC_ABC_VOID_TRAITS (context)) {
+      SWFDEC_AS_VALUE_SET_UNDEFINED (val);
+    } else {
+      SWFDEC_AS_VALUE_SET_NULL (val);
+    }
+  }
+
+  return swfdec_as_value_is_traits (val, traits);
+}
+

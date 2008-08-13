@@ -125,6 +125,8 @@ const SwfdecAbcTrait *	swfdec_abc_traits_find_trait_multi	(SwfdecAbcTraits *	tra
 
 gboolean		swfdec_abc_traits_is_traits		(SwfdecAbcTraits *	traits,
 								 SwfdecAbcTraits *	parent);
+gboolean		swfdec_abc_traits_coerce		(SwfdecAbcTraits *	traits,
+								 SwfdecAsValue *	val);
 /* FIXME: kinda wrong header */
 gboolean		swfdec_as_value_is_traits		(const SwfdecAsValue *	value,
 								 SwfdecAbcTraits *	traits);

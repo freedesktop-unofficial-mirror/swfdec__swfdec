@@ -39,7 +39,10 @@ typedef struct _SwfdecAbcException SwfdecAbcException;
 #define SWFDEC_ABC_FUNCTION_GET_CLASS(obj)          (G_TYPE_INSTANCE_GET_CLASS ((obj), SWFDEC_TYPE_ABC_FUNCTION, SwfdecAbcFunctionClass))
 
 struct _SwfdecAbcFunctionArgument {
-  gpointer		type;			/* trait pointer if verified, multiname otherwise */
+  union {
+    SwfdecAbcMultiname *type;			/* multiname if not resolved */
+    SwfdecAbcTraits *	traits;			/* traits pointer if resolved */
+  };
   const char *		name;			/* name of argument or NULL if not given or read error */
   guint			default_index;		/* index of default value */
   guint8		default_type;		/* type of default value */
@@ -58,13 +61,18 @@ struct _SwfdecAbcFunction {
 
   const char *		name;			/* gc'd name of the function or NULL if unnamed */
   gboolean		verified:1;		/* function body has been verified */
+  gboolean		resolved:1;		/* function arguments and return type have been resolved */
   gboolean		need_arguments:1;	/* needs arguments object */
   gboolean		need_rest:1;		/* needs rest object */
   gboolean		need_activation:1;	/* needs activation object */
   gboolean		set_dxns:1;		/* sets dynamic xml namespace */
 
-  gpointer		return_type;		/* trait pointer if verified, multiname otherwise */
+  union {
+    SwfdecAbcMultiname *return_type;		/* multiname if not resolved */
+    SwfdecAbcTraits *	return_traits;		/* traits pointer if resolved */
+  };
   guint			n_args;			/* number of arguments */
+  guint			min_args;     		/* minimum required number of arguments */
   SwfdecAbcFunctionArgument *args;		/* n_args arguments */ 
 
   SwfdecAbcTraits *	bound_traits;		/* traits of objects we construct or NULL */
@@ -90,6 +98,7 @@ GType			swfdec_abc_function_get_type	(void);
 gboolean		swfdec_abc_function_bind	(SwfdecAbcFunction *	fun,
 							 SwfdecAbcTraits *	traits);
 gboolean		swfdec_abc_function_is_native	(SwfdecAbcFunction *	fun);
+gboolean		swfdec_abc_function_resolve	(SwfdecAbcFunction *	fun);
 
 
 G_END_DECLS
