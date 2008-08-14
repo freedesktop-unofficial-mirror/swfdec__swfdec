@@ -23,8 +23,10 @@
 
 #include "swfdec_abc_file.h"
 #include "swfdec_abc_internal.h"
+#include "swfdec_abc_method.h" /* default stub */
 #include "swfdec_abc_script.h"
 #include "swfdec_abc_traits.h"
+#include "swfdec_as_frame.h" /* default stub */
 #include "swfdec_as_strings.h"
 #include "swfdec_debug.h"
 
@@ -617,8 +619,23 @@ swfdec_abc_file_parse_traits (SwfdecAbcFile *file, SwfdecAbcTraits *traits, Swfd
   return TRUE;
 }
 
+static void
+swfdec_abc_default_stub (SwfdecAsContext *cx, SwfdecAsObject *obj, guint argc,
+    SwfdecAsValue *argv, SwfdecAsValue *ret)
+{
+  SwfdecAsFrame *frame = swfdec_as_context_get_frame (cx);
+  SwfdecAbcMethod *method = SWFDEC_ABC_METHOD (swfdec_as_frame_get_function (frame));
+  char *name;
+
+  name = g_strconcat (SWFDEC_ABC_OBJECT (obj)->traits->name, ".",
+      method->function->bound_traits->name, NULL);
+  SWFDEC_STUB (name);
+  g_free (name);
+}
+
 static gboolean
-swfdec_abc_file_parse_methods (SwfdecAbcFile *file, SwfdecBits *bits)
+swfdec_abc_file_parse_methods (SwfdecAbcFile *file, SwfdecBits *bits,
+    const SwfdecAsNative *natives, guint n_natives)
 {
   SwfdecAsContext *context = swfdec_gc_object_get_context (file);
   guint i;
@@ -680,7 +697,16 @@ swfdec_abc_file_parse_methods (SwfdecAbcFile *file, SwfdecBits *bits)
       fun->need_activation = swfdec_bits_getbit (bits);
       fun->need_arguments = swfdec_bits_getbit (bits);
       if (native) {
-	SWFDEC_FIXME ("supposed to load native method %u here", i);
+
+	if (i >= n_natives) {
+	  SWFDEC_ERROR ("only %u native methods specified, but wanting index %u", n_natives, i);
+	} else {
+	  fun->native = natives[i];
+	}
+	if (fun->native == NULL) {
+	  SWFDEC_INFO ("no native for index %u, using default stub", i);
+	  fun->native = swfdec_abc_default_stub;
+	}
       }
       if (optional) {
 	READ_U30 (len, bits);
@@ -969,10 +995,11 @@ swfdec_abc_file_parse_bodies (SwfdecAbcFile *file, SwfdecBits *bits)
 }
 
 static gboolean
-swfdec_abc_file_parse (SwfdecAbcFile *file, SwfdecBits *bits)
+swfdec_abc_file_parse (SwfdecAbcFile *file, SwfdecBits *bits,
+    const SwfdecAsNative *natives, guint n_natives)
 {
   return swfdec_abc_file_parse_constants (file, bits) &&
-      swfdec_abc_file_parse_methods (file, bits) &&
+      swfdec_abc_file_parse_methods (file, bits, natives, n_natives) &&
       swfdec_abc_file_skip_metadata (file, bits) &&
       swfdec_abc_file_parse_instances (file, bits) &&
       swfdec_abc_file_parse_classes (file, bits) &&
@@ -982,6 +1009,13 @@ swfdec_abc_file_parse (SwfdecAbcFile *file, SwfdecBits *bits)
 
 SwfdecAbcFile *
 swfdec_abc_file_new (SwfdecAsContext *context, SwfdecBits *bits)
+{
+  return swfdec_abc_file_new_trusted (context, bits, NULL, 0);
+}
+
+SwfdecAbcFile *
+swfdec_abc_file_new_trusted (SwfdecAsContext *context, SwfdecBits *bits,
+    const SwfdecAsNative *natives, guint n_natives)
 {
   SwfdecAbcFile *file;
   guint major, minor;
@@ -998,7 +1032,7 @@ swfdec_abc_file_new (SwfdecAsContext *context, SwfdecBits *bits)
   SWFDEC_LOG ("  major version: %u", major);
   SWFDEC_LOG ("  minor version: %u", minor);
   if (major == 46 && minor == 16) {
-    if (!swfdec_abc_file_parse (file, bits)) {
+    if (!swfdec_abc_file_parse (file, bits, natives, n_natives)) {
       swfdec_as_context_throw_abc (context, SWFDEC_ABC_ERROR_VERIFY,
 	  "The ABC data is corrupt, attempt to read out of bounds.");
       return NULL;

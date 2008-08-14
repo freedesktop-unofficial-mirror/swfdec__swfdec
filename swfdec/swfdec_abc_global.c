@@ -29,7 +29,9 @@
 #include "swfdec_abc_file.h"
 #include "swfdec_abc_function.h"
 #include "swfdec_abc_initialize.h"
+#include "swfdec_abc_internal.h"
 #include "swfdec_abc_method.h"
+#include "swfdec_abc_native.h"
 #include "swfdec_abc_script.h"
 #include "swfdec_abc_traits.h"
 #include "swfdec_as_context.h"
@@ -117,7 +119,8 @@ swfdec_abc_global_new (SwfdecAsContext *context)
 
   /* init default pool */
   swfdec_bits_init_data (&bits, swfdec_abc_initialize, sizeof (swfdec_abc_initialize));
-  global->file = swfdec_abc_file_new (context, &bits);
+  global->file = swfdec_abc_file_new_trusted (context, &bits, 
+      swfdec_abc_natives, G_N_ELEMENTS (swfdec_abc_natives));
   /* must work and not throw exceptions */
   g_assert (global->file);
 
@@ -249,5 +252,40 @@ swfdec_abc_global_get_script_variable (SwfdecAbcGlobal *global,
   SWFDEC_FIXME ("global variables, please");
   SWFDEC_AS_VALUE_SET_UNDEFINED (value);
   return FALSE;
+}
+
+/*** ABC CODE ***/
+
+/* FIXME: just here to make stuff compile */
+SWFDEC_ABC_NATIVE(0, swfdec_abc_global_trace)
+void
+swfdec_abc_global_trace (SwfdecAsContext *cx, SwfdecAsObject *object,
+    guint argc, SwfdecAsValue *argv, SwfdecAsValue *ret)
+{
+  GString *string = g_string_new ("");
+  guint i;
+
+  for (i = 0; i < argc; i++) {
+    const char *s = swfdec_as_value_to_string (cx, &argv[i]);
+    g_string_append (string, s);
+  }
+  g_signal_emit_by_name (cx, "trace", string->str);
+  g_string_free (string, TRUE);
+}
+
+SWFDEC_ABC_FLASH(0, swfdec_abc_global_trace2)
+void
+swfdec_abc_global_trace2 (SwfdecAsContext *cx, SwfdecAsObject *object,
+    guint argc, SwfdecAsValue *argv, SwfdecAsValue *ret)
+{
+  GString *string = g_string_new ("");
+  guint i;
+
+  for (i = 0; i < argc; i++) {
+    const char *s = swfdec_as_value_to_string (cx, &argv[i]);
+    g_string_append (string, s);
+  }
+  g_signal_emit_by_name (cx, "trace", string->str);
+  g_string_free (string, TRUE);
 }
 

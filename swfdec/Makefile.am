@@ -185,6 +185,7 @@ libswfdec_source_files = \
 
 libswfdec_@SWFDEC_MAJORMINOR@_la_SOURCES = \
   	$(libswfdec_source_files) \
+	swfdec_abc_native.c \
 	swfdec_asnative.c \
 	swfdec_enums.c \
 	swfdec_marshal.c
@@ -241,6 +242,7 @@ noinst_HEADERS = \
 	swfdec_abc_interpret.h \
 	swfdec_abc_method.h \
 	swfdec_abc_multiname.h \
+	swfdec_abc_native.h \
 	swfdec_abc_ns_set.h \
 	swfdec_abc_object.h \
 	swfdec_abc_script.h \
@@ -366,6 +368,7 @@ EXTRA_DIST = \
 	swfdec_marshal.list
 
 BUILT_SOURCES = \
+	swfdec_abc_native.c \
 	swfdec_asnative.c \
 	swfdec_as_strings.h \
 	swfdec_enums.c \
@@ -375,6 +378,27 @@ BUILT_SOURCES = \
 
 CLEANFILES = \
 	$(BUILT_SOURCES)
+
+swfdec_abc_native.c: $(libswfdec_source_files)
+	(cd $(srcdir) \
+	  && echo "#include \"swfdec_as_types.h\"" \
+	  && echo "#define SWFDEC_ABC_NATIVE(id,func) void func (SwfdecAsContext *cx, \\" \
+	  && echo "    SwfdecAsObject *object, guint argc, SwfdecAsValue *argv, SwfdecAsValue *ret);" \
+	  && echo "#define SWFDEC_ABC_FLASH SWFDEC_ABC_NATIVE" \
+	  && grep -he "^SWFDEC_ABC_NATIVE" $(libswfdec_source_files) \
+	  && grep -he "^SWFDEC_ABC_FLASH" $(libswfdec_source_files) \
+	  && echo "#undef SWFDEC_ABC_NATIVE" \
+	  && echo "#define SWFDEC_ABC_NATIVE(id,func) [id] = func," \
+	  && echo "const SwfdecAsNative swfdec_abc_natives[585] = {" \
+	  && grep -he "^SWFDEC_ABC_NATIVE" $(libswfdec_source_files) \
+	  && echo "};" \
+	  && echo "const SwfdecAsNative swfdec_abc_natives_flash[1944] = {" \
+	  && grep -he "^SWFDEC_ABC_FLASH" $(libswfdec_source_files) \
+	  && echo "};" \
+	  && echo "#undef SWFDEC_ABC_NATIVE" \
+	 ) >> xgen-san \
+	&& (cmp -s xgen-san swfdec_abc_native.c || cp xgen-san swfdec_abc_native.c) \
+	&& rm -f xgen-san
 
 swfdec_asnative.c: $(libswfdec_source_files)
 	(cd $(srcdir) \

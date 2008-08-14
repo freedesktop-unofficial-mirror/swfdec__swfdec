@@ -76,6 +76,10 @@ GType		swfdec_abc_file_get_type	(void);
 
 SwfdecAbcFile *	swfdec_abc_file_new		(SwfdecAsContext *	context,
 						 SwfdecBits *		bits);
+SwfdecAbcFile *	swfdec_abc_file_new_trusted	(SwfdecAsContext *	context,
+						 SwfdecBits *		bits,
+						 const SwfdecAsNative *	natives,
+						 guint			n_natives);
 
 
 G_END_DECLS

@@ -11,6 +11,7 @@ Makefile.in
 *.lo
 *.loT
 
+swfdec_abc_native.c
 swfdec_as_strings.h
 swfdec_asnative.c
 swfdec_enums.[ch]

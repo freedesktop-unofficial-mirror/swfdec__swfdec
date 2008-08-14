@@ -115,6 +115,8 @@ swfdec_abc_method_call (SwfdecAbcMethod *method, SwfdecAbcObject *thisp,
   if (!swfdec_abc_function_verify (fun))
     return;
   swfdec_as_frame_init_native (&frame, context);
+  /* HACK! */
+  frame.function = (SwfdecAsFunction *) method;
   frame.thisp = SWFDEC_AS_OBJECT (thisp);
   frame.argc = argc;
   frame.argv = argv;

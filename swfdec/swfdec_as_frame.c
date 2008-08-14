@@ -783,3 +783,20 @@ swfdec_as_frame_get_this (SwfdecAsFrame *frame)
   return frame->thisp;
 }
 
+/**
+ * swfdec_as_frame_get_function:
+ * @frame: a #SwfdecAsFrame
+ *
+ * Gets the function that is currently executed or %NULL, if a script is
+ * executed that is not a function.
+ *
+ * Returns: The function executed in this frame or %NULL if none.
+ **/
+SwfdecAsFunction *
+swfdec_as_frame_get_function (SwfdecAsFrame *frame)
+{
+  g_return_val_if_fail (frame != NULL, NULL);
+
+  return frame->function;
+}
+
