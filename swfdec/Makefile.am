@@ -19,6 +19,7 @@ libswfdec_source_files = \
 	swfdec_abc_namespace.c \
 	swfdec_abc_ns_set.c \
 	swfdec_abc_object.c \
+	swfdec_abc_scope_chain.c \
 	swfdec_abc_script.c \
 	swfdec_abc_traits.c \
 	swfdec_access.c \
@@ -245,6 +246,7 @@ noinst_HEADERS = \
 	swfdec_abc_native.h \
 	swfdec_abc_ns_set.h \
 	swfdec_abc_object.h \
+	swfdec_abc_scope_chain.h \
 	swfdec_abc_script.h \
 	swfdec_abc_traits.h \
 	swfdec_abc_types.h \

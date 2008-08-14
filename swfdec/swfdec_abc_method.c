@@ -33,12 +33,23 @@
 G_DEFINE_TYPE (SwfdecAbcMethod, swfdec_abc_method, SWFDEC_TYPE_ABC_OBJECT)
 
 static void
+swfdec_abc_method_dispose (GObject *object)
+{
+  SwfdecAbcMethod *method = SWFDEC_ABC_METHOD (object);
+
+  swfdec_abc_scope_chain_free (swfdec_gc_object_get_context (method),
+      method->scope);
+
+  G_OBJECT_CLASS (swfdec_abc_method_parent_class)->dispose (object);
+}
+
+static void
 swfdec_abc_method_mark (SwfdecGcObject *object)
 {
   SwfdecAbcMethod *method = SWFDEC_ABC_METHOD (object);
 
   swfdec_gc_object_mark (method->function);
-  g_slist_foreach (method->scope, (GFunc) swfdec_gc_object_mark, NULL);
+  swfdec_abc_scope_chain_mark (method->scope);
 
   SWFDEC_GC_OBJECT_CLASS (swfdec_abc_method_parent_class)->mark (object);
 }
@@ -46,7 +57,10 @@ swfdec_abc_method_mark (SwfdecGcObject *object)
 static void
 swfdec_abc_method_class_init (SwfdecAbcMethodClass *klass)
 {
+  GObjectClass *object_class = G_OBJECT_CLASS (klass);
   SwfdecGcObjectClass *gc_class = SWFDEC_GC_OBJECT_CLASS (klass);
+
+  object_class->dispose = swfdec_abc_method_dispose;
 
   gc_class->mark = swfdec_abc_method_mark;
 }
@@ -57,7 +71,7 @@ swfdec_abc_method_init (SwfdecAbcMethod *method)
 }
 
 SwfdecAbcMethod *
-swfdec_abc_method_new (SwfdecAbcFunction *function, const GSList *scope)
+swfdec_abc_method_new (SwfdecAbcFunction *function, SwfdecAbcScopeChain *chain)
 {
   SwfdecAbcMethod *method;
 
@@ -70,7 +84,7 @@ swfdec_abc_method_new (SwfdecAbcFunction *function, const GSList *scope)
       "context", swfdec_gc_object_get_context (function), 
       "traits", function->bound_traits, NULL);
   method->function = function;
-  method->scope = g_slist_copy ((GSList *) scope);
+  method->scope = chain;
 
   return method;
 }

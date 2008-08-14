@@ -21,6 +21,7 @@
 #define _SWFDEC_ABC_METHOD_H_
 
 #include <swfdec/swfdec_abc_object.h>
+#include <swfdec/swfdec_abc_scope_chain.h>
 #include <swfdec/swfdec_abc_types.h>
 
 G_BEGIN_DECLS
@@ -39,7 +40,7 @@ struct _SwfdecAbcMethod {
   SwfdecAbcObject	object;
 
   SwfdecAbcFunction *	function;	/* the function we call */
-  GSList *		scope;		/* the scope the method was defined in */
+  SwfdecAbcScopeChain *	scope;		/* scope chain */
 };
 
 struct _SwfdecAbcMethodClass {
@@ -49,7 +50,7 @@ struct _SwfdecAbcMethodClass {
 GType			swfdec_abc_method_get_type	(void);
 
 SwfdecAbcMethod *	swfdec_abc_method_new		(SwfdecAbcFunction *	function,
-							 const GSList *		scope);
+							 SwfdecAbcScopeChain *	chain);
 
 void			swfdec_abc_method_call		(SwfdecAbcMethod *	method,
 							 SwfdecAbcObject *	thisp,
