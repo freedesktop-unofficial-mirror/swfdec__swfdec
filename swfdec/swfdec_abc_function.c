@@ -91,5 +91,19 @@ swfdec_abc_function_resolve (SwfdecAbcFunction *fun)
 {
   g_return_val_if_fail (SWFDEC_IS_ABC_FUNCTION (fun), FALSE);
   
+  SWFDEC_FIXME ("i can has resolve?");
+  fun->resolved = TRUE;
   return TRUE;
 }
+
+gboolean
+swfdec_abc_function_verify (SwfdecAbcFunction *fun)
+{
+  g_return_val_if_fail (SWFDEC_IS_ABC_FUNCTION (fun), FALSE);
+  g_return_val_if_fail (fun->resolved, FALSE);
+  
+  SWFDEC_FIXME ("i can has verify?");
+  fun->verified = TRUE;
+  return TRUE;
+}
+

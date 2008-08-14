@@ -917,18 +917,18 @@ swfdec_abc_file_parse_bodies (SwfdecAbcFile *file, SwfdecBits *bits)
     if (fun->code != NULL)
       THROW (file, "Method %u has a duplicate method body.", fun - file->functions[0]);
 
-    READ_U30 (fun->stack, bits);
-    SWFDEC_LOG ("  stack: %u", fun->stack);
-    READ_U30 (fun->locals, bits);
-    if (fun->n_args >= fun->locals)
+    READ_U30 (fun->n_stack, bits);
+    SWFDEC_LOG ("  stack: %u", fun->n_stack);
+    READ_U30 (fun->n_locals, bits);
+    if (fun->n_args >= fun->n_locals)
       THROW (file, "The ABC data is corrupt, attempt to read out of bounds.");
-    SWFDEC_LOG ("  locals: %u", fun->locals);
+    SWFDEC_LOG ("  locals: %u", fun->n_locals);
     READ_U30 (min_scope, bits);
     READ_U30 (max_scope, bits);
     if (min_scope > max_scope)
       THROW (file, "The ABC data is corrupt, attempt to read out of bounds.");
-    fun->scope = max_scope - min_scope;
-    SWFDEC_LOG ("  scope: %u (%u - %u)", fun->scope, min_scope, max_scope);
+    fun->n_scope = max_scope - min_scope;
+    SWFDEC_LOG ("  scope: %u (%u - %u)", fun->n_scope, min_scope, max_scope);
     READ_U30 (size, bits);
     if (size == 0)
       THROW (file, "Invalid code_length=0.");

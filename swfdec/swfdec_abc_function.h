@@ -44,8 +44,13 @@ struct _SwfdecAbcFunctionArgument {
     SwfdecAbcTraits *	traits;			/* traits pointer if resolved */
   };
   const char *		name;			/* name of argument or NULL if not given or read error */
-  guint			default_index;		/* index of default value */
-  guint8		default_type;		/* type of default value */
+  union {
+    struct {
+      guint		default_index;		/* index of default value if not resolved */
+      guint8		default_type;		/* type of default value if not resolved */
+    };
+    SwfdecAsValue	default_value;		/* default value if resolved */
+  };
 };
 
 struct _SwfdecAbcException {
@@ -81,9 +86,9 @@ struct _SwfdecAbcFunction {
   GCallback		native;			/* SwfdecAsNative for now - will become native when we can marhsal */
   /* functions with body only */
   SwfdecBuffer *	code;			/* the code to be executed */
-  guint			stack;			/* max number of values on stack */
-  guint			scope;			/* number of scope values necessary */
-  guint			locals;			/* number of local variables */
+  guint			n_stack;		/* max number of values on stack */
+  guint			n_scope;		/* number of scope values necessary */
+  guint			n_locals;		/* number of local variables */
   SwfdecAbcTraits *	activation;		/* traits of activation object */
   guint			n_exceptions;		/* number of exceptions */
   SwfdecAbcException *	exceptions;		/* the exceptions */
@@ -99,6 +104,7 @@ gboolean		swfdec_abc_function_bind	(SwfdecAbcFunction *	fun,
 							 SwfdecAbcTraits *	traits);
 gboolean		swfdec_abc_function_is_native	(SwfdecAbcFunction *	fun);
 gboolean		swfdec_abc_function_resolve	(SwfdecAbcFunction *	fun);
+gboolean		swfdec_abc_function_verify	(SwfdecAbcFunction *	fun);
 
 
 G_END_DECLS
