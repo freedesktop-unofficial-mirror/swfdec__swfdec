@@ -409,7 +409,7 @@ swfdec_as_string_mark (const char *string)
  * function is only valid during the marking phase of garbage collection.
  **/
 void
-swfdec_as_value_mark (SwfdecAsValue *value)
+swfdec_as_value_mark (const SwfdecAsValue *value)
 {
   g_return_if_fail (SWFDEC_IS_AS_VALUE (value));
 

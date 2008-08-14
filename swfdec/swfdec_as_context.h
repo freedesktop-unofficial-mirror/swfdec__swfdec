@@ -139,7 +139,7 @@ gpointer	swfdec_as_context_alloc		(SwfdecAsContext *	context,
 void		swfdec_as_context_free		(SwfdecAsContext *	context,
 						 gsize			bytes,
 						 gpointer		mem);
-void		swfdec_as_value_mark		(SwfdecAsValue *	value);
+void		swfdec_as_value_mark		(const SwfdecAsValue *	value);
 void		swfdec_as_string_mark		(const char *		string);
 void		swfdec_as_context_gc		(SwfdecAsContext *	context);
 void		swfdec_as_context_maybe_gc	(SwfdecAsContext *	context);
