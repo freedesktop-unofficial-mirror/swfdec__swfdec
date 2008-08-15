@@ -55,6 +55,7 @@ enum {
   SWFDEC_ABC_TYPE_XML_LIST = 27,
   SWFDEC_ABC_TYPE_QNAME = 28
 };
+#define SWFDEC_ABC_N_TYPES 29
 
 typedef struct _SwfdecAbcClass SwfdecAbcClass;
 typedef struct _SwfdecAbcFile SwfdecAbcFile;

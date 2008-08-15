@@ -438,7 +438,16 @@ swfdec_abc_interpret_new_class (SwfdecAbcTraits *traits, SwfdecAbcClass *base,
 	SWFDEC_AS_STR_constructor, &val, SWFDEC_AS_VARIABLE_HIDDEN);
   }
 
-  SWFDEC_FIXME ("set Class as __proto__ for new class");
+  if (SWFDEC_ABC_GLOBAL (context->global)->classes[SWFDEC_ABC_TYPE_CLASS] == NULL) {
+    if (traits->name == SWFDEC_AS_STR_Class) {
+      SWFDEC_ABC_GLOBAL (context->global)->classes[SWFDEC_ABC_TYPE_CLASS] = classp;
+      SWFDEC_AS_OBJECT (classp)->prototype = SWFDEC_AS_OBJECT (classp);
+    } else {
+      SWFDEC_ERROR ("cannot set prototype for %s class to Class", traits->name);
+    }
+  } else {
+    SWFDEC_AS_OBJECT (classp)->prototype = SWFDEC_AS_OBJECT (SWFDEC_ABC_GET_CLASS_CLASS (context));
+  }
   method = swfdec_abc_method_new (traits->construct, chain);
   swfdec_abc_method_call (method, SWFDEC_ABC_OBJECT (classp), 0, NULL, &val);
 

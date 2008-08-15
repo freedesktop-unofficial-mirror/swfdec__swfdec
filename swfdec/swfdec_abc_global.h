@@ -61,6 +61,40 @@ G_BEGIN_DECLS
 #define SWFDEC_ABC_VOID_TRAITS(context) (SWFDEC_ABC_GLOBAL ((context)->global)->void_traits)
 #define SWFDEC_ABC_NULL_TRAITS(context) (SWFDEC_ABC_GLOBAL ((context)->global)->null_traits)
 
+#define SWFDEC_ABC_GET_BUILTIN_CLASS(context, type) \
+  (SWFDEC_ABC_GLOBAL ((context)->global)->classes[type] ? \
+   SWFDEC_ABC_GLOBAL ((context)->global)->classes[type] : \
+   swfdec_abc_global_get_builtin_class (SWFDEC_ABC_GLOBAL (context->global), type))
+#define SWFDEC_ABC_GET_OBJECT_CLASS(context) SWFDEC_ABC_GET_BUILTIN_CLASS(context, SWFDEC_ABC_TYPE_OBJECT)
+#define SWFDEC_ABC_GET_CLASS_CLASS(context) SWFDEC_ABC_GET_BUILTIN_CLASS(context, SWFDEC_ABC_TYPE_CLASS)
+#define SWFDEC_ABC_GET_NAMESPACE_CLASS(context) SWFDEC_ABC_GET_BUILTIN_CLASS(context, SWFDEC_ABC_TYPE_NAMESPACE)
+#define SWFDEC_ABC_GET_FUNCTION_CLASS(context) SWFDEC_ABC_GET_BUILTIN_CLASS(context, SWFDEC_ABC_TYPE_FUNCTION)
+#define SWFDEC_ABC_GET_METHOD_CLOSURE_CLASS(context) SWFDEC_ABC_GET_BUILTIN_CLASS(context, SWFDEC_ABC_TYPE_METHOD_CLOSURE)
+#define SWFDEC_ABC_GET_ERROR_CLASS(context) SWFDEC_ABC_GET_BUILTIN_CLASS(context, SWFDEC_ABC_TYPE_ERROR)
+#define SWFDEC_ABC_GET_DEFINITION_ERROR_CLASS(context) SWFDEC_ABC_GET_BUILTIN_CLASS(context, SWFDEC_ABC_TYPE_DEFINITION_ERROR)
+#define SWFDEC_ABC_GET_EVAL_ERROR_CLASS(context) SWFDEC_ABC_GET_BUILTIN_CLASS(context, SWFDEC_ABC_TYPE_EVAL_ERROR)
+#define SWFDEC_ABC_GET_RANGE_ERROR_CLASS(context) SWFDEC_ABC_GET_BUILTIN_CLASS(context, SWFDEC_ABC_TYPE_RANGE_ERROR)
+#define SWFDEC_ABC_GET_REFERENCE_ERROR_CLASS(context) SWFDEC_ABC_GET_BUILTIN_CLASS(context, SWFDEC_ABC_TYPE_REFERENCE_ERROR)
+#define SWFDEC_ABC_GET_SECURITY_ERROR_CLASS(context) SWFDEC_ABC_GET_BUILTIN_CLASS(context, SWFDEC_ABC_TYPE_SECURITY_ERROR)
+#define SWFDEC_ABC_GET_SYNTAX_ERROR_CLASS(context) SWFDEC_ABC_GET_BUILTIN_CLASS(context, SWFDEC_ABC_TYPE_SYNTAX_ERROR)
+#define SWFDEC_ABC_GET_TYPE_ERROR_CLASS(context) SWFDEC_ABC_GET_BUILTIN_CLASS(context, SWFDEC_ABC_TYPE_TYPE_ERROR)
+#define SWFDEC_ABC_GET_URI_ERROR_CLASS(context) SWFDEC_ABC_GET_BUILTIN_CLASS(context, SWFDEC_ABC_TYPE_URI_ERROR)
+#define SWFDEC_ABC_GET_VERIFY_ERROR_CLASS(context) SWFDEC_ABC_GET_BUILTIN_CLASS(context, SWFDEC_ABC_TYPE_VERIFY_ERROR)
+#define SWFDEC_ABC_GET_UNINITIALIZED_ERROR_CLASS(context) SWFDEC_ABC_GET_BUILTIN_CLASS(context, SWFDEC_ABC_TYPE_UNINITIALIZED_ERROR)
+#define SWFDEC_ABC_GET_ARGUMENT_ERROR_CLASS(context) SWFDEC_ABC_GET_BUILTIN_CLASS(context, SWFDEC_ABC_TYPE_ARGUMENT_ERROR)
+#define SWFDEC_ABC_GET_STRING_CLASS(context) SWFDEC_ABC_GET_BUILTIN_CLASS(context, SWFDEC_ABC_TYPE_STRING)
+#define SWFDEC_ABC_GET_BOOLEAN_CLASS(context) SWFDEC_ABC_GET_BUILTIN_CLASS(context, SWFDEC_ABC_TYPE_BOOLEAN)
+#define SWFDEC_ABC_GET_NUMBER_CLASS(context) SWFDEC_ABC_GET_BUILTIN_CLASS(context, SWFDEC_ABC_TYPE_NUMBER)
+#define SWFDEC_ABC_GET_INT_CLASS(context) SWFDEC_ABC_GET_BUILTIN_CLASS(context, SWFDEC_ABC_TYPE_INT)
+#define SWFDEC_ABC_GET_UINT_CLASS(context) SWFDEC_ABC_GET_BUILTIN_CLASS(context, SWFDEC_ABC_TYPE_UINT)
+#define SWFDEC_ABC_GET_MATH_CLASS(context) SWFDEC_ABC_GET_BUILTIN_CLASS(context, SWFDEC_ABC_TYPE_MATH)
+#define SWFDEC_ABC_GET_ARRAY_CLASS(context) SWFDEC_ABC_GET_BUILTIN_CLASS(context, SWFDEC_ABC_TYPE_ARRAY)
+#define SWFDEC_ABC_GET_REGEXP_CLASS(context) SWFDEC_ABC_GET_BUILTIN_CLASS(context, SWFDEC_ABC_TYPE_REGEXP)
+#define SWFDEC_ABC_GET_DATE_CLASS(context) SWFDEC_ABC_GET_BUILTIN_CLASS(context, SWFDEC_ABC_TYPE_DATE)
+#define SWFDEC_ABC_GET_XML_CLASS(context) SWFDEC_ABC_GET_BUILTIN_CLASS(context, SWFDEC_ABC_TYPE_XML)
+#define SWFDEC_ABC_GET_XML_LIST_CLASS(context) SWFDEC_ABC_GET_BUILTIN_CLASS(context, SWFDEC_ABC_TYPE_XML_LIST)
+#define SWFDEC_ABC_GET_QNAME_CLASS(context) SWFDEC_ABC_GET_BUILTIN_CLASS(context, SWFDEC_ABC_TYPE_QNAME)
+
 typedef struct _SwfdecAbcGlobal SwfdecAbcGlobal;
 typedef struct _SwfdecAbcGlobalClass SwfdecAbcGlobalClass;
 
@@ -77,6 +111,7 @@ struct _SwfdecAbcGlobal {
   SwfdecAbcFile	*	file;		/* file that read the default objects */
   SwfdecAbcTraits *	void_traits;	/* the void traits */
   SwfdecAbcTraits *	null_traits;	/* the null traits */
+  SwfdecAbcClass *	classes[SWFDEC_ABC_N_TYPES];	/* NULL or resolved Class objects */
   GPtrArray *		traits;		/* list of all traits - FIXME: needs fast index by ns/name */
   GArray *		scripts;	/* list of all scripts - FIXME: needs fast index by ns/name */
 };
@@ -90,6 +125,9 @@ GType			swfdec_abc_global_get_type	(void);
 void			swfdec_abc_global_new		(SwfdecAsContext *		context);
 
 SwfdecAbcTraits *	swfdec_abc_global_get_builtin_traits 
+							(SwfdecAbcGlobal *		global,
+							 guint				id);
+SwfdecAbcClass *	swfdec_abc_global_get_builtin_class
 							(SwfdecAbcGlobal *		global,
 							 guint				id);
 void			swfdec_abc_global_add_traits	(SwfdecAbcGlobal *		global,

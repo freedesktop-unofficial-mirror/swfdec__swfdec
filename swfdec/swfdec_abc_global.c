@@ -21,11 +21,13 @@
 #include "config.h"
 #endif
 
+#include "swfdec_abc_global.h"
+
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
 
-#include "swfdec_abc_global.h"
+#include "swfdec_abc_class.h"
 #include "swfdec_abc_file.h"
 #include "swfdec_abc_function.h"
 #include "swfdec_abc_initialize.h"
@@ -62,8 +64,13 @@ static void
 swfdec_abc_global_mark (SwfdecGcObject *object)
 {
   SwfdecAbcGlobal *global = SWFDEC_ABC_GLOBAL (object);
+  guint i;
 
   g_ptr_array_foreach (global->traits, (GFunc) swfdec_gc_object_mark, NULL);
+  for (i = 0; i < SWFDEC_ABC_N_TYPES; i++) {
+    if (global->classes[i])
+      swfdec_gc_object_mark (global->classes[i]);
+  }
 
   SWFDEC_GC_OBJECT_CLASS (swfdec_abc_global_parent_class)->mark (object);
 }
@@ -237,8 +244,32 @@ swfdec_abc_global_get_builtin_traits (SwfdecAbcGlobal *global, guint id)
 {
   g_return_val_if_fail (SWFDEC_IS_ABC_GLOBAL (global), NULL);
   g_return_val_if_fail (global->file, NULL);
+  g_return_val_if_fail (id < SWFDEC_ABC_N_TYPES, NULL);
 
   return global->file->classes[id];
+}
+
+SwfdecAbcClass *
+swfdec_abc_global_get_builtin_class (SwfdecAbcGlobal *global, guint id)
+{
+  SwfdecAbcTraits *traits;
+  SwfdecAbcMultiname mn;
+  SwfdecAsValue val;
+
+  g_return_val_if_fail (SWFDEC_IS_ABC_GLOBAL (global), NULL);
+  g_return_val_if_fail (global->file, NULL);
+  g_return_val_if_fail (id < SWFDEC_ABC_N_TYPES, NULL);
+
+  traits = global->file->classes[id];
+
+  swfdec_abc_multiname_init (&mn, traits->name, traits->ns, NULL);
+  if (!swfdec_abc_object_get_variable (SWFDEC_ABC_OBJECT (global), &mn, &val))
+    g_assert_not_reached ();
+  g_assert (SWFDEC_AS_VALUE_IS_OBJECT (&val));
+  g_assert (SWFDEC_IS_ABC_CLASS (SWFDEC_AS_VALUE_GET_OBJECT (&val)));
+  global->classes[id] = SWFDEC_ABC_CLASS (SWFDEC_AS_VALUE_GET_OBJECT (&val));
+
+  return global->classes[id];
 }
 
 SwfdecAbcScript *

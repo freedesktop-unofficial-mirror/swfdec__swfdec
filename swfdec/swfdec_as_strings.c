@@ -533,5 +533,6 @@ const char swfdec_as_strings[] =
   SWFDEC_AS_CONSTANT_STRING ("global")
   SWFDEC_AS_CONSTANT_STRING ("void")
   SWFDEC_AS_CONSTANT_STRING ("Namespace")
+  SWFDEC_AS_CONSTANT_STRING ("Class")
   /* add more here */
 ;
