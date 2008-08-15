@@ -106,6 +106,9 @@ void	  		swfdec_abc_global_add_script	(SwfdecAbcGlobal *		global,
 							 const char *			name,
 							 SwfdecAbcScript *		script,
 							 gboolean			override);
+SwfdecAbcScript *	swfdec_abc_global_get_script_multi 
+							(SwfdecAbcGlobal *		global,
+							 const SwfdecAbcMultiname *	mn);
 
 gboolean		swfdec_abc_global_get_script_variable
 							(SwfdecAbcGlobal *		global,

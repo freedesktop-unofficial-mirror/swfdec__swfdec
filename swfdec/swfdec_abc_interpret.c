@@ -22,7 +22,13 @@
 #endif
 
 #include "swfdec_abc_interpret.h"
+#include "swfdec_abc_file.h"
 #include "swfdec_abc_function.h"
+#include "swfdec_abc_internal.h"
+#include "swfdec_abc_method.h"
+#include "swfdec_abc_scope_chain.h"
+#include "swfdec_abc_script.h"
+#include "swfdec_abc_traits.h"
 #include "swfdec_as_context.h"
 #include "swfdec_as_frame_internal.h"
 #include "swfdec_as_internal.h"
@@ -215,20 +221,192 @@ swfdec_abc_opcode_get_name (guint opcode)
   return "unknown";
 }
 
+/*** INTERPRETER ***/
+
+static gboolean
+swfdec_abc_interpret_resolve_multiname (SwfdecAsContext *context,
+    SwfdecAbcMultiname *target, const SwfdecAbcMultiname *source)
+{
+  SwfdecAsValue *val;
+
+  g_return_val_if_fail (SWFDEC_IS_AS_CONTEXT (context), FALSE);
+  g_return_val_if_fail (target != NULL, FALSE);
+  g_return_val_if_fail (source != NULL, FALSE);
+
+  /* extract name */
+  if (source->name == NULL) {
+    val = swfdec_as_stack_pop (context);
+    
+    if (SWFDEC_AS_VALUE_IS_OBJECT (val) &&
+	SWFDEC_IS_ABC_OBJECT (SWFDEC_AS_VALUE_GET_OBJECT (val)) &&
+	SWFDEC_ABC_OBJECT (SWFDEC_AS_VALUE_GET_OBJECT (val))->traits == SWFDEC_ABC_QNAME_TRAITS (context)) {
+      SWFDEC_FIXME ("implement Qname multiname resolution");
+    }
+    target->name = swfdec_as_value_to_string (context, val);
+  } else {
+    target->name = source->name;
+  }
+
+  /* extract namespace */
+  if (source->ns == NULL && source->nsset == NULL) {
+    val = swfdec_as_stack_pop (context);
+    if (SWFDEC_AS_VALUE_IS_NAMESPACE (val)) {
+      target->ns = SWFDEC_AS_VALUE_GET_NAMESPACE (val);
+      target->nsset = NULL;
+    } else {
+      swfdec_as_context_throw_abc (context, SWFDEC_ABC_ERROR_TYPE,
+	  "Illegal value for namespace.");
+      return FALSE;
+    }
+  } else {
+    target->ns = source->ns;
+    target->nsset = source->nsset;
+  }
+
+  return TRUE;
+}
+
+static gboolean
+swfdec_abc_interpreter_throw_null (SwfdecAsContext *context, const SwfdecAsValue *val)
+{
+  if (SWFDEC_AS_VALUE_IS_NULL (val)) {
+    swfdec_as_context_throw_abc (context, SWFDEC_ABC_ERROR_TYPE,
+	"A term is undefined and has no properties.");
+    return TRUE;
+  } else if (SWFDEC_AS_VALUE_IS_UNDEFINED (val)) {
+    swfdec_as_context_throw_abc (context, SWFDEC_ABC_ERROR_TYPE,
+	"Cannot access a property or method of a null object reference.");
+    return TRUE;
+  } else {
+    return FALSE;
+  }
+}
+
+static SwfdecAsObject *
+swfdec_as_value_to_prototype (SwfdecAsContext *context, const SwfdecAsValue *value)
+{
+  SWFDEC_FIXME ("implement");
+  return NULL;
+}
+
+static gboolean
+swfdec_as_value_has_property (SwfdecAsContext *context, const SwfdecAsValue *value, 
+    const SwfdecAbcMultiname *mn)
+{
+  SwfdecAbcTraits *traits;
+  SwfdecAsObject *o;
+  const char *name;
+
+  if (SWFDEC_AS_VALUE_IS_OBJECT (value)) {
+    o = SWFDEC_AS_VALUE_GET_OBJECT (value);
+  } else {
+    traits = swfdec_as_value_to_traits (context, value);
+    if (swfdec_abc_traits_find_trait_multi (traits, mn))
+      return TRUE;
+    o = swfdec_as_value_to_prototype (context, value);
+  }
+
+  if (swfdec_abc_multiname_contains_namespace (mn, context->public_ns))
+    name = mn->name;
+  else
+    name = NULL;
+  while (o) {
+    if (SWFDEC_IS_ABC_OBJECT (o)) {
+      traits = SWFDEC_ABC_OBJECT (o)->traits;
+      if (swfdec_abc_traits_find_trait_multi (traits, mn))
+	return TRUE;
+      if (name && !traits->sealed && swfdec_as_object_get_variable (o, name, NULL))
+	return TRUE;
+    } else {
+      if (name && swfdec_as_object_get_variable (o, name, NULL))
+	return TRUE;
+    }
+    o = o->prototype;
+  }
+  return FALSE;
+}
+
+static gboolean
+swfdec_abc_interpret_find_property (SwfdecAsContext *context, SwfdecAsValue *ret,
+    const SwfdecAbcMultiname *mn, const SwfdecAbcScopeChain *chain, 
+    const SwfdecAsValue *start, const SwfdecAsValue *end, const SwfdecAsValue *with)
+{
+  const SwfdecAsValue *cur;
+  SwfdecAbcScript *script;
+  guint i;
+
+  for (cur = end - 1; end >= with; end--) {
+    if (swfdec_as_value_has_property (context, cur, mn)) {
+      *ret = *cur;
+      return TRUE;
+    }
+  }
+  for (; cur > start; cur--) {
+    /* FIXME: only use verify-time properties */
+    if (swfdec_as_value_has_property (context, cur, mn)) {
+      *ret = *cur;
+      return TRUE;
+    }
+  }
+
+  if (chain && cur >= start) {
+    /* FIXME: I don't get this comment:
+     *
+     * consider "this" scope now, but constrain it to the declaringTraits of
+     * the current method (verifier ensures this is safe)
+     */
+  }
+
+  if (chain) {
+    for (i = chain->n_entries; i > 0; i--) {
+      cur = &chain->entries[i].value;
+      /* FIXME: only use verify-time properties for non-with values */
+      if (swfdec_as_value_has_property (context, cur, mn)) {
+	*ret = *cur;
+	return TRUE;
+      }
+    }
+  }
+
+  /* FIXME: return FALSE for attributes here */
+  
+  script = swfdec_abc_global_get_script_multi (SWFDEC_ABC_GLOBAL (context->global), mn);
+  if (script) {
+    SWFDEC_AS_VALUE_SET_OBJECT (ret,
+	SWFDEC_AS_OBJECT (swfdec_abc_script_get_global (script)));
+    return TRUE;
+  }
+
+  if (swfdec_abc_multiname_contains_namespace (mn, context->public_ns) && 
+      swfdec_as_object_get_variable (context->global, mn->name, NULL)) {
+    SWFDEC_AS_VALUE_SET_OBJECT (ret, context->global);
+    return TRUE;
+  }
+
+  return FALSE;
+}
+
 void
 swfdec_abc_interpret (SwfdecAbcFunction *fun)
 {
   SwfdecAsContext *context;
-  SwfdecAsValue *locals, *scope;
+  SwfdecAsValue *locals, *scope_start, *scope_end, *scope_with;
+  SwfdecAbcScopeChain *outer_scope;
   SwfdecAsFrame *frame;
   SwfdecBits bits;
   guint i, opcode;
+  /* used in interpretation switch */
+  SwfdecAbcMultiname mn;
+  SwfdecAbcFile *pool;
+  SwfdecAsValue *val;
 
   g_return_if_fail (SWFDEC_IS_ABC_FUNCTION (fun));
   g_return_if_fail (fun->verified);
 
   context = swfdec_gc_object_get_context (fun);
   frame = context->frame;
+  pool = fun->bound_traits->pool;
+  outer_scope = SWFDEC_ABC_METHOD (frame->function)->scope;
 
   if (!swfdec_as_context_check_continue (context))
     return;
@@ -254,17 +432,55 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun)
   }
 
   /* init scope */
-  scope = context->cur;
+  scope_start = scope_end = context->cur;
   for (i = 0; i < fun->n_scope; i++) {
     SWFDEC_AS_VALUE_SET_UNDEFINED (swfdec_as_stack_push (context));
   }
+  /* We set scope_with to be greater than any scope if not in use.
+   * That way we can do for loops over all scope values */
+  scope_with = context->cur;
 
   /* init pc */
   swfdec_bits_init (&bits, fun->code);
-  g_print ("%u bytes of code\n", fun->code->length);
   while (TRUE) {
     opcode = swfdec_bits_get_u8 (&bits);
+    /* NB: We use the magic of continue statement in switch clauses here:
+     * Since switch doesn't effect continue, it applies to the surrounding loop.
+     * If you continue, the next opcode will immediately be executed. If you
+     * break, additional checks like exception handling will happen below the
+     * giant switch statement.
+     */
     switch (opcode) {
+      case SWFDEC_ABC_OPCODE_PUSH_SCOPE:
+	val = swfdec_as_stack_pop (context);
+	if (swfdec_abc_interpreter_throw_null (context, val))
+	  break;
+	*scope_end = *val;
+	scope_end++;
+	continue;
+      case SWFDEC_ABC_OPCODE_FIND_PROP_STRICT:
+	i = swfdec_bits_get_vu32 (&bits);
+	if (!swfdec_abc_interpret_resolve_multiname (context, &mn, &pool->multinames[i]))
+	  break;
+	if (!swfdec_abc_interpret_find_property (context, swfdec_as_stack_push (context),
+	      &mn, outer_scope, scope_start, scope_end, scope_with)) {
+	  swfdec_as_context_throw_abc (context, SWFDEC_ABC_ERROR_REFERENCE,
+	      "Variable %s is not defined.", mn.name);
+	  break;
+	}
+	continue;
+      case SWFDEC_ABC_OPCODE_GET_LOCAL_0:
+	*swfdec_as_stack_push (context) = locals[0];
+	continue;
+      case SWFDEC_ABC_OPCODE_GET_LOCAL_1:
+	*swfdec_as_stack_push (context) = locals[1];
+	continue;
+      case SWFDEC_ABC_OPCODE_GET_LOCAL_2:
+	*swfdec_as_stack_push (context) = locals[2];
+	continue;
+      case SWFDEC_ABC_OPCODE_GET_LOCAL_3:
+	*swfdec_as_stack_push (context) = locals[3];
+	continue;
       case SWFDEC_ABC_OPCODE_BREAKPOINT:
       case SWFDEC_ABC_OPCODE_NOP:
       case SWFDEC_ABC_OPCODE_THROW:
@@ -309,7 +525,6 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun)
       case SWFDEC_ABC_OPCODE_PUSH_INT:
       case SWFDEC_ABC_OPCODE_PUSH_UINT:
       case SWFDEC_ABC_OPCODE_PUSH_DOUBLE:
-      case SWFDEC_ABC_OPCODE_PUSH_SCOPE:
       case SWFDEC_ABC_OPCODE_PUSH_NAMESPACE:
       case SWFDEC_ABC_OPCODE_HAS_NEXT2:
       case SWFDEC_ABC_OPCODE_NEW_FUNCTION:
@@ -334,7 +549,6 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun)
       case SWFDEC_ABC_OPCODE_NEW_CLASS:
       case SWFDEC_ABC_OPCODE_GET_DESCENDANTS:
       case SWFDEC_ABC_OPCODE_NEW_CATCH:
-      case SWFDEC_ABC_OPCODE_FIND_PROP_STRICT:
       case SWFDEC_ABC_OPCODE_FIND_PROPERTY:
       case SWFDEC_ABC_OPCODE_FIND_DEF:
       case SWFDEC_ABC_OPCODE_GET_LEX:
@@ -408,10 +622,6 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun)
       case SWFDEC_ABC_OPCODE_ADD_I:
       case SWFDEC_ABC_OPCODE_SUBTRACT_I:
       case SWFDEC_ABC_OPCODE_MULTIPLY_I:
-      case SWFDEC_ABC_OPCODE_GET_LOCAL_0:
-      case SWFDEC_ABC_OPCODE_GET_LOCAL_1:
-      case SWFDEC_ABC_OPCODE_GET_LOCAL_2:
-      case SWFDEC_ABC_OPCODE_GET_LOCAL_3:
       case SWFDEC_ABC_OPCODE_SET_LOCAL_0:
       case SWFDEC_ABC_OPCODE_SET_LOCAL_1:
       case SWFDEC_ABC_OPCODE_SET_LOCAL_2:

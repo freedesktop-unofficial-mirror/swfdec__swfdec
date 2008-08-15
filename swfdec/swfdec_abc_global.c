@@ -241,6 +241,28 @@ swfdec_abc_global_get_builtin_traits (SwfdecAbcGlobal *global, guint id)
   return global->file->classes[id];
 }
 
+SwfdecAbcScript *
+swfdec_abc_global_get_script_multi (SwfdecAbcGlobal *global,
+    const SwfdecAbcMultiname *mn)
+{
+  SwfdecAbcGlobalScript *script, *found;
+  guint i;
+
+  found = NULL;
+  for (i = 0; i < swfdec_abc_multiname_get_n_namespaces (mn); i++) {
+    script = swfdec_abc_global_find_script (global,
+	swfdec_abc_multiname_get_namespace (mn, i), mn->name);
+    if (script == NULL)
+      continue;
+    if (found == NULL) {
+      found = script;
+    } else {
+      SWFDEC_FIXME ("handle ambiguity error somehow here");
+    }
+  }
+  return found ? found->script : NULL;
+}
+
 gboolean
 swfdec_abc_global_get_script_variable (SwfdecAbcGlobal *global,
     const SwfdecAbcMultiname *mn, SwfdecAsValue *value)

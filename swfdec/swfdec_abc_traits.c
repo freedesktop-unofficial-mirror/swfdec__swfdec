@@ -197,45 +197,54 @@ swfdec_abc_traits_is_traits (SwfdecAbcTraits *traits, SwfdecAbcTraits *parent)
   return FALSE;
 }
 
-gboolean
-swfdec_as_value_is_traits (const SwfdecAsValue *value, SwfdecAbcTraits *traits)
+SwfdecAbcTraits *
+swfdec_as_value_to_traits (SwfdecAsContext *context, const SwfdecAsValue *value)
 {
-  SwfdecAsContext *context;
-
-  g_return_val_if_fail (value != NULL, FALSE);
-  g_return_val_if_fail (SWFDEC_IS_ABC_TRAITS (traits), FALSE);
-
-  context = swfdec_gc_object_get_context (traits);
+  g_return_val_if_fail (SWFDEC_IS_AS_CONTEXT (context), NULL);
+  g_return_val_if_fail (value != NULL, NULL);
 
   switch (value->type) {
     case SWFDEC_AS_TYPE_UNDEFINED:
-      return traits == SWFDEC_ABC_VOID_TRAITS (context);
+      return SWFDEC_ABC_VOID_TRAITS (context);
     case SWFDEC_AS_TYPE_NULL:
-      return traits == SWFDEC_ABC_NULL_TRAITS (context);
+      return SWFDEC_ABC_NULL_TRAITS (context);
     case SWFDEC_AS_TYPE_BOOLEAN:
-      return traits == SWFDEC_ABC_BOOLEAN_TRAITS (context);
+      return SWFDEC_ABC_BOOLEAN_TRAITS (context);
     case SWFDEC_AS_TYPE_NUMBER:
       /* FIXME: support uint and int traits */
-      return traits == SWFDEC_ABC_NUMBER_TRAITS (context);
+      return SWFDEC_ABC_NUMBER_TRAITS (context);
     case SWFDEC_AS_TYPE_STRING:
-      return traits == SWFDEC_ABC_STRING_TRAITS (context);
+      return SWFDEC_ABC_STRING_TRAITS (context);
     case SWFDEC_AS_TYPE_NAMESPACE:
-      return traits == SWFDEC_ABC_NAMESPACE_TRAITS (context);
+      return SWFDEC_ABC_NAMESPACE_TRAITS (context);
     case SWFDEC_AS_TYPE_OBJECT:
       {
 	SwfdecAsObject *o = SWFDEC_AS_VALUE_GET_OBJECT (value);
 	if (!SWFDEC_IS_ABC_OBJECT (o)) {
 	  SWFDEC_ERROR ("wtf? is_traits on a non-abc object?");
-	  return FALSE;
+	  return SWFDEC_ABC_OBJECT_TRAITS (context);
 	}
-	return swfdec_abc_traits_is_traits (SWFDEC_ABC_OBJECT (o)->traits,
-	    traits);
+	return SWFDEC_ABC_OBJECT (o)->traits;
       }
     case SWFDEC_AS_TYPE_INT:
     default:
       g_assert_not_reached ();
-      return FALSE;
+      return NULL;
   }
+}
+
+gboolean
+swfdec_as_value_is_traits (const SwfdecAsValue *value, SwfdecAbcTraits *traits)
+{
+  SwfdecAsContext *context;
+  SwfdecAbcTraits *vtraits;
+
+  g_return_val_if_fail (value != NULL, FALSE);
+  g_return_val_if_fail (SWFDEC_IS_ABC_TRAITS (traits), FALSE);
+
+  context = swfdec_gc_object_get_context (traits);
+  vtraits = swfdec_as_value_to_traits (context, value);
+  return swfdec_abc_traits_is_traits (vtraits, traits);
 }
 
 gboolean
