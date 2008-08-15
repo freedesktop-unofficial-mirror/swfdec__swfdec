@@ -136,7 +136,7 @@ swfdec_abc_file_init (SwfdecAbcFile *date)
 }G_STMT_END;
 #define THROW(file, ...) G_STMT_START{ \
   swfdec_as_context_throw_abc (swfdec_gc_object_get_context (file), \
-      SWFDEC_ABC_ERROR_VERIFY, __VA_ARGS__); \
+      SWFDEC_ABC_TYPE_VERIFY_ERROR, __VA_ARGS__); \
   return FALSE; \
 }G_STMT_END
 
@@ -1050,12 +1050,12 @@ swfdec_abc_file_new_trusted (SwfdecAsContext *context, SwfdecBits *bits,
   SWFDEC_LOG ("  minor version: %u", minor);
   if (major == 46 && minor == 16) {
     if (!swfdec_abc_file_parse (file, bits, natives, n_natives)) {
-      swfdec_as_context_throw_abc (context, SWFDEC_ABC_ERROR_VERIFY,
+      swfdec_as_context_throw_abc (context, SWFDEC_ABC_TYPE_VERIFY_ERROR,
 	  "The ABC data is corrupt, attempt to read out of bounds.");
       return NULL;
     }
   } else {
-    swfdec_as_context_throw_abc (context, SWFDEC_ABC_ERROR_VERIFY,
+    swfdec_as_context_throw_abc (context, SWFDEC_ABC_TYPE_VERIFY_ERROR,
 	"Not an ABC file.  major_version=%u minor_version=%u.", major, minor);
     return NULL;
   }

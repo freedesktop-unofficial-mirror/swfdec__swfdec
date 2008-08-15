@@ -34,27 +34,13 @@ G_BEGIN_DECLS
 /* This header contains all private symbols of Abc handling that should not be 
  * exported in the API */
 
-typedef enum {
-  SWFDEC_ABC_ERROR_ERROR,
-  SWFDEC_ABC_ERROR_EVAL,
-  SWFDEC_ABC_ERROR_RANGE,
-  SWFDEC_ABC_ERROR_REFERENCE,
-  SWFDEC_ABC_ERROR_SECURITY,
-  SWFDEC_ABC_ERROR_SYNTAX,
-  SWFDEC_ABC_ERROR_TYPE,
-  SWFDEC_ABC_ERROR_URI,
-  SWFDEC_ABC_ERROR_VERIFY,
-  SWFDEC_ABC_ERROR_UNINITIALIZED,
-  SWFDEC_ABC_ERROR_ARGUMENT
-} SwfdecAbcErrorType;
-
 /* swfdec_as_context.c */
 void			swfdec_as_context_throw_abc		(SwfdecAsContext *	context,
-								 SwfdecAbcErrorType	type,
+								 guint			type,
 								 const char *		format,
 								 ...) G_GNUC_PRINTF (3, 4);
 void			swfdec_as_context_throw_abcv		(SwfdecAsContext *	context,
-								 SwfdecAbcErrorType	type,
+								 guint			type,
 								 const char *		format,
 								 va_list		args);
 

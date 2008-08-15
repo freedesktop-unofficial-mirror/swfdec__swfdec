@@ -551,7 +551,7 @@ swfdec_sprite_movie_perform_one_action (SwfdecSpriteMovie *movie, guint tag, Swf
 	    swfdec_resource_add_abc_class (mov->resource, id, 
 		SWFDEC_ABC_CLASS (SWFDEC_AS_VALUE_GET_OBJECT (&val)));
 	  } else {
-	    swfdec_as_context_throw_abc (context, SWFDEC_ABC_ERROR_REFERENCE,
+	    swfdec_as_context_throw_abc (context, SWFDEC_ABC_TYPE_REFERENCE_ERROR,
 		"Class %s could not be found.", s);
 	  }
 	  swfdec_sandbox_unuse (sandbox);

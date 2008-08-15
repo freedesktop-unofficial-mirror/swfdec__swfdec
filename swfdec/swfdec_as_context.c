@@ -1090,12 +1090,13 @@ out:
 /*** ABC ***/
 
 void
-swfdec_as_context_throw_abc (SwfdecAsContext *context, SwfdecAbcErrorType type,
+swfdec_as_context_throw_abc (SwfdecAsContext *context, guint type,
   const char *format, ...)
 {
   va_list args;
 
   g_return_if_fail (SWFDEC_IS_AS_CONTEXT (context));
+  g_return_if_fail (type < SWFDEC_ABC_N_TYPES);
   g_return_if_fail (format != NULL);
 
   va_start (args, format);
@@ -1104,12 +1105,13 @@ swfdec_as_context_throw_abc (SwfdecAsContext *context, SwfdecAbcErrorType type,
 }
 
 void
-swfdec_as_context_throw_abcv (SwfdecAsContext *context, SwfdecAbcErrorType type,
+swfdec_as_context_throw_abcv (SwfdecAsContext *context, guint type,
     const char *format, va_list	args)
 {
   char *s;
 
   g_return_if_fail (SWFDEC_IS_AS_CONTEXT (context));
+  g_return_if_fail (type < SWFDEC_ABC_N_TYPES);
   g_return_if_fail (format != NULL);
 
   s = g_strdup_vprintf (format, args);

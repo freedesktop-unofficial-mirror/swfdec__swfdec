@@ -259,7 +259,7 @@ swfdec_abc_interpret_resolve_multiname (SwfdecAsContext *context,
       target->ns = SWFDEC_AS_VALUE_GET_NAMESPACE (val);
       target->nsset = NULL;
     } else {
-      swfdec_as_context_throw_abc (context, SWFDEC_ABC_ERROR_TYPE,
+      swfdec_as_context_throw_abc (context, SWFDEC_ABC_TYPE_TYPE_ERROR,
 	  "Illegal value for namespace.");
       return FALSE;
     }
@@ -275,11 +275,11 @@ static gboolean
 swfdec_abc_interpreter_throw_null (SwfdecAsContext *context, const SwfdecAsValue *val)
 {
   if (SWFDEC_AS_VALUE_IS_NULL (val)) {
-    swfdec_as_context_throw_abc (context, SWFDEC_ABC_ERROR_TYPE,
+    swfdec_as_context_throw_abc (context, SWFDEC_ABC_TYPE_TYPE_ERROR,
 	"A term is undefined and has no properties.");
     return TRUE;
   } else if (SWFDEC_AS_VALUE_IS_UNDEFINED (val)) {
-    swfdec_as_context_throw_abc (context, SWFDEC_ABC_ERROR_TYPE,
+    swfdec_as_context_throw_abc (context, SWFDEC_ABC_TYPE_TYPE_ERROR,
 	"Cannot access a property or method of a null object reference.");
     return TRUE;
   } else {
@@ -411,13 +411,13 @@ swfdec_abc_interpret_new_class (SwfdecAbcTraits *traits, SwfdecAbcClass *base,
 
   if (base == NULL) {
     if (itraits->base) {
-      swfdec_as_context_throw_abc (context, SWFDEC_ABC_ERROR_TYPE,
+      swfdec_as_context_throw_abc (context, SWFDEC_ABC_TYPE_TYPE_ERROR,
 	  "Cannot access a property or method of a null object reference.");
       return NULL;
     }
   } else {
     if (itraits->base != SWFDEC_ABC_OBJECT (base)->traits->instance_traits) {
-      swfdec_as_context_throw_abc (context, SWFDEC_ABC_ERROR_VERIFY,
+      swfdec_as_context_throw_abc (context, SWFDEC_ABC_TYPE_VERIFY_ERROR,
 	  "The OP_newclass opcode was used with the incorrect base class.");
     }
   }
@@ -525,7 +525,7 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun)
 	  break;
 	if (!swfdec_abc_interpret_find_property (context, swfdec_as_stack_push (context),
 	      &mn, outer_scope, scope_start, scope_end, scope_with)) {
-	  swfdec_as_context_throw_abc (context, SWFDEC_ABC_ERROR_REFERENCE,
+	  swfdec_as_context_throw_abc (context, SWFDEC_ABC_TYPE_REFERENCE_ERROR,
 	      "Variable %s is not defined.", mn.name);
 	  break;
 	}
@@ -548,7 +548,7 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun)
 	  i = swfdec_bits_get_vu32 (&bits);
 	  val = swfdec_as_stack_peek (context, 1);
 	  if (!swfdec_abc_traits_coerce (SWFDEC_ABC_CLASS_TRAITS (context), val)) {
-	    swfdec_as_context_throw_abc (context, SWFDEC_ABC_ERROR_REFERENCE,
+	    swfdec_as_context_throw_abc (context, SWFDEC_ABC_TYPE_REFERENCE_ERROR,
 		"Type Coercion failed: cannot convert %s to %s.", 
 		swfdec_as_value_get_type_name (val), "Class");
 	    break;

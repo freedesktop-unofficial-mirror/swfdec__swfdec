@@ -155,7 +155,7 @@ swfdec_abc_object_get_variable (SwfdecAbcObject *object, const SwfdecAbcMultinam
 	!swfdec_abc_multiname_contains_namespace (mn,
 	  swfdec_gc_object_get_context (object)->public_ns)) {
       swfdec_as_context_throw_abc (swfdec_gc_object_get_context (object),
-	  SWFDEC_ABC_ERROR_REFERENCE, "Property %s not found on %s and there is no default value.", 
+	  SWFDEC_ABC_TYPE_REFERENCE_ERROR, "Property %s not found on %s and there is no default value.", 
 	  mn->name, object->traits->name);
       SWFDEC_AS_VALUE_SET_UNDEFINED (value);
       return FALSE;
@@ -164,7 +164,7 @@ swfdec_abc_object_get_variable (SwfdecAbcObject *object, const SwfdecAbcMultinam
 	mn->name, value);
   } else if (trait == SWFDEC_ABC_TRAIT_AMBIGUOUS) {
     swfdec_as_context_throw_abc (swfdec_gc_object_get_context (object),
-	SWFDEC_ABC_ERROR_REFERENCE, "%s is ambiguous; Found more than one matching binding.", mn->name);
+	SWFDEC_ABC_TYPE_REFERENCE_ERROR, "%s is ambiguous; Found more than one matching binding.", mn->name);
     SWFDEC_AS_VALUE_SET_UNDEFINED (value);
     return FALSE;
   } else {
@@ -185,7 +185,7 @@ swfdec_abc_object_get_variable (SwfdecAbcObject *object, const SwfdecAbcMultinam
 	break;
       case SWFDEC_ABC_TRAIT_SET:
 	swfdec_as_context_throw_abc (swfdec_gc_object_get_context (object),
-	    SWFDEC_ABC_ERROR_REFERENCE, "Illegal read of write-only property %s on %s.", mn->name, object->traits->name);
+	    SWFDEC_ABC_TYPE_REFERENCE_ERROR, "Illegal read of write-only property %s on %s.", mn->name, object->traits->name);
 	SWFDEC_AS_VALUE_SET_UNDEFINED (value);
 	return FALSE;
       case SWFDEC_ABC_TRAIT_NONE:
