@@ -303,7 +303,7 @@ swfdec_abc_file_parse_constants (SwfdecAbcFile *file, SwfdecBits *bits)
 	READ_U30 (ns, bits);
 	if (ns == 0 || ns >= file->n_namespaces)
 	  return FALSE;
-	swfdec_abc_ns_set_add (file->nssets[i], &file->namespaces[ns]);
+	swfdec_abc_ns_set_add (file->nssets[i], file->namespaces[ns]);
       }
       SWFDEC_LOG ("  ns set %u: %u namespaces", i, len);
     }
