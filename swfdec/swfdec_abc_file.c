@@ -882,9 +882,12 @@ swfdec_abc_file_parse_classes (SwfdecAbcFile *file, SwfdecBits *bits)
       traits->pool = file;
 
       traits->ns = file->instances[i]->ns;
-      traits->name = file->instances[i]->name;
+      traits->name = swfdec_as_context_give_string (context,
+	  g_strconcat (file->instances[i]->name, "$", NULL));
       traits->final = TRUE;
       traits->sealed = FALSE;
+      if (SWFDEC_ABC_GLOBAL (context->global)->file)
+	traits->base = SWFDEC_ABC_CLASS_TRAITS (context);
 
       if (!swfdec_abc_file_parse_method (file, bits, traits, NULL))
 	return FALSE;
