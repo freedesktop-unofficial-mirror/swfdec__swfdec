@@ -263,7 +263,9 @@ swfdec_abc_global_get_builtin_class (SwfdecAbcGlobal *global, guint id)
   traits = global->file->classes[id];
 
   swfdec_abc_multiname_init (&mn, traits->name, traits->ns, NULL);
-  if (!swfdec_abc_object_get_variable (SWFDEC_ABC_OBJECT (global), &mn, &val))
+  SWFDEC_AS_VALUE_SET_OBJECT (&val, SWFDEC_AS_OBJECT (global));
+  if (!swfdec_abc_object_get_variable (swfdec_gc_object_get_context (global),
+	&val, &mn, &val))
     g_assert_not_reached ();
   g_assert (SWFDEC_AS_VALUE_IS_OBJECT (&val));
   g_assert (SWFDEC_IS_ABC_CLASS (SWFDEC_AS_VALUE_GET_OBJECT (&val)));

@@ -140,31 +140,33 @@ swfdec_abc_object_new (SwfdecAbcTraits *traits)
 }
 
 gboolean
-swfdec_abc_object_get_variable (SwfdecAbcObject *object, const SwfdecAbcMultiname *mn,
-    SwfdecAsValue *value)
+swfdec_abc_object_get_variable (SwfdecAsContext *context, const SwfdecAsValue *object,
+    const SwfdecAbcMultiname *mn, SwfdecAsValue *value)
 {
+  SwfdecAbcTraits *traits;
   const SwfdecAbcTrait *trait;
 
-  g_return_val_if_fail (SWFDEC_IS_ABC_OBJECT (object), FALSE);
+  g_return_val_if_fail (SWFDEC_IS_AS_CONTEXT (context), FALSE);
+  g_return_val_if_fail (object != NULL, FALSE);
   g_return_val_if_fail (mn != NULL, FALSE);
   g_return_val_if_fail (value != NULL, FALSE);
 
-  trait = swfdec_abc_traits_find_trait_multi (object->traits, mn);
+  traits = swfdec_as_value_to_traits (context, object);
+  trait = swfdec_abc_traits_find_trait_multi (traits, mn);
   if (!trait) {
-    if (object->traits->sealed ||
-	!swfdec_abc_multiname_contains_namespace (mn,
-	  swfdec_gc_object_get_context (object)->public_ns)) {
-      swfdec_as_context_throw_abc (swfdec_gc_object_get_context (object),
-	  SWFDEC_ABC_TYPE_REFERENCE_ERROR, "Property %s not found on %s and there is no default value.", 
-	  mn->name, object->traits->name);
+    if (!SWFDEC_AS_VALUE_IS_OBJECT (object) || traits->sealed ||
+	!swfdec_abc_multiname_contains_namespace (mn, context->public_ns)) {
+      swfdec_as_context_throw_abc (context, SWFDEC_ABC_TYPE_REFERENCE_ERROR, 
+	  "Property %s not found on %s and there is no default value.", 
+	  mn->name, traits->name);
       SWFDEC_AS_VALUE_SET_UNDEFINED (value);
       return FALSE;
     }
-    return swfdec_as_object_get_variable (SWFDEC_AS_OBJECT (object),
+    return swfdec_as_object_get_variable (SWFDEC_AS_VALUE_GET_OBJECT (object),
 	mn->name, value);
   } else if (trait == SWFDEC_ABC_TRAIT_AMBIGUOUS) {
-    swfdec_as_context_throw_abc (swfdec_gc_object_get_context (object),
-	SWFDEC_ABC_TYPE_REFERENCE_ERROR, "%s is ambiguous; Found more than one matching binding.", mn->name);
+    swfdec_as_context_throw_abc (context, SWFDEC_ABC_TYPE_REFERENCE_ERROR, 
+	"%s is ambiguous; Found more than one matching binding.", mn->name);
     SWFDEC_AS_VALUE_SET_UNDEFINED (value);
     return FALSE;
   } else {
@@ -172,9 +174,10 @@ swfdec_abc_object_get_variable (SwfdecAbcObject *object, const SwfdecAbcMultinam
       case SWFDEC_ABC_TRAIT_SLOT:
       case SWFDEC_ABC_TRAIT_CONST:
 	{
+	  SwfdecAbcObject *o = SWFDEC_ABC_OBJECT (SWFDEC_AS_VALUE_GET_OBJECT (object));
 	  guint slot = SWFDEC_ABC_BINDING_GET_ID (trait->type);
-	  g_assert (slot < object->traits->n_slots);
-	  *value = object->slots[slot];
+	  g_assert (slot < o->traits->n_slots);
+	  *value = o->slots[slot];
 	}
 	break;
       case SWFDEC_ABC_TRAIT_METHOD:
@@ -184,8 +187,8 @@ swfdec_abc_object_get_variable (SwfdecAbcObject *object, const SwfdecAbcMultinam
 	SWFDEC_AS_VALUE_SET_UNDEFINED (value);
 	break;
       case SWFDEC_ABC_TRAIT_SET:
-	swfdec_as_context_throw_abc (swfdec_gc_object_get_context (object),
-	    SWFDEC_ABC_TYPE_REFERENCE_ERROR, "Illegal read of write-only property %s on %s.", mn->name, object->traits->name);
+	swfdec_as_context_throw_abc (context, SWFDEC_ABC_TYPE_REFERENCE_ERROR, 
+	    "Illegal read of write-only property %s on %s.", mn->name, traits->name);
 	SWFDEC_AS_VALUE_SET_UNDEFINED (value);
 	return FALSE;
       case SWFDEC_ABC_TRAIT_NONE:
@@ -195,5 +198,86 @@ swfdec_abc_object_get_variable (SwfdecAbcObject *object, const SwfdecAbcMultinam
     }
   }
   return TRUE;
+}
+
+static gboolean
+swfdec_abc_object_set_variable_full (SwfdecAsContext *context, const SwfdecAsValue *object,
+    gboolean init, const SwfdecAbcMultiname *mn, const SwfdecAsValue *value)
+{
+  SwfdecAbcTraits *traits;
+  const SwfdecAbcTrait *trait;
+
+  traits = swfdec_as_value_to_traits (context, object);
+  trait = swfdec_abc_traits_find_trait_multi (traits, mn);
+  if (trait == NULL) {
+    if (!SWFDEC_AS_VALUE_IS_OBJECT (object) || traits->sealed ||
+	!swfdec_abc_multiname_contains_namespace (mn, context->public_ns)) {
+      swfdec_as_context_throw_abc (context, SWFDEC_ABC_TYPE_REFERENCE_ERROR,
+	  "Cannot create property %s on %s.", mn->name, traits->name);
+      return FALSE;
+    }
+    swfdec_as_object_set_variable (SWFDEC_AS_VALUE_GET_OBJECT (object),
+	mn->name, value);
+  } else if (trait == SWFDEC_ABC_TRAIT_AMBIGUOUS) {
+    swfdec_as_context_throw_abc (context, SWFDEC_ABC_TYPE_REFERENCE_ERROR,
+	"%s is ambiguous; Found more than one matching binding.", mn->name);
+    return FALSE;
+  } else {
+    SwfdecAbcTraitType type = SWFDEC_ABC_BINDING_GET_TYPE (trait->type);
+    if (init && type == SWFDEC_ABC_TRAIT_CONST)
+      type = SWFDEC_ABC_TRAIT_SLOT;
+    switch (type) {
+      case SWFDEC_ABC_TRAIT_SLOT:
+	{
+	  SwfdecAbcObject *o = SWFDEC_ABC_OBJECT (SWFDEC_AS_VALUE_GET_OBJECT (object));
+	  SwfdecAsValue tmp = *value;
+	  guint slot = SWFDEC_ABC_BINDING_GET_ID (trait->type);
+	  //if (!swfdec_abc_traits_coerce (trait->traits, &tmp))
+	  //  return FALSE;
+	  g_assert (slot < o->traits->n_slots);
+	  o->slots[slot] = tmp;
+	}
+	break;
+      case SWFDEC_ABC_TRAIT_CONST:
+      case SWFDEC_ABC_TRAIT_GET:
+	swfdec_as_context_throw_abc (context, SWFDEC_ABC_TYPE_REFERENCE_ERROR,
+	    "Illegal write to read-only property %s on %s.", mn->name, traits->name);
+	return FALSE;
+      case SWFDEC_ABC_TRAIT_METHOD:
+      case SWFDEC_ABC_TRAIT_SET:
+      case SWFDEC_ABC_TRAIT_GETSET:
+	SWFDEC_FIXME ("implement vtables");
+	break;
+      case SWFDEC_ABC_TRAIT_NONE:
+      case SWFDEC_ABC_TRAIT_ITRAMP:
+      default:
+	g_assert_not_reached ();
+    }
+  }
+  return TRUE;
+}
+
+gboolean
+swfdec_abc_object_set_variable (SwfdecAsContext *context, const SwfdecAsValue *object,
+    const SwfdecAbcMultiname *mn, const SwfdecAsValue *value)
+{
+  g_return_val_if_fail (SWFDEC_IS_AS_CONTEXT (context), FALSE);
+  g_return_val_if_fail (object != NULL, FALSE);
+  g_return_val_if_fail (mn != NULL, FALSE);
+  g_return_val_if_fail (value != NULL, FALSE);
+
+  return swfdec_abc_object_set_variable_full (context, object, FALSE, mn, value);
+}
+
+gboolean
+swfdec_abc_object_init_variable (SwfdecAsContext *context, const SwfdecAsValue *object,
+    const SwfdecAbcMultiname *mn, const SwfdecAsValue *value)
+{
+  g_return_val_if_fail (SWFDEC_IS_AS_CONTEXT (context), FALSE);
+  g_return_val_if_fail (object != NULL, FALSE);
+  g_return_val_if_fail (mn != NULL, FALSE);
+  g_return_val_if_fail (value != NULL, FALSE);
+
+  return swfdec_abc_object_set_variable_full (context, object, TRUE, mn, value);
 }
 

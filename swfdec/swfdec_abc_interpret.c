@@ -518,6 +518,7 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun)
      * break, additional checks like exception handling will happen below the
      * giant switch statement.
      */
+    /* order of opcodes is alphabetical */
     switch (opcode) {
       case SWFDEC_ABC_OPCODE_FIND_PROP_STRICT:
       case SWFDEC_ABC_OPCODE_FIND_PROPERTY:
@@ -546,6 +547,26 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun)
 	continue;
       case SWFDEC_ABC_OPCODE_GET_LOCAL_3:
 	*swfdec_as_stack_push (context) = locals[3];
+	continue;
+      case SWFDEC_ABC_OPCODE_INIT_PROPERTY:
+	{
+	  SwfdecAbcTraits *traits;
+	  SwfdecAsValue *object;
+	  i = swfdec_bits_get_vu32 (&bits);
+	  val = swfdec_as_stack_pop (context);
+	  if (!swfdec_abc_interpret_resolve_multiname (context, &mn, &pool->multinames[i]))
+	    break;
+	  object = swfdec_as_stack_pop (context);
+	  traits = swfdec_as_value_to_traits (context, object);
+	  /* FIXME: do we capture init vs set right? */
+	  if (fun == traits->construct) {
+	    if (!swfdec_abc_object_init_variable (context, object, &mn, val))
+	      break;
+	  } else {
+	    if (!swfdec_abc_object_set_variable (context, object, &mn, val))
+	      break;
+	  }
+	}
 	continue;
       case SWFDEC_ABC_OPCODE_NEW_CLASS:
 	{
@@ -664,7 +685,6 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun)
       case SWFDEC_ABC_OPCODE_GET_GLOBAL_SCOPE:
       case SWFDEC_ABC_OPCODE_GET_SCOPE_OBJECT:
       case SWFDEC_ABC_OPCODE_GET_PROPERTY:
-      case SWFDEC_ABC_OPCODE_INIT_PROPERTY:
       case SWFDEC_ABC_OPCODE_DELETE_PROPERTY:
       case SWFDEC_ABC_OPCODE_GET_SLOT:
       case SWFDEC_ABC_OPCODE_SET_SLOT:

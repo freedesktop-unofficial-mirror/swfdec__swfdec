@@ -50,9 +50,18 @@ GType			swfdec_abc_object_get_type	(void);
 
 SwfdecAbcObject *	swfdec_abc_object_new		(SwfdecAbcTraits *		traits);
 
-gboolean		swfdec_abc_object_get_variable	(SwfdecAbcObject *		object,
+gboolean		swfdec_abc_object_get_variable	(SwfdecAsContext *		context,
+							 const SwfdecAsValue *		object,
 							 const SwfdecAbcMultiname *	mn,
 							 SwfdecAsValue *		value);
+gboolean		swfdec_abc_object_set_variable	(SwfdecAsContext *		context,
+							 const SwfdecAsValue *		object,
+							 const SwfdecAbcMultiname *	mn,
+							 const SwfdecAsValue *		value);
+gboolean		swfdec_abc_object_init_variable	(SwfdecAsContext *		context,
+							 const SwfdecAsValue *		object,
+							 const SwfdecAbcMultiname *	mn,
+							 const SwfdecAsValue *		value);
 
 
 G_END_DECLS
