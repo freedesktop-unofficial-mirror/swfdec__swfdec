@@ -520,14 +520,19 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun)
      */
     switch (opcode) {
       case SWFDEC_ABC_OPCODE_FIND_PROP_STRICT:
+      case SWFDEC_ABC_OPCODE_FIND_PROPERTY:
 	i = swfdec_bits_get_vu32 (&bits);
 	if (!swfdec_abc_interpret_resolve_multiname (context, &mn, &pool->multinames[i]))
 	  break;
 	if (!swfdec_abc_interpret_find_property (context, swfdec_as_stack_push (context),
 	      &mn, outer_scope, scope_start, scope_end, scope_with)) {
-	  swfdec_as_context_throw_abc (context, SWFDEC_ABC_TYPE_REFERENCE_ERROR,
-	      "Variable %s is not defined.", mn.name);
-	  break;
+	  if (opcode == SWFDEC_ABC_OPCODE_FIND_PROP_STRICT) {
+	    swfdec_as_context_throw_abc (context, SWFDEC_ABC_TYPE_REFERENCE_ERROR,
+		"Variable %s is not defined.", mn.name);
+	    break;
+	  } else {
+	    SWFDEC_AS_VALUE_SET_OBJECT (swfdec_as_stack_peek (context, 1), context->global);
+	  }
 	}
 	continue;
       case SWFDEC_ABC_OPCODE_GET_LOCAL_0:
@@ -651,7 +656,6 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun)
       case SWFDEC_ABC_OPCODE_NEW_ACTIVATION:
       case SWFDEC_ABC_OPCODE_GET_DESCENDANTS:
       case SWFDEC_ABC_OPCODE_NEW_CATCH:
-      case SWFDEC_ABC_OPCODE_FIND_PROPERTY:
       case SWFDEC_ABC_OPCODE_FIND_DEF:
       case SWFDEC_ABC_OPCODE_GET_LEX:
       case SWFDEC_ABC_OPCODE_SET_PROPERTY:
