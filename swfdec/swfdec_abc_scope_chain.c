@@ -58,7 +58,7 @@ swfdec_abc_scope_chain_new (SwfdecAsContext *context, const SwfdecAbcScopeChain 
   }
 
   chain = g_slice_alloc0 (size);
-  chain->n_entries = size;
+  chain->n_entries = n_entries;
   if (base) {
     memcpy (chain->entries, base->entries, base->n_entries * sizeof (SwfdecAbcScopeEntry));
     cur = &chain->entries[base->n_entries];
