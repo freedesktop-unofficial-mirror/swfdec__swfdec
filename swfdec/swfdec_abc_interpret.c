@@ -548,6 +548,14 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun)
       case SWFDEC_ABC_OPCODE_GET_LOCAL_3:
 	*swfdec_as_stack_push (context) = locals[3];
 	continue;
+      case SWFDEC_ABC_OPCODE_GET_PROPERTY:
+	i = swfdec_bits_get_vu32 (&bits);
+	if (!swfdec_abc_interpret_resolve_multiname (context, &mn, &pool->multinames[i]))
+	  break;
+	val = swfdec_as_stack_peek (context, 1);
+	if (!swfdec_abc_object_get_variable (context, val, &mn, val))
+	  break;
+	continue;
       case SWFDEC_ABC_OPCODE_INIT_PROPERTY:
 	{
 	  SwfdecAbcTraits *traits;
@@ -617,6 +625,9 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun)
       case SWFDEC_ABC_OPCODE_PUSH_UNDEFINED:
 	SWFDEC_AS_VALUE_SET_UNDEFINED (swfdec_as_stack_push (context));
 	continue;
+      case SWFDEC_ABC_OPCODE_RETURN_VOID:
+	swfdec_as_frame_return (frame, NULL);
+	return;
       case SWFDEC_ABC_OPCODE_BREAKPOINT:
       case SWFDEC_ABC_OPCODE_NOP:
       case SWFDEC_ABC_OPCODE_THROW:
@@ -663,7 +674,6 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun)
       case SWFDEC_ABC_OPCODE_CALL_STATIC:
       case SWFDEC_ABC_OPCODE_CALL_SUPER:
       case SWFDEC_ABC_OPCODE_CALL_PROPERTY:
-      case SWFDEC_ABC_OPCODE_RETURN_VOID:
       case SWFDEC_ABC_OPCODE_RETURN_VALUE:
       case SWFDEC_ABC_OPCODE_CONSTRUCT_SUPER:
       case SWFDEC_ABC_OPCODE_CONSTRUCT_PROP:
@@ -684,7 +694,6 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun)
       case SWFDEC_ABC_OPCODE_SET_LOCAL:
       case SWFDEC_ABC_OPCODE_GET_GLOBAL_SCOPE:
       case SWFDEC_ABC_OPCODE_GET_SCOPE_OBJECT:
-      case SWFDEC_ABC_OPCODE_GET_PROPERTY:
       case SWFDEC_ABC_OPCODE_DELETE_PROPERTY:
       case SWFDEC_ABC_OPCODE_GET_SLOT:
       case SWFDEC_ABC_OPCODE_SET_SLOT:
@@ -772,11 +781,9 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun)
       default:
 	SWFDEC_ERROR ("opcode %02X %s not implemented",
 	    opcode, swfdec_abc_opcode_get_name (opcode));
-	goto out;
+	swfdec_as_frame_return (frame, NULL);
+	return;
     }
   }
-
-out:
-  swfdec_as_frame_return (frame, NULL);
 }
 
