@@ -363,7 +363,7 @@ swfdec_abc_interpret_find_property (SwfdecAsContext *context, SwfdecAsValue *ret
   }
 
   if (chain) {
-    for (i = chain->n_entries; i > 0; i--) {
+    for (i = chain->n_entries - 1; i > 0; i--) {
       cur = &chain->entries[i].value;
       /* FIXME: only use verify-time properties for non-with values */
       if (swfdec_as_value_has_property (context, cur, mn)) {
