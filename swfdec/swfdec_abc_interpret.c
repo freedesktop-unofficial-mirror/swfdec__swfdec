@@ -22,6 +22,9 @@
 #endif
 
 #include "swfdec_abc_interpret.h"
+
+#include <math.h>
+
 #include "swfdec_abc_file.h"
 #include "swfdec_abc_function.h"
 #include "swfdec_abc_internal.h"
@@ -451,13 +454,6 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun)
      * giant switch statement.
      */
     switch (opcode) {
-      case SWFDEC_ABC_OPCODE_PUSH_SCOPE:
-	val = swfdec_as_stack_pop (context);
-	if (swfdec_abc_interpreter_throw_null (context, val))
-	  break;
-	*scope_end = *val;
-	scope_end++;
-	continue;
       case SWFDEC_ABC_OPCODE_FIND_PROP_STRICT:
 	i = swfdec_bits_get_vu32 (&bits);
 	if (!swfdec_abc_interpret_resolve_multiname (context, &mn, &pool->multinames[i]))
@@ -480,6 +476,36 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun)
 	continue;
       case SWFDEC_ABC_OPCODE_GET_LOCAL_3:
 	*swfdec_as_stack_push (context) = locals[3];
+	continue;
+      case SWFDEC_ABC_OPCODE_PUSH_BYTE:
+	SWFDEC_AS_VALUE_SET_INT (swfdec_as_stack_push (context),
+	    swfdec_bits_get_u8 (&bits));
+	continue;
+      case SWFDEC_ABC_OPCODE_PUSH_FALSE:
+	SWFDEC_AS_VALUE_SET_BOOLEAN (swfdec_as_stack_push (context), FALSE);
+	continue;
+      case SWFDEC_ABC_OPCODE_PUSH_NAN:
+	SWFDEC_AS_VALUE_SET_NUMBER (swfdec_as_stack_push (context), NAN);
+	continue;
+      case SWFDEC_ABC_OPCODE_PUSH_NULL:
+	SWFDEC_AS_VALUE_SET_NULL (swfdec_as_stack_push (context));
+	continue;
+      case SWFDEC_ABC_OPCODE_PUSH_SCOPE:
+	val = swfdec_as_stack_pop (context);
+	if (swfdec_abc_interpreter_throw_null (context, val))
+	  break;
+	*scope_end = *val;
+	scope_end++;
+	continue;
+      case SWFDEC_ABC_OPCODE_PUSH_SHORT:
+	SWFDEC_AS_VALUE_SET_INT (swfdec_as_stack_push (context),
+	    (gint16) swfdec_bits_get_vs32 (&bits));
+	continue;
+      case SWFDEC_ABC_OPCODE_PUSH_TRUE:
+	SWFDEC_AS_VALUE_SET_BOOLEAN (swfdec_as_stack_push (context), TRUE);
+	continue;
+      case SWFDEC_ABC_OPCODE_PUSH_UNDEFINED:
+	SWFDEC_AS_VALUE_SET_UNDEFINED (swfdec_as_stack_push (context));
 	continue;
       case SWFDEC_ABC_OPCODE_BREAKPOINT:
       case SWFDEC_ABC_OPCODE_NOP:
@@ -510,14 +536,7 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun)
       case SWFDEC_ABC_OPCODE_POP_SCOPE:
       case SWFDEC_ABC_OPCODE_NEXT_NAME:
       case SWFDEC_ABC_OPCODE_HAS_NEXT:
-      case SWFDEC_ABC_OPCODE_PUSH_NULL:
-      case SWFDEC_ABC_OPCODE_PUSH_UNDEFINED:
       case SWFDEC_ABC_OPCODE_NEXT_VALUE:
-      case SWFDEC_ABC_OPCODE_PUSH_BYTE:
-      case SWFDEC_ABC_OPCODE_PUSH_SHORT:
-      case SWFDEC_ABC_OPCODE_PUSH_TRUE:
-      case SWFDEC_ABC_OPCODE_PUSH_FALSE:
-      case SWFDEC_ABC_OPCODE_PUSH_NAN:
       case SWFDEC_ABC_OPCODE_POP:
       case SWFDEC_ABC_OPCODE_DUP:
       case SWFDEC_ABC_OPCODE_SWAP:
