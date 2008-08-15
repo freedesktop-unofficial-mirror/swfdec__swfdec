@@ -439,9 +439,8 @@ swfdec_abc_interpret_new_class (SwfdecAbcTraits *traits, SwfdecAbcClass *base,
   }
 
   if (SWFDEC_ABC_GLOBAL (context->global)->classes[SWFDEC_ABC_TYPE_CLASS] == NULL) {
-    if (traits->name == SWFDEC_AS_STR_Class) {
+    if (itraits->name == SWFDEC_AS_STR_Class) {
       SWFDEC_ABC_GLOBAL (context->global)->classes[SWFDEC_ABC_TYPE_CLASS] = classp;
-      SWFDEC_AS_OBJECT (classp)->prototype = SWFDEC_AS_OBJECT (classp);
     } else {
       SWFDEC_ERROR ("cannot set prototype for %s class to Class", traits->name);
     }
