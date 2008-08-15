@@ -509,6 +509,7 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun)
 
   /* init pc */
   swfdec_bits_init (&bits, fun->code);
+  g_print ("executing\n");
   while (TRUE) {
     opcode = swfdec_bits_get_u8 (&bits);
     /* NB: We use the magic of continue statement in switch clauses here:
@@ -517,6 +518,8 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun)
      * break, additional checks like exception handling will happen below the
      * giant switch statement.
      */
+    g_print ("  %s%02X %s\n", frame->next ? frame->next->next ? "    " : "  " : "",
+	opcode, swfdec_abc_opcode_get_name (opcode));
     /* order of opcodes is alphabetical */
     switch (opcode) {
       case SWFDEC_ABC_OPCODE_FIND_PROP_STRICT:
@@ -594,6 +597,11 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun)
 	  SWFDEC_AS_VALUE_SET_OBJECT (val, SWFDEC_AS_OBJECT (classp));
 	}
 	continue;
+      case SWFDEC_ABC_OPCODE_POP_SCOPE:
+	scope_end--;
+	if (scope_end == scope_with)
+	  scope_with = scope_start + fun->n_scope;
+	continue;
       case SWFDEC_ABC_OPCODE_PUSH_BYTE:
 	SWFDEC_AS_VALUE_SET_INT (swfdec_as_stack_push (context),
 	    swfdec_bits_get_u8 (&bits));
@@ -653,7 +661,6 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun)
       case SWFDEC_ABC_OPCODE_IFSTRICTNE:
       case SWFDEC_ABC_OPCODE_LOOKUP_SWITCH:
       case SWFDEC_ABC_OPCODE_PUSH_WITH:
-      case SWFDEC_ABC_OPCODE_POP_SCOPE:
       case SWFDEC_ABC_OPCODE_NEXT_NAME:
       case SWFDEC_ABC_OPCODE_HAS_NEXT:
       case SWFDEC_ABC_OPCODE_NEXT_VALUE:
