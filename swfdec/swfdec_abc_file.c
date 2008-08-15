@@ -423,17 +423,34 @@ swfdec_abc_file_parse_traits (SwfdecAbcFile *file, SwfdecAbcTraits *traits, Swfd
 
   READ_U30 (n_traits, bits);
   SWFDEC_LOG ("%u traits", n_traits);
-  if (n_traits) {
-    traits->traits = swfdec_as_context_try_new (context, SwfdecAbcTrait, n_traits);
-    if (traits->traits == NULL)
-      return FALSE;
-    traits->n_traits = n_traits;
+
+  /* ensure we can copy protected traits from base class into new protected namespace */
+  traits->n_traits = n_traits;
+  if (base && base->protected_ns && traits->protected_ns) {
+    for (i = 0; i < base->n_traits; i++) {
+      if (base->traits[i].ns == base->protected_ns)
+	traits->n_traits++;
+    }
   }
 
-  /* copy protected traits from base class into new protected namespace */
-  if (base && base->protected_ns && traits->protected_ns) {
-    SWFDEC_FIXME ("copy protected slots");
+  if (traits->n_traits) {
+    traits->traits = swfdec_as_context_try_new (context, SwfdecAbcTrait, traits->n_traits);
+    if (traits->traits == NULL) {
+      traits->n_traits = 0;
+      return FALSE;
+    }
   }
+  if (base && base->protected_ns && traits->protected_ns) {
+    traits->n_traits = n_traits;
+    for (i = 0; i < base->n_traits; i++) {
+      if (base->traits[i].ns == base->protected_ns) {
+	traits->traits[traits->n_traits] = base->traits[i];
+	traits->traits[traits->n_traits].ns = traits->protected_ns;
+	traits->n_traits++;
+      }
+    }
+  }
+
 
   if (base) {
     n_slots = base->n_slots;
