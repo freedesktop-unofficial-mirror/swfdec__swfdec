@@ -400,9 +400,9 @@ swfdec_abc_native.c: $(libswfdec_source_files)
 	  && grep -he "^SWFDEC_ABC_FLASH" $(libswfdec_source_files) \
 	  && echo "};" \
 	  && echo "#undef SWFDEC_ABC_NATIVE" \
-	 ) >> xgen-san \
-	&& (cmp -s xgen-san swfdec_abc_native.c || cp xgen-san swfdec_abc_native.c) \
-	&& rm -f xgen-san
+	 ) >> xgen-sabcn \
+	&& (cmp -s xgen-sabcn swfdec_abc_native.c || cp xgen-sabcn swfdec_abc_native.c) \
+	&& rm -f xgen-sabcn
 
 swfdec_asnative.c: $(libswfdec_source_files)
 	(cd $(srcdir) \
