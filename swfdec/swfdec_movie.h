@@ -21,7 +21,7 @@
 #define _SWFDEC_MOVIE_H_
 
 #include <glib-object.h>
-#include <swfdec/swfdec_abc_object.h>
+#include <swfdec/swfdec_abc_types.h>
 #include <swfdec/swfdec_as_object.h>
 #include <swfdec/swfdec_color.h>
 #include <swfdec/swfdec.h>

@@ -21,12 +21,14 @@
 #include "config.h"
 #endif
 
+#include "swfdec_player_internal.h"
+
 #include <errno.h>
 #include <math.h>
 #include <string.h>
 #include <stdlib.h>
 
-#include "swfdec_player_internal.h"
+#include "swfdec_abc_object.h"
 #include "swfdec_abc_traits.h"
 #include "swfdec_as_frame_internal.h"
 #include "swfdec_as_strings.h"
