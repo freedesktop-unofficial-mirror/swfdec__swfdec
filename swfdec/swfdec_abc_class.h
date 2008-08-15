@@ -36,6 +36,8 @@ typedef struct _SwfdecAbcClassClass SwfdecAbcClassClass;
 
 struct _SwfdecAbcClass {
   SwfdecAbcObject	object;
+
+  SwfdecAbcObject *	prototype;	/* Class.prototype in Javascrpt */
 };
 
 struct _SwfdecAbcClassClass {

@@ -10,6 +10,7 @@ lib_LTLIBRARIES = libswfdec-@SWFDEC_MAJORMINOR@.la
 
 # these are files that must be in SRCDIR
 libswfdec_source_files = \
+	swfdec_abc_class.c \
 	swfdec_abc_file.c \
 	swfdec_abc_function.c \
 	swfdec_abc_global.c \
@@ -236,6 +237,7 @@ libswfdec_@SWFDEC_MAJORMINOR@includedir = $(includedir)/swfdec-@SWFDEC_MAJORMINO
 libswfdec_@SWFDEC_MAJORMINOR@include_HEADERS = $(public_headers) swfdec_enums.h
 
 noinst_HEADERS = \
+	swfdec_abc_class.h \
 	swfdec_abc_file.h \
 	swfdec_abc_function.h \
 	swfdec_abc_global.h \

@@ -294,6 +294,7 @@ swfdec_abc_traits_coerce (SwfdecAbcTraits *traits, SwfdecAsValue *val)
     } else {
       SWFDEC_AS_VALUE_SET_NULL (val);
     }
+    return TRUE;
   }
 
   return swfdec_as_value_is_traits (val, traits);

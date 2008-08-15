@@ -25,6 +25,7 @@
 
 #include <math.h>
 
+#include "swfdec_abc_class.h"
 #include "swfdec_abc_file.h"
 #include "swfdec_abc_function.h"
 #include "swfdec_abc_internal.h"
@@ -36,6 +37,7 @@
 #include "swfdec_as_frame_internal.h"
 #include "swfdec_as_internal.h"
 #include "swfdec_as_stack.h"
+#include "swfdec_as_strings.h"
 #include "swfdec_bits.h"
 #include "swfdec_debug.h"
 
@@ -389,6 +391,60 @@ swfdec_abc_interpret_find_property (SwfdecAsContext *context, SwfdecAsValue *ret
   return FALSE;
 }
 
+static SwfdecAbcClass *
+swfdec_abc_interpret_new_class (SwfdecAbcTraits *traits, SwfdecAbcClass *base, 
+    SwfdecAbcScopeChain *chain)
+{
+  SwfdecAsContext *context;
+  SwfdecAbcTraits *itraits;
+  SwfdecAbcMethod *method;
+  SwfdecAbcClass *classp;
+  SwfdecAsValue val;
+  
+  g_return_val_if_fail (SWFDEC_IS_ABC_TRAITS (traits), NULL);
+  g_return_val_if_fail (base == NULL || SWFDEC_IS_ABC_CLASS (base), NULL);
+
+  context = swfdec_gc_object_get_context (traits);
+
+  itraits = traits->instance_traits;
+  g_assert (itraits);
+
+  if (base == NULL) {
+    if (itraits->base) {
+      swfdec_as_context_throw_abc (context, SWFDEC_ABC_ERROR_TYPE,
+	  "Cannot access a property or method of a null object reference.");
+      return NULL;
+    }
+  } else {
+    if (itraits->base != SWFDEC_ABC_OBJECT (base)->traits->instance_traits) {
+      swfdec_as_context_throw_abc (context, SWFDEC_ABC_ERROR_VERIFY,
+	  "The OP_newclass opcode was used with the incorrect base class.");
+    }
+  }
+
+  if (!swfdec_abc_traits_resolve (traits) ||
+      !swfdec_abc_traits_resolve (itraits))
+    return NULL;
+
+  classp = g_object_new (SWFDEC_TYPE_ABC_CLASS, "context", context,
+      "traits", traits, NULL);
+
+  if (classp->prototype) {
+    if (base)
+      SWFDEC_AS_OBJECT (classp->prototype)->prototype = SWFDEC_AS_OBJECT (base->prototype);
+
+    SWFDEC_AS_VALUE_SET_OBJECT (&val, SWFDEC_AS_OBJECT (classp));
+    swfdec_as_object_set_variable_and_flags (SWFDEC_AS_OBJECT (classp->prototype),
+	SWFDEC_AS_STR_constructor, &val, SWFDEC_AS_VARIABLE_HIDDEN);
+  }
+
+  SWFDEC_FIXME ("set Class as __proto__ for new class");
+  method = swfdec_abc_method_new (traits->construct, chain);
+  swfdec_abc_method_call (method, SWFDEC_ABC_OBJECT (classp), 0, NULL, &val);
+
+  return classp;
+}
+
 void
 swfdec_abc_interpret (SwfdecAbcFunction *fun)
 {
@@ -476,6 +532,25 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun)
 	continue;
       case SWFDEC_ABC_OPCODE_GET_LOCAL_3:
 	*swfdec_as_stack_push (context) = locals[3];
+	continue;
+      case SWFDEC_ABC_OPCODE_NEW_CLASS:
+	{
+	  SwfdecAbcClass *classp;
+	  i = swfdec_bits_get_vu32 (&bits);
+	  val = swfdec_as_stack_peek (context, 1);
+	  if (!swfdec_abc_traits_coerce (SWFDEC_ABC_CLASS_TRAITS (context), val)) {
+	    swfdec_as_context_throw_abc (context, SWFDEC_ABC_ERROR_REFERENCE,
+		"Type Coercion failed: cannot convert %s to %s.", 
+		swfdec_as_value_get_type_name (val), "Class");
+	    break;
+	  }
+	  classp = swfdec_abc_interpret_new_class (pool->classes[i], 
+	      SWFDEC_AS_VALUE_IS_NULL (val) ? NULL : SWFDEC_ABC_CLASS (SWFDEC_AS_VALUE_GET_OBJECT (val)),
+	      swfdec_abc_scope_chain_new (context, outer_scope, scope_start, scope_end, scope_with));
+	  if (classp == NULL)
+	    break;
+	  SWFDEC_AS_VALUE_SET_OBJECT (val, SWFDEC_AS_OBJECT (classp));
+	}
 	continue;
       case SWFDEC_ABC_OPCODE_PUSH_BYTE:
 	SWFDEC_AS_VALUE_SET_INT (swfdec_as_stack_push (context),
@@ -565,7 +640,6 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun)
       case SWFDEC_ABC_OPCODE_NEW_OBJECT:
       case SWFDEC_ABC_OPCODE_NEW_ARRAY:
       case SWFDEC_ABC_OPCODE_NEW_ACTIVATION:
-      case SWFDEC_ABC_OPCODE_NEW_CLASS:
       case SWFDEC_ABC_OPCODE_GET_DESCENDANTS:
       case SWFDEC_ABC_OPCODE_NEW_CATCH:
       case SWFDEC_ABC_OPCODE_FIND_PROPERTY:
