@@ -64,6 +64,7 @@ struct _SwfdecAbcException {
 struct _SwfdecAbcFunction {
   SwfdecGcObject	object;
 
+  SwfdecAbcFile *	pool;			/* pool that spawned us */
   const char *		name;			/* gc'd name of the function or NULL if unnamed */
   gboolean		verified:1;		/* function body has been verified */
   gboolean		resolved:1;		/* function arguments and return type have been resolved */

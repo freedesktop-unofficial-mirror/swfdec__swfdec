@@ -681,6 +681,7 @@ swfdec_abc_file_parse_methods (SwfdecAbcFile *file, SwfdecBits *bits,
       guint id, j, len;
       SwfdecAbcFunction *fun = file->functions[i] = 
 	g_object_new (SWFDEC_TYPE_ABC_FUNCTION, "context", context, NULL);
+      fun->pool = file;
       READ_U30 (len, bits);
       SWFDEC_LOG ("  function %u:", i);
       if (len) {
@@ -1094,6 +1095,9 @@ swfdec_abc_file_get_constant (SwfdecAbcFile *pool, SwfdecAsValue *value,
   g_return_val_if_fail (value != NULL, FALSE);
 
   switch (type) {
+    case SWFDEC_ABC_CONST_UNDEFINED:
+      SWFDEC_AS_VALUE_SET_UNDEFINED (value);
+      break;
     case SWFDEC_ABC_CONST_STRING:
       if (id >= pool->n_strings)
 	THROW (pool, "Cpool index %u is out of range %u.", id, pool->n_strings);

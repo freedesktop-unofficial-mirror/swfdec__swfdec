@@ -22,6 +22,10 @@
 #endif
 
 #include "swfdec_abc_function.h"
+
+#include "swfdec_abc_file.h"
+#include "swfdec_abc_global.h"
+#include "swfdec_abc_internal.h"
 #include "swfdec_abc_traits.h"
 #include "swfdec_as_context.h"
 #include "swfdec_debug.h"
@@ -89,9 +93,62 @@ swfdec_abc_function_is_native (SwfdecAbcFunction *fun)
 gboolean
 swfdec_abc_function_resolve (SwfdecAbcFunction *fun)
 {
+  SwfdecAsContext *context;
+  SwfdecAbcTraits *traits;
+  SwfdecAbcGlobal *global;
+  guint i;
+
   g_return_val_if_fail (SWFDEC_IS_ABC_FUNCTION (fun), FALSE);
   
-  SWFDEC_FIXME ("i can has resolve?");
+  if (fun->resolved)
+    return TRUE;
+
+  context = swfdec_gc_object_get_context (fun);
+  global = SWFDEC_ABC_GLOBAL (context->global);
+
+  if (fun->return_type == NULL) {
+    fun->return_traits = NULL;
+  } else {
+    traits = swfdec_abc_global_get_traits_for_multiname (global,
+	fun->return_type);
+    if (traits == NULL) {
+      swfdec_as_context_throw_abc (context, SWFDEC_ABC_TYPE_VERIFY_ERROR,
+	  "Class %s could not be found.", fun->return_type->name);
+      return FALSE;
+    }
+    fun->return_traits = traits;
+  }
+
+  if (fun->bound_traits == NULL)
+    fun->bound_traits = SWFDEC_ABC_OBJECT_TRAITS (context);
+
+  for (i = 0; i < fun->n_args; i++) {
+    if (fun->args[i].type == NULL) {
+      fun->args[i].traits = NULL;
+    } else {
+      traits = swfdec_abc_global_get_traits_for_multiname (global,
+	  fun->args[i].type);
+      if (traits == NULL) {
+	swfdec_as_context_throw_abc (context, SWFDEC_ABC_TYPE_VERIFY_ERROR,
+	    "Class %s could not be found.", fun->args[i].type->name);
+	return FALSE;
+      }
+      fun->args[i].traits = traits;
+    }
+    if (fun->args[i].default_index == 0) {
+      SWFDEC_AS_VALUE_SET_UNDEFINED (&fun->args[i].default_value);
+    } else {
+      if (!swfdec_abc_file_get_constant (fun->pool, &fun->args[i].default_value,
+	    fun->args[i].default_type, fun->args[i].default_index))
+	return FALSE;
+    }
+    if (fun->args[i].traits && !swfdec_abc_traits_coerce (fun->args[i].traits, &fun->args[i].default_value)) {
+      swfdec_as_context_throw_abc (context, SWFDEC_ABC_TYPE_VERIFY_ERROR,
+	  "Illegal default value for type %s.", fun->args[i].traits->name);
+      return FALSE;
+    }
+  }
+
   fun->resolved = TRUE;
   return TRUE;
 }
