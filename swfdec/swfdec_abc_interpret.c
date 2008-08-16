@@ -290,8 +290,28 @@ swfdec_abc_interpreter_throw_null (SwfdecAsContext *context, const SwfdecAsValue
 static SwfdecAsObject *
 swfdec_as_value_to_prototype (SwfdecAsContext *context, const SwfdecAsValue *value)
 {
-  SWFDEC_FIXME ("implement");
-  return NULL;
+  g_return_val_if_fail (SWFDEC_IS_AS_CONTEXT (context), NULL);
+  g_return_val_if_fail (value != NULL, NULL);
+
+  switch (value->type) {
+    case SWFDEC_AS_TYPE_UNDEFINED:
+    case SWFDEC_AS_TYPE_NULL:
+      return NULL;
+    case SWFDEC_AS_TYPE_BOOLEAN:
+      return SWFDEC_AS_OBJECT (SWFDEC_ABC_GET_BOOLEAN_CLASS (context)->prototype);
+    case SWFDEC_AS_TYPE_NUMBER:
+      return SWFDEC_AS_OBJECT (SWFDEC_ABC_GET_NUMBER_CLASS (context)->prototype);
+    case SWFDEC_AS_TYPE_STRING:
+      return SWFDEC_AS_OBJECT (SWFDEC_ABC_GET_STRING_CLASS (context)->prototype);
+    case SWFDEC_AS_TYPE_NAMESPACE:
+      return SWFDEC_AS_OBJECT (SWFDEC_ABC_GET_NAMESPACE_CLASS (context)->prototype);
+    case SWFDEC_AS_TYPE_OBJECT:
+      return SWFDEC_AS_OBJECT (SWFDEC_AS_VALUE_GET_OBJECT (value)->prototype);
+    case SWFDEC_AS_TYPE_INT:
+    default:
+      g_assert_not_reached ();
+      return NULL;
+  }
 }
 
 static gboolean
