@@ -168,7 +168,7 @@ swfdec_abc_traits_find_trait_multi (SwfdecAbcTraits *traits,
   found = NULL;
   for (i = 0; i < swfdec_abc_multiname_get_n_namespaces (mn); i++) {
     trait = swfdec_abc_traits_find_trait (traits, 
-	swfdec_abc_multiname_get_namespace (mn, i), traits->name);
+	swfdec_abc_multiname_get_namespace (mn, i), mn->name);
     if (trait == NULL)
       continue;
     if (found == NULL)
