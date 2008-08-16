@@ -529,7 +529,7 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun)
 
   /* init pc */
   swfdec_bits_init (&bits, fun->code);
-  g_print ("executing\n");
+  g_print ("executing %s\n", fun->bound_traits ? fun->bound_traits->name : "unbound function");
   while (TRUE) {
     opcode = swfdec_bits_get_u8 (&bits);
     /* NB: We use the magic of continue statement in switch clauses here:
@@ -626,8 +626,20 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun)
 	SWFDEC_AS_VALUE_SET_INT (swfdec_as_stack_push (context),
 	    swfdec_bits_get_u8 (&bits));
 	continue;
+      case SWFDEC_ABC_OPCODE_PUSH_DOUBLE:
+	i = swfdec_bits_get_vu32 (&bits);
+	SWFDEC_AS_VALUE_SET_NUMBER (swfdec_as_stack_push (context), pool->doubles[i]);
+	continue;
       case SWFDEC_ABC_OPCODE_PUSH_FALSE:
 	SWFDEC_AS_VALUE_SET_BOOLEAN (swfdec_as_stack_push (context), FALSE);
+	continue;
+      case SWFDEC_ABC_OPCODE_PUSH_INT:
+	i = swfdec_bits_get_vu32 (&bits);
+	SWFDEC_AS_VALUE_SET_INT (swfdec_as_stack_push (context), pool->ints[i]);
+	continue;
+      case SWFDEC_ABC_OPCODE_PUSH_NAMESPACE:
+	i = swfdec_bits_get_vu32 (&bits);
+	SWFDEC_AS_VALUE_SET_NAMESPACE (swfdec_as_stack_push (context), pool->namespaces[i]);
 	continue;
       case SWFDEC_ABC_OPCODE_PUSH_NAN:
 	SWFDEC_AS_VALUE_SET_NUMBER (swfdec_as_stack_push (context), NAN);
@@ -646,8 +658,16 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun)
 	SWFDEC_AS_VALUE_SET_INT (swfdec_as_stack_push (context),
 	    (gint16) swfdec_bits_get_vs32 (&bits));
 	continue;
+      case SWFDEC_ABC_OPCODE_PUSH_STRING:
+	i = swfdec_bits_get_vu32 (&bits);
+	SWFDEC_AS_VALUE_SET_STRING (swfdec_as_stack_push (context), pool->strings[i]);
+	continue;
       case SWFDEC_ABC_OPCODE_PUSH_TRUE:
 	SWFDEC_AS_VALUE_SET_BOOLEAN (swfdec_as_stack_push (context), TRUE);
+	continue;
+      case SWFDEC_ABC_OPCODE_PUSH_UINT:
+	i = swfdec_bits_get_vu32 (&bits);
+	SWFDEC_AS_VALUE_SET_NUMBER (swfdec_as_stack_push (context), pool->uints[i]);
 	continue;
       case SWFDEC_ABC_OPCODE_PUSH_UNDEFINED:
 	SWFDEC_AS_VALUE_SET_UNDEFINED (swfdec_as_stack_push (context));
@@ -687,11 +707,6 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun)
       case SWFDEC_ABC_OPCODE_POP:
       case SWFDEC_ABC_OPCODE_DUP:
       case SWFDEC_ABC_OPCODE_SWAP:
-      case SWFDEC_ABC_OPCODE_PUSH_STRING:
-      case SWFDEC_ABC_OPCODE_PUSH_INT:
-      case SWFDEC_ABC_OPCODE_PUSH_UINT:
-      case SWFDEC_ABC_OPCODE_PUSH_DOUBLE:
-      case SWFDEC_ABC_OPCODE_PUSH_NAMESPACE:
       case SWFDEC_ABC_OPCODE_HAS_NEXT2:
       case SWFDEC_ABC_OPCODE_NEW_FUNCTION:
       case SWFDEC_ABC_OPCODE_CALL:
