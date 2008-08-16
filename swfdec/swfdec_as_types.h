@@ -119,12 +119,12 @@ struct _SwfdecAsValue {
 
 #define SWFDEC_AS_VALUE_IS_NAMESPACE(val) ((val)->type == SWFDEC_AS_TYPE_NAMESPACE)
 #define SWFDEC_AS_VALUE_GET_NAMESPACE(val) ((val)->value.ns)
-#define SWFDEC_AS_VALUE_SET_NAMESPACE(val,ns) G_STMT_START { \
+#define SWFDEC_AS_VALUE_SET_NAMESPACE(val,ns_) G_STMT_START { \
   SwfdecAsValue *__val = (val); \
-  SwfdecAsObject *__ns = (ns); \
-  g_assert (__ns != NULL); \
+  SwfdecAbcNamespace *__ns = (ns_); \
+  g_assert (SWFDEC_IS_ABC_NAMESPACE (__ns)); \
   __val->type = SWFDEC_AS_TYPE_NAMESPACE; \
-  __val->value.object = __ns; \
+  __val->value.ns = __ns; \
 } G_STMT_END
 
 /* value conversion functions */
