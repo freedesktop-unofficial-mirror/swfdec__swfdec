@@ -55,7 +55,7 @@ swfdec_abc_traits_dispose (GObject *object)
     if (traits->n_slots)
       swfdec_as_context_free (context, traits->n_slots * sizeof (SwfdecAsValue), traits->slots);
     if (traits->n_methods)
-      swfdec_as_context_free (context, traits->n_slots * sizeof (SwfdecAsFunction *), traits->methods);
+      swfdec_as_context_free (context, traits->n_methods * sizeof (SwfdecAsFunction *), traits->methods);
   }
 
   G_OBJECT_CLASS (swfdec_abc_traits_parent_class)->dispose (object);
