@@ -184,7 +184,7 @@ swfdec_abc_traits_resolve (SwfdecAbcTraits *traits)
 	  g_assert (trait->traits == NULL);
 	  trait->traits = pool->classes[trait->default_index];
 	  SWFDEC_AS_VALUE_SET_NULL (&traits->slots[slot]);
-	} else if (trait->traits == NULL && trait->default_index == 0) {
+	} else if (trait->default_index == 0) {
 	  SWFDEC_AS_VALUE_SET_UNDEFINED (&traits->slots[slot]);
 	} else {
 	  if (!swfdec_abc_file_get_constant (pool, &traits->slots[slot],
