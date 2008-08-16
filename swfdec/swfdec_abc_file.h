@@ -31,6 +31,23 @@
 
 G_BEGIN_DECLS
 
+typedef enum {
+  SWFDEC_ABC_CONST_STRING = 1,
+  SWFDEC_ABC_CONST_INT = 3,
+  SWFDEC_ABC_CONST_UINT = 4,
+  SWFDEC_ABC_CONST_PRIVATE_NAMESPACE = 5,
+  SWFDEC_ABC_CONST_DOUBLE = 6,
+  SWFDEC_ABC_CONST_NAMESPACE = 8,
+  SWFDEC_ABC_CONST_FALSE = 10,
+  SWFDEC_ABC_CONST_TRUE = 11,
+  SWFDEC_ABC_CONST_NULL = 12,
+  SWFDEC_ABC_CONST_PACKAGE_NAMESPACE = 22,
+  SWFDEC_ABC_CONST_INTERNAL_NAMESPACE = 23,
+  SWFDEC_ABC_CONST_PROTECTED_NAMESPACE = 24,
+  SWFDEC_ABC_CONST_EXPLICIT_NAMESPACE = 25,
+  SWFDEC_ABC_CONST_STATIC_PROTECTED_NAMESPACE = 26
+} SwfdecAbcConstant;
+
 //typedef struct _SwfdecAbcFile SwfdecAbcFile;
 typedef struct _SwfdecAbcFileClass SwfdecAbcFileClass;
 
@@ -80,6 +97,11 @@ SwfdecAbcFile *	swfdec_abc_file_new_trusted	(SwfdecAsContext *	context,
 						 SwfdecBits *		bits,
 						 const SwfdecAsNative *	natives,
 						 guint			n_natives);
+
+gboolean	swfdec_abc_file_get_constant	(SwfdecAbcFile *	pool,
+						 SwfdecAsValue *	value,
+						 guint			type,
+						 guint			id);
 
 
 G_END_DECLS

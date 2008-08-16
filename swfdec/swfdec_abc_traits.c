@@ -22,7 +22,12 @@
 #endif
 
 #include "swfdec_abc_traits.h"
+
+#include <string.h>
+
+#include "swfdec_abc_file.h"
 #include "swfdec_abc_global.h"
+#include "swfdec_abc_internal.h"
 #include "swfdec_abc_multiname.h"
 #include "swfdec_abc_namespace.h"
 #include "swfdec_abc_object.h"
@@ -46,6 +51,12 @@ swfdec_abc_traits_dispose (GObject *object)
     traits->traits = NULL;
     traits->n_traits = 0;
   }
+  if (traits->resolved) {
+    if (traits->n_slots)
+      swfdec_as_context_free (context, traits->n_slots * sizeof (SwfdecAsValue), traits->slots);
+    if (traits->n_methods)
+      swfdec_as_context_free (context, traits->n_slots * sizeof (SwfdecAsFunction *), traits->methods);
+  }
 
   G_OBJECT_CLASS (swfdec_abc_traits_parent_class)->dispose (object);
 }
@@ -54,6 +65,7 @@ static void
 swfdec_abc_traits_mark (SwfdecGcObject *object)
 {
   SwfdecAbcTraits *traits = SWFDEC_ABC_TRAITS (object);
+  guint i;
 
   swfdec_gc_object_mark (traits->ns);
   swfdec_as_string_mark (traits->name);
@@ -65,6 +77,11 @@ swfdec_abc_traits_mark (SwfdecGcObject *object)
     swfdec_gc_object_mark (traits->protected_ns);
   if (traits->pool)
     swfdec_gc_object_mark (traits->pool);
+  if (traits->resolved) {
+    for (i = 0; i < traits->n_slots; i++) {
+      swfdec_as_value_mark (&traits->slots[i]);
+    }
+  }
 
   SWFDEC_GC_OBJECT_CLASS (swfdec_abc_traits_parent_class)->mark (object);
 }
@@ -104,14 +121,133 @@ swfdec_abc_traits_allow_early_binding (SwfdecAbcTraits *traits)
 gboolean
 swfdec_abc_traits_resolve (SwfdecAbcTraits *traits)
 {
+  SwfdecAsContext *context;
+  SwfdecAbcTraits *base;
+  SwfdecAbcFile *pool;
+  guint i;
+
   g_return_val_if_fail (SWFDEC_IS_ABC_TRAITS (traits), FALSE);
   
   if (traits->resolved)
     return TRUE;
 
-  SWFDEC_FIXME ("resolve traits");
+  context = swfdec_gc_object_get_context (traits);
+  base = traits->base;
+  pool = traits->pool;
+
+  if (base && !swfdec_abc_traits_resolve (base))
+    return FALSE;
+  /* resolve interfaces here */
+
+  if (traits->n_slots) {
+    traits->slots = swfdec_as_context_new (context, SwfdecAsValue, traits->n_slots);
+    if (base && base->n_slots)
+      memcpy (traits->slots, base->slots, base->n_slots * sizeof (SwfdecAsValue));
+  }
+  if (traits->n_methods) {
+    traits->methods = swfdec_as_context_new (context, SwfdecAbcFunction *, traits->n_methods);
+    if (base && base->n_methods)
+      memcpy (traits->methods, base->methods, base->n_methods * sizeof (SwfdecAsFunction *));
+  }
+
+  for (i = 0; i < traits->n_traits; i++) {
+    SwfdecAbcTrait *trait = &traits->traits[i];
+    guint slot = SWFDEC_ABC_BINDING_GET_ID (trait->type);
+
+    switch (SWFDEC_ABC_BINDING_GET_TYPE (trait->type)) {
+      case SWFDEC_ABC_TRAIT_NONE:
+	continue;
+      case SWFDEC_ABC_TRAIT_SLOT:
+      case SWFDEC_ABC_TRAIT_CONST:
+	if (trait->traits_type) {
+	  if (trait->traits_type >= pool->n_multinames) {
+	    swfdec_as_context_throw_abc (context, SWFDEC_ABC_TYPE_VERIFY_ERROR,
+		"Cpool index %u is out of range %u.", trait->traits_type, pool->n_multinames);
+	    goto fail;
+	  }
+	  trait->traits = swfdec_abc_global_get_traits_for_multiname (
+	      SWFDEC_ABC_GLOBAL (context->global), &pool->multinames[trait->traits_type]);
+	  if (trait->traits == NULL) {
+	    swfdec_as_context_throw_abc (context, SWFDEC_ABC_TYPE_VERIFY_ERROR,
+		"Class %s could not be found.", pool->multinames[trait->traits_type].name);
+	    goto fail;
+	  } else if (trait->traits == SWFDEC_ABC_VOID_TRAITS (context)) {
+	    swfdec_as_context_throw_abc (context, SWFDEC_ABC_TYPE_VERIFY_ERROR,
+		"Type void may only be used as a function return type.");
+	    goto fail;
+	  }
+	} else {
+	  trait->traits = NULL;
+	}
+	if (trait->default_type == G_MAXUINT) {
+	  /* magic value for classes */
+	  g_assert (trait->traits == NULL);
+	  trait->traits = pool->classes[trait->default_index];
+	  SWFDEC_AS_VALUE_SET_NULL (&traits->slots[slot]);
+	} else if (trait->traits == NULL && trait->default_index == 0) {
+	  SWFDEC_AS_VALUE_SET_UNDEFINED (&traits->slots[slot]);
+	} else {
+	  if (!swfdec_abc_file_get_constant (pool, &traits->slots[slot],
+		trait->default_type, trait->default_index))
+	    goto fail;
+	}
+	if (trait->traits && !swfdec_abc_traits_coerce (trait->traits, &traits->slots[slot])) {
+	  swfdec_as_context_throw_abc (context, SWFDEC_ABC_TYPE_VERIFY_ERROR,
+	      "Illegal default value for type %s.", trait->traits->name);
+	  goto fail;
+	}
+	continue;
+      case SWFDEC_ABC_TRAIT_METHOD:
+      case SWFDEC_ABC_TRAIT_GET:
+      case SWFDEC_ABC_TRAIT_GETSET:
+	traits->methods[slot] = pool->functions[trait->default_index];
+	if (!swfdec_abc_function_resolve (traits->methods[slot]))
+	  goto fail;
+	if (SWFDEC_ABC_BINDING_GET_TYPE (trait->type) != SWFDEC_ABC_TRAIT_GETSET)
+	  break;
+      case SWFDEC_ABC_TRAIT_SET:
+	slot++;
+	traits->methods[slot] = pool->functions[trait->default_type];
+	if (!swfdec_abc_function_resolve (traits->methods[slot]))
+	  goto fail;
+	break;
+      case SWFDEC_ABC_TRAIT_ITRAMP:
+      default:
+	g_assert_not_reached ();
+	break;
+    }
+  }
+
+  /* check all overrides are fine */
+  if (base) {
+    for (i = 0; i < base->n_methods; i++) {
+      if (base->methods[i] != NULL && 
+	  base->methods[i] != traits->methods[i] &&
+	  (traits->methods[i] == NULL ||
+	   !swfdec_abc_function_is_override (traits->methods[i], base->methods[i]))) {
+	/* nice error message */
+	swfdec_as_context_throw_abc (context, SWFDEC_ABC_TYPE_VERIFY_ERROR,
+	    "Illegal override of %s in %s.", traits->name, traits->name);
+	goto fail;
+      }
+    }
+  }
+
+  /* FIXME: interface override verification goes here */
+
   traits->resolved = TRUE;
   return TRUE;
+
+fail:
+  if (traits->n_slots) {
+    swfdec_as_context_free (context, traits->n_slots * sizeof (SwfdecAsValue), traits->slots);
+    traits->slots = NULL;
+  }
+  if (traits->n_methods) {
+    swfdec_as_context_free (context, traits->n_slots * sizeof (SwfdecAsFunction *), traits->methods);
+    traits->methods = NULL;
+  }
+  return FALSE;
 }
 
 const SwfdecAbcTrait *
@@ -268,6 +404,10 @@ swfdec_abc_traits_coerce (SwfdecAbcTraits *traits, SwfdecAsValue *val)
   } else if (traits == SWFDEC_ABC_INT_TRAITS (context)) {
     SWFDEC_AS_VALUE_SET_INT (val,
 	swfdec_as_value_to_integer (context, val));
+    return TRUE;
+  } else if (traits == SWFDEC_ABC_UINT_TRAITS (context)) {
+    SWFDEC_AS_VALUE_SET_NUMBER (val,
+	(guint) swfdec_as_value_to_integer (context, val));
     return TRUE;
   } else if (traits == SWFDEC_ABC_NUMBER_TRAITS (context)) {
     SWFDEC_AS_VALUE_SET_NUMBER (val,

@@ -107,3 +107,14 @@ swfdec_abc_function_verify (SwfdecAbcFunction *fun)
   return TRUE;
 }
 
+gboolean
+swfdec_abc_function_is_override (SwfdecAbcFunction *fun, SwfdecAbcFunction *base)
+{
+  g_return_val_if_fail (SWFDEC_IS_ABC_FUNCTION (fun), FALSE);
+  g_return_val_if_fail (fun->resolved, FALSE);
+  g_return_val_if_fail (SWFDEC_IS_ABC_FUNCTION (base), FALSE);
+  g_return_val_if_fail (base->resolved, FALSE);
+
+  SWFDEC_FIXME ("implement");
+  return TRUE;
+}

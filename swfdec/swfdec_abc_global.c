@@ -101,7 +101,6 @@ swfdec_abc_global_new (SwfdecAsContext *context)
   SwfdecAbcMethod *method;
   SwfdecAsValue ret;
   SwfdecBits bits;
-  guint i;
 
   g_return_if_fail (SWFDEC_IS_AS_CONTEXT (context));
 
@@ -131,10 +130,6 @@ swfdec_abc_global_new (SwfdecAsContext *context)
       swfdec_abc_natives, G_N_ELEMENTS (swfdec_abc_natives));
   /* must work and not throw exceptions */
   g_assert (global->file);
-  /* finish init of base traits */
-  for (i = 0; i < global->file->n_classes; i++) {
-    global->file->classes[i]->base = SWFDEC_ABC_CLASS_TRAITS (context);
-  }
 
   /* set proper traits here */
   traits = global->file->main->traits;
@@ -251,7 +246,7 @@ swfdec_abc_global_get_builtin_traits (SwfdecAbcGlobal *global, guint id)
   g_return_val_if_fail (global->file, NULL);
   g_return_val_if_fail (id < SWFDEC_ABC_N_TYPES, NULL);
 
-  return global->file->classes[id]->instance_traits;
+  return global->file->instances[id];
 }
 
 SwfdecAbcClass *

@@ -103,6 +103,8 @@ GType			swfdec_abc_function_get_type	(void);
 gboolean		swfdec_abc_function_bind	(SwfdecAbcFunction *	fun,
 							 SwfdecAbcTraits *	traits);
 gboolean		swfdec_abc_function_is_native	(SwfdecAbcFunction *	fun);
+gboolean		swfdec_abc_function_is_override	(SwfdecAbcFunction *	fun,
+							 SwfdecAbcFunction *	base);
 gboolean		swfdec_abc_function_resolve	(SwfdecAbcFunction *	fun);
 gboolean		swfdec_abc_function_verify	(SwfdecAbcFunction *	fun);
 

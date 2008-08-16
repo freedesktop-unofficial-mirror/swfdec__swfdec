@@ -48,7 +48,7 @@ typedef guint SwfdecAbcBinding;
 #define SWFDEC_ABC_BINDING_NEW(type, id) ((id) << 3 | (type))
 #define SWFDEC_ABC_BINDING_NONE SWFDEC_ABC_BINDING_NEW (SWFDEC_ABC_TRAIT_NONE, 0)
 #define SWFDEC_ABC_BINDING_GET_ID(bind) ((bind) >> 3)
-#define SWFDEC_ABC_BINDING_GET_TYPE(bind) ((bind) & 7)
+#define SWFDEC_ABC_BINDING_GET_TYPE(bind) ((SwfdecAbcTraitType) ((bind) & 7))
 #define SWFDEC_ABC_BINDING_IS_TYPE(bind, type) (((bind) & 7) == (type))
 #define SWFDEC_ABC_BINDING_IS_ACCESSOR(bind) (SWFDEC_ABC_BINDING_GET_TYPE (bind) > 4)
 
@@ -71,12 +71,12 @@ struct _SwfdecAbcTrait {
   gboolean			final:1;	/* TRUE if trait is final */
   gboolean			override:1;	/* TRUE if trait overrides a base trait */
   union {
-    struct {
-      guint			type;
-      guint			default_index;
-      guint			default_type;
-    }				slot;
+    guint			traits_type;	/* if not resolved: index into multiname array of pool */
+    SwfdecAbcTraits *		traits;		/* if resolved: traits describing this trait */
   };
+  guint				default_index;	/* if not resolved: index into array */
+  guint	  			default_type;	/* if not resolved: for slots the type of array to index, for methods 
+						   and getters unused, for setters index into function array (yes, i know this sucks) */
 };
 extern const SwfdecAbcTrait swfdec_abc_trait_ambiguous;
 #define SWFDEC_ABC_TRAIT_AMBIGUOUS (&swfdec_abc_trait_ambiguous)
@@ -98,6 +98,8 @@ struct _SwfdecAbcTraits {
 
   guint				n_slots;	/* number of slots */
   guint				n_methods;	/* number of methods */
+  SwfdecAsValue *		slots;		/* if resolved: n_slots default values */
+  SwfdecAbcFunction **		methods;	/* if resolved: n_methods methods */
 
   gboolean			sealed:1;	/* cannot add properties to object */
   gboolean			final:1;	/* no derived traits */

@@ -22,6 +22,9 @@
 #endif
 
 #include "swfdec_abc_file.h"
+
+#include <math.h>
+
 #include "swfdec_abc_internal.h"
 #include "swfdec_abc_method.h" /* default stub */
 #include "swfdec_abc_script.h"
@@ -204,6 +207,7 @@ swfdec_abc_file_parse_constants (SwfdecAbcFile *file, SwfdecBits *bits)
       file->n_doubles = 0;
       return FALSE;
     }
+    file->doubles[0] = NAN;
     for (i = 1; i < file->n_doubles && swfdec_bits_left (bits); i++) {
       file->doubles[i] = swfdec_bits_get_ldouble (bits);
       SWFDEC_LOG ("  double %u: %g", i, file->doubles[i]);
@@ -244,23 +248,23 @@ swfdec_abc_file_parse_constants (SwfdecAbcFile *file, SwfdecBits *bits)
       SwfdecAbcNamespaceType type;
       guint id;
       switch (swfdec_bits_get_u8 (bits)) {
-	case 0x05:
+	case SWFDEC_ABC_CONST_PRIVATE_NAMESPACE:
 	  type = SWFDEC_ABC_NAMESPACE_PRIVATE;
 	  break;
-	case 0x08:
-	case 0x16:
+	case SWFDEC_ABC_CONST_NAMESPACE:
+	case SWFDEC_ABC_CONST_PACKAGE_NAMESPACE:
 	  type = SWFDEC_ABC_NAMESPACE_PUBLIC;
 	  break;
-	case 0x17:
+	case SWFDEC_ABC_CONST_INTERNAL_NAMESPACE:
 	  type = SWFDEC_ABC_NAMESPACE_PACKAGE;
 	  break;
-	case 0x18:
+	case SWFDEC_ABC_CONST_PROTECTED_NAMESPACE:
 	  type = SWFDEC_ABC_NAMESPACE_PROTECTED;
 	  break;
-	case 0x19:
+	case SWFDEC_ABC_CONST_EXPLICIT_NAMESPACE:
 	  type = SWFDEC_ABC_NAMESPACE_EXPLICIT;
 	  break;
-	case 0x1A:
+	case SWFDEC_ABC_CONST_STATIC_PROTECTED_NAMESPACE:
 	  type = SWFDEC_ABC_NAMESPACE_STATIC_PROTECTED;
 	  break;
 	default:
@@ -507,8 +511,6 @@ swfdec_abc_file_parse_traits (SwfdecAbcFile *file, SwfdecAbcTraits *traits, Swfd
 	  if (swfdec_abc_traits_get_trait (traits, trait->ns, trait->name))
 	    THROW (file, "The ABC data is corrupt, attempt to read out of bounds.");
 				
-	  /* FIXME: if (script) addNamedScript(ns, name, script); */
-
 	  if (type == 4) {
 	    guint id;
 	    READ_U30 (id, bits);
@@ -517,15 +519,15 @@ swfdec_abc_file_parse_traits (SwfdecAbcFile *file, SwfdecAbcTraits *traits, Swfd
 	    if (file->classes[id] == NULL)
 	      THROW (file, "ClassInfo-%u is referenced before definition.", id);
 
-	    /* if (script) addNamedTraits(ns, name, cinit->declaringTraits->itraits); */
-	    
 	    trait->type = SWFDEC_ABC_BINDING_NEW (SWFDEC_ABC_TRAIT_CONST, slot);
+	    trait->default_index = id;
+	    trait->default_type = G_MAXUINT; /* magic value */
 	  } else {
 	    g_assert (type == 0 || type == 6);
-	    READ_U30 (trait->slot.type, bits);
-	    READ_U30 (trait->slot.default_index, bits);
-	    if (trait->slot.default_index) {
-	      trait->slot.default_type = swfdec_bits_get_u8 (bits);
+	    READ_U30 (trait->traits_type, bits);
+	    READ_U30 (trait->default_index, bits);
+	    if (trait->default_index) {
+	      trait->default_type = swfdec_bits_get_u8 (bits);
 	    }
 	    trait->type = SWFDEC_ABC_BINDING_NEW (type == 0 ? SWFDEC_ABC_TRAIT_SLOT : SWFDEC_ABC_TRAIT_CONST, slot);
 	  }
@@ -535,31 +537,33 @@ swfdec_abc_file_parse_traits (SwfdecAbcFile *file, SwfdecAbcTraits *traits, Swfd
       case 2: /* getter */
       case 3: /* setter */
 	{
-	  guint ignore;
+	  guint ignore, method_id;
 	  SwfdecAbcBinding bind;
 	  const SwfdecAbcTrait *found;
 	  SwfdecAbcFunction *fun;
 	  READ_U30 (ignore, bits);
 	  SWFDEC_LOG ("  display id = %u (ignored)", ignore);
-	  if (!swfdec_abc_file_parse_method (file, bits, NULL, &fun))
-	    return FALSE;
+	  READ_U30 (method_id, bits);
+	  if (method_id >= file->n_functions) {
+	    THROW (file, "Method_info %u exceeds method_count=%u.", method_id, file->n_functions);
+	  } else if (file->functions[method_id] == NULL) {
+	    THROW (file, "MethodInfo-%u referenced before definition.", method_id);
+	  } else {
+	    fun = file->functions[method_id];
+	  }
 	  if (!swfdec_abc_function_bind (fun, traits)) {
 	    THROW (file, "Function %s has already been bound to %s.", fun->name,
 		fun->bound_traits->name);
 	  }
 
-#if 0
-	  // only export one name for an accessor 
-	  if (script && !domain->getNamedScript(name,ns))
-		  addNamedScript(ns, name, script);
-#endif
-	  
 	  if (traits->base && (found = swfdec_abc_traits_find_trait (traits->base,
 	      trait->ns == traits->protected_ns ? traits->base->protected_ns: trait->ns, 
 	      trait->name))) {
 	    bind = found->type;
 	    SWFDEC_LOG ("  found method %u of type %u to override", 
 		SWFDEC_ABC_BINDING_GET_ID (bind), SWFDEC_ABC_BINDING_GET_TYPE (bind));
+	    trait->default_index = found->default_index;
+	    trait->default_type = found->default_type;
 	  } else {
 	    bind = SWFDEC_ABC_BINDING_NONE;
 	  }
@@ -581,6 +585,7 @@ swfdec_abc_file_parse_traits (SwfdecAbcFile *file, SwfdecAbcTraits *traits, Swfd
 	    } else {
 	      THROW (file, "The ABC data is corrupt, attempt to read out of bounds.");
 	    }
+	    trait->default_index = method_id;
 	  } else {
 	    SwfdecAbcTraitType ttype = type == 2 ? SWFDEC_ABC_TRAIT_GET : SWFDEC_ABC_TRAIT_SET;
 	    /* getter or setter */
@@ -601,9 +606,10 @@ swfdec_abc_file_parse_traits (SwfdecAbcFile *file, SwfdecAbcTraits *traits, Swfd
 	    found = swfdec_abc_traits_get_trait (traits, trait->ns, trait->name);
 	    if (found) {
 	      /* FIXME: This is kinda (read: very) hacky */
-	      ((SwfdecAbcTrait *) found)->type = SWFDEC_ABC_BINDING_NEW (SWFDEC_ABC_TRAIT_GETSET, 
-		  SWFDEC_ABC_BINDING_GET_ID (found->type));
-	      SWFDEC_LOG ("  method: %u (reuse)", SWFDEC_ABC_BINDING_GET_ID (found->type));
+	      trait = (SwfdecAbcTrait *) found;
+	      trait->type = SWFDEC_ABC_BINDING_NEW (SWFDEC_ABC_TRAIT_GETSET, 
+		  SWFDEC_ABC_BINDING_GET_ID (trait->type));
+	      SWFDEC_LOG ("  method: %u (reuse)", SWFDEC_ABC_BINDING_GET_ID (trait->type));
 	    } else if (bind == SWFDEC_ABC_BINDING_NONE) {
 	      trait->type = SWFDEC_ABC_BINDING_NEW (ttype, n_methods);
 	      SWFDEC_LOG ("  method: %u (new)", n_methods);
@@ -611,6 +617,11 @@ swfdec_abc_file_parse_traits (SwfdecAbcFile *file, SwfdecAbcTraits *traits, Swfd
 	    } else {
 	      trait->type = SWFDEC_ABC_BINDING_NEW (SWFDEC_ABC_BINDING_GET_TYPE (bind) | ttype,
 		  SWFDEC_ABC_BINDING_GET_ID (bind));
+	    }
+	    if (type == 2) {
+	      trait->default_index = method_id;
+	    } else {
+	      trait->default_type = method_id;
 	    }
 	  }
 	}
@@ -628,10 +639,10 @@ swfdec_abc_file_parse_traits (SwfdecAbcFile *file, SwfdecAbcTraits *traits, Swfd
 	READ_U30 (ignore, bits);
       }
     }
-
-    traits->n_slots = n_slots;
-    traits->n_methods = n_methods;
   }
+
+  traits->n_slots = n_slots;
+  traits->n_methods = n_methods;
 
   return TRUE;
 }
@@ -845,8 +856,8 @@ swfdec_abc_file_parse_instances (SwfdecAbcFile *file, SwfdecBits *bits)
   READ_U30 (file->n_classes, bits);
   SWFDEC_LOG ("%u classes", file->n_classes);
   if (file->n_classes) {
-    file->instances = swfdec_as_context_try_new (context, SwfdecAbcFunction *, file->n_classes);
-    file->classes = swfdec_as_context_try_new (context, SwfdecAbcFunction *, file->n_classes);
+    file->instances = swfdec_as_context_try_new (context, SwfdecAbcTraits *, file->n_classes);
+    file->classes = swfdec_as_context_try_new (context, SwfdecAbcTraits *, file->n_classes);
     if (file->instances == NULL || file->classes == NULL) {
       if (file->instances) {
 	swfdec_as_context_free (context, sizeof (SwfdecAbcFunction *) * file->n_classes, file->instances);
@@ -888,6 +899,9 @@ swfdec_abc_file_parse_classes (SwfdecAbcFile *file, SwfdecBits *bits)
       traits->sealed = FALSE;
       if (SWFDEC_ABC_GLOBAL (context->global)->file)
 	traits->base = SWFDEC_ABC_CLASS_TRAITS (context);
+      else
+	traits->base = file->instances[SWFDEC_ABC_TYPE_CLASS];
+      g_assert (traits->base);
 
       if (!swfdec_abc_file_parse_method (file, bits, traits, NULL))
 	return FALSE;
@@ -920,7 +934,10 @@ swfdec_abc_file_parse_scripts (SwfdecAbcFile *file, SwfdecBits *bits)
     traits->final = TRUE;
     traits->ns = context->public_ns;
     traits->name = SWFDEC_AS_STR_global;
-    /* FIXME: traits->base = OBJECT_TYPE */
+    if (SWFDEC_ABC_GLOBAL (context->global)->file)
+      traits->base = SWFDEC_ABC_OBJECT_TRAITS (context);
+    else
+      traits->base = file->instances[SWFDEC_ABC_TYPE_OBJECT];
     if (!swfdec_abc_file_parse_method (file, bits, traits, &fun))
       return FALSE;
     traits->construct = fun;
@@ -1006,7 +1023,10 @@ swfdec_abc_file_parse_bodies (SwfdecAbcFile *file, SwfdecBits *bits)
     traits->final = TRUE;
     traits->ns = context->public_ns;
     traits->name = SWFDEC_AS_STR_EMPTY;
-    /* FIXME: traits->base = OBJECT_TYPE */
+    if (SWFDEC_ABC_GLOBAL (context->global)->file)
+      traits->base = SWFDEC_ABC_OBJECT_TRAITS (context);
+    else
+      traits->base = file->instances[SWFDEC_ABC_TYPE_OBJECT];
     if (!swfdec_abc_file_parse_traits (file, traits, bits))
       return FALSE;
     fun->activation = traits;
@@ -1064,4 +1084,58 @@ swfdec_abc_file_new_trusted (SwfdecAsContext *context, SwfdecBits *bits,
   }
 
   return file;
+}
+
+gboolean
+swfdec_abc_file_get_constant (SwfdecAbcFile *pool, SwfdecAsValue *value, 
+    guint type, guint id)
+{
+  g_return_val_if_fail (SWFDEC_IS_ABC_FILE (pool), FALSE);
+  g_return_val_if_fail (value != NULL, FALSE);
+
+  switch (type) {
+    case SWFDEC_ABC_CONST_STRING:
+      if (id >= pool->n_strings)
+	THROW (pool, "Cpool index %u is out of range %u.", id, pool->n_strings);
+      SWFDEC_AS_VALUE_SET_STRING (value, pool->strings[id]);
+      break;
+    case SWFDEC_ABC_CONST_INT:
+      if (id >= pool->n_ints)
+	THROW (pool, "Cpool index %u is out of range %u.", id, pool->n_ints);
+      SWFDEC_AS_VALUE_SET_INT (value, pool->ints[id]);
+      break;
+    case SWFDEC_ABC_CONST_UINT:
+      if (id >= pool->n_uints)
+	THROW (pool, "Cpool index %u is out of range %u.", id, pool->n_uints);
+      SWFDEC_AS_VALUE_SET_NUMBER (value, pool->uints[id]);
+      break;
+    case SWFDEC_ABC_CONST_DOUBLE:
+      if (id >= pool->n_doubles)
+	THROW (pool, "Cpool index %u is out of range %u.", id, pool->n_doubles);
+      SWFDEC_AS_VALUE_SET_NUMBER (value, pool->doubles[id]);
+      break;
+    case SWFDEC_ABC_CONST_FALSE:
+      SWFDEC_AS_VALUE_SET_BOOLEAN (value, FALSE);
+      break;
+    case SWFDEC_ABC_CONST_TRUE:
+      SWFDEC_AS_VALUE_SET_BOOLEAN (value, TRUE);
+      break;
+    case SWFDEC_ABC_CONST_NULL:
+      SWFDEC_AS_VALUE_SET_NULL (value);
+      break;
+    case SWFDEC_ABC_CONST_PRIVATE_NAMESPACE:
+    case SWFDEC_ABC_CONST_NAMESPACE:
+    case SWFDEC_ABC_CONST_PACKAGE_NAMESPACE:
+    case SWFDEC_ABC_CONST_INTERNAL_NAMESPACE:
+    case SWFDEC_ABC_CONST_PROTECTED_NAMESPACE:
+    case SWFDEC_ABC_CONST_EXPLICIT_NAMESPACE:
+    case SWFDEC_ABC_CONST_STATIC_PROTECTED_NAMESPACE:
+      if (id >= pool->n_namespaces)
+	THROW (pool, "Cpool index %u is out of range %u.", id, pool->n_namespaces);
+      SWFDEC_AS_VALUE_SET_NAMESPACE (value, pool->namespaces[id]);
+      break;
+    default:
+      THROW (pool, "Illegal default value for type %s.", "FIXME");
+  }
+  return TRUE;
 }
