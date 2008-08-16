@@ -123,6 +123,8 @@ swfdec_abc_global_new (SwfdecAsContext *context)
   global->null_traits->name = SWFDEC_AS_STR_null;
   global->null_traits->final = TRUE;
   global->null_traits->resolved = TRUE;
+  swfdec_abc_global_add_traits (global, global->void_traits);
+  swfdec_abc_global_add_traits (global, global->null_traits);
 
   /* init default pool */
   swfdec_bits_init_data (&bits, swfdec_abc_initialize, sizeof (swfdec_abc_initialize));
