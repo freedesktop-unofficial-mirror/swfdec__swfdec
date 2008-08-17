@@ -34,7 +34,7 @@ enum {
   PROP_TRAITS
 };
 
-G_DEFINE_ABSTRACT_TYPE (SwfdecAbcObject, swfdec_abc_object, SWFDEC_TYPE_AS_OBJECT)
+G_DEFINE_TYPE (SwfdecAbcObject, swfdec_abc_object, SWFDEC_TYPE_AS_OBJECT)
 
 static void
 swfdec_abc_object_get_property (GObject *object, guint param_id, GValue *value, 
