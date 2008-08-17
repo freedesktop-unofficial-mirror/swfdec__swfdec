@@ -109,7 +109,7 @@ gboolean		swfdec_abc_function_is_override	(SwfdecAbcFunction *	fun,
 gboolean		swfdec_abc_function_resolve	(SwfdecAbcFunction *	fun);
 gboolean		swfdec_abc_function_verify	(SwfdecAbcFunction *	fun);
 
-void			swfdec_abc_function_call	(SwfdecAbcFunction *	fun,
+gboolean		swfdec_abc_function_call	(SwfdecAbcFunction *	fun,
 							 SwfdecAbcScopeChain *	scope,
 							 SwfdecAbcObject *	thisp,
 							 guint			argc,

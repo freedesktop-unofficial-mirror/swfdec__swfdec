@@ -470,7 +470,7 @@ swfdec_abc_interpret_new_class (SwfdecAbcTraits *traits, SwfdecAbcClass *base,
   return classp;
 }
 
-void
+gboolean
 swfdec_abc_interpret (SwfdecAbcFunction *fun, SwfdecAbcScopeChain *outer_scope)
 {
   SwfdecAsContext *context;
@@ -483,15 +483,15 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun, SwfdecAbcScopeChain *outer_scope)
   SwfdecAbcFile *pool;
   SwfdecAsValue *val;
 
-  g_return_if_fail (SWFDEC_IS_ABC_FUNCTION (fun));
-  g_return_if_fail (fun->verified);
+  g_return_val_if_fail (SWFDEC_IS_ABC_FUNCTION (fun), FALSE);
+  g_return_val_if_fail (fun->verified, FALSE);
 
   context = swfdec_gc_object_get_context (fun);
   frame = context->frame;
   pool = fun->bound_traits->pool;
 
   if (!swfdec_as_context_check_continue (context))
-    return;
+    return TRUE;
 
   swfdec_as_stack_ensure_free (context, fun->n_locals + fun->n_scope + fun->n_stack);
 
@@ -674,7 +674,7 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun, SwfdecAbcScopeChain *outer_scope)
 	continue;
       case SWFDEC_ABC_OPCODE_RETURN_VOID:
 	swfdec_as_frame_return (frame, NULL);
-	return;
+	return TRUE;
       case SWFDEC_ABC_OPCODE_BREAKPOINT:
       case SWFDEC_ABC_OPCODE_NOP:
       case SWFDEC_ABC_OPCODE_THROW:
@@ -823,7 +823,7 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun, SwfdecAbcScopeChain *outer_scope)
 	SWFDEC_ERROR ("opcode %02X %s not implemented",
 	    opcode, swfdec_abc_opcode_get_name (opcode));
 	swfdec_as_frame_return (frame, NULL);
-	return;
+	return TRUE;
     }
   }
 }

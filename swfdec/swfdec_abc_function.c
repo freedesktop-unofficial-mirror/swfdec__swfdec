@@ -159,8 +159,10 @@ gboolean
 swfdec_abc_function_verify (SwfdecAbcFunction *fun)
 {
   g_return_val_if_fail (SWFDEC_IS_ABC_FUNCTION (fun), FALSE);
-  g_return_val_if_fail (fun->resolved, FALSE);
   
+  if (!swfdec_abc_function_resolve (fun))
+    return FALSE;
+
   SWFDEC_FIXME ("i can has verify?");
   fun->verified = TRUE;
   return TRUE;
@@ -178,14 +180,20 @@ swfdec_abc_function_is_override (SwfdecAbcFunction *fun, SwfdecAbcFunction *base
   return TRUE;
 }
 
-void
+gboolean
 swfdec_abc_function_call (SwfdecAbcFunction *fun, SwfdecAbcScopeChain *scope,
     SwfdecAbcObject *thisp, guint argc, SwfdecAsValue *argv, SwfdecAsValue *ret)
 {
   SwfdecAsFrame frame = { NULL, };
   SwfdecAsContext *context;
 
-  g_return_if_fail (SWFDEC_IS_ABC_FUNCTION (fun));
+  g_return_val_if_fail (SWFDEC_IS_ABC_FUNCTION (fun), FALSE);
+  g_return_val_if_fail (SWFDEC_IS_ABC_OBJECT (thisp), FALSE);
+  g_return_val_if_fail (argc == 0 || argv != NULL, FALSE);
+  g_return_val_if_fail (ret != NULL, FALSE);
+
+  if (!swfdec_abc_function_verify (fun))
+    return FALSE;
 
   context = swfdec_gc_object_get_context (fun);
   swfdec_as_frame_init_native (&frame, context);
@@ -201,7 +209,8 @@ swfdec_abc_function_call (SwfdecAbcFunction *fun, SwfdecAbcScopeChain *scope,
     SwfdecAsValue rval;
     ((SwfdecAsNative) fun->native) (context, frame.thisp, argc, argv, &rval);
     swfdec_as_frame_return (&frame, &rval);
+    return TRUE;
   } else {
-    swfdec_abc_interpret (fun, scope);
+    return swfdec_abc_interpret (fun, scope);
   }
 }

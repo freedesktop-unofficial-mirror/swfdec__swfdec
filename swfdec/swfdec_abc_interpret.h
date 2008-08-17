@@ -196,7 +196,7 @@ typedef enum {
   SWFDEC_ABC_OPCODE_DECODE = 0xFF
 } SwfdecAbcOpcode;
 
-void		swfdec_abc_interpret		(SwfdecAbcFunction *	fun,
+gboolean	swfdec_abc_interpret		(SwfdecAbcFunction *	fun,
 						 SwfdecAbcScopeChain *	outer_scope);
 
 const char *	swfdec_abc_opcode_get_name	(guint			opcode);
