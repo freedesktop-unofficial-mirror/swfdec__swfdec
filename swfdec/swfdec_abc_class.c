@@ -1,6 +1,5 @@
 /* Swfdec
- * Copyright (C) 2007 Benjamin Otte <otte@gnome.org>
- *               2007 Pekka Lampila <pekka.lampila@iki.fi>
+ * Copyright (C) 2008 Benjamin Otte <otte@gnome.org>
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -27,11 +26,35 @@
 #include <math.h>
 
 #include "swfdec_abc_class.h"
+
 #include "swfdec_abc_function.h"
+#include "swfdec_abc_global.h"
+#include "swfdec_abc_internal.h"
 #include "swfdec_as_context.h"
+#include "swfdec_as_native_function.h"
 #include "swfdec_debug.h"
 
 G_DEFINE_TYPE (SwfdecAbcClass, swfdec_abc_class, SWFDEC_TYPE_ABC_OBJECT)
+
+static GObject *
+swfdec_abc_class_constructor (GType type, guint n_construct_properties,
+    GObjectConstructParam *construct_properties)
+{
+  SwfdecAbcClass *classp;
+  GObject *object;
+  SwfdecAsContext *context;
+
+  object = G_OBJECT_CLASS (swfdec_abc_class_parent_class)->constructor (type, 
+      n_construct_properties, construct_properties);
+
+  classp = SWFDEC_ABC_CLASS (object);
+  if (classp->prototype == NULL) {
+    context = swfdec_gc_object_get_context (classp);
+    classp->prototype = swfdec_abc_object_new (SWFDEC_ABC_OBJECT_TRAITS (context), NULL);
+  }
+
+  return object;
+}
 
 static void
 swfdec_abc_class_dispose (GObject *object)
@@ -55,6 +78,7 @@ swfdec_abc_class_class_init (SwfdecAbcClassClass *klass)
   GObjectClass *object_class = G_OBJECT_CLASS (klass);
   SwfdecGcObjectClass *gc_class = SWFDEC_GC_OBJECT_CLASS (klass);
 
+  object_class->constructor = swfdec_abc_class_constructor;
   object_class->dispose = swfdec_abc_class_dispose;
 
   gc_class->mark = swfdec_abc_class_mark;
@@ -63,5 +87,19 @@ swfdec_abc_class_class_init (SwfdecAbcClassClass *klass)
 static void
 swfdec_abc_class_init (SwfdecAbcClass *class)
 {
+}
+
+/*** ABC CODE ***/
+
+SWFDEC_ABC_NATIVE (29, swfdec_abc_class_get_prototype)
+void
+swfdec_abc_class_get_prototype (SwfdecAsContext *cx, SwfdecAsObject *object,
+    guint argc, SwfdecAsValue *argv, SwfdecAsValue *ret)
+{
+  SwfdecAbcClass *classp;
+
+  SWFDEC_AS_CHECK (SWFDEC_TYPE_ABC_CLASS, &classp, "");
+
+  SWFDEC_AS_VALUE_SET_OBJECT (ret, SWFDEC_AS_OBJECT (classp->prototype));
 }
 
