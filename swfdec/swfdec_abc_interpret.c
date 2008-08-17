@@ -446,6 +446,7 @@ swfdec_abc_interpret_new_class (SwfdecAbcTraits *traits, SwfdecAbcClass *base,
 
   classp = g_object_new (SWFDEC_TYPE_ABC_CLASS, "context", context,
       "traits", traits, NULL);
+  SWFDEC_ABC_OBJECT (classp)->scope = swfdec_abc_scope_chain_ref (chain);
 
   if (classp->prototype) {
     if (base)
