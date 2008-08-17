@@ -653,6 +653,10 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun, SwfdecAbcScopeChain *outer_scope)
 	  }
 	}
 	continue;
+      case SWFDEC_ABC_OPCODE_KILL:
+	i = swfdec_bits_get_vu32 (&bits);
+	SWFDEC_AS_VALUE_SET_UNDEFINED (&locals[i]);
+	continue;
       case SWFDEC_ABC_OPCODE_NEW_CLASS:
 	{
 	  SwfdecAbcClass *classp;
@@ -877,7 +881,6 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun, SwfdecAbcScopeChain *outer_scope)
       case SWFDEC_ABC_OPCODE_IS_TYPE:
       case SWFDEC_ABC_OPCODE_IS_TYPE_LATE:
       case SWFDEC_ABC_OPCODE_JUMP:
-      case SWFDEC_ABC_OPCODE_KILL:
       case SWFDEC_ABC_OPCODE_LABEL:
       case SWFDEC_ABC_OPCODE_LESS_EQUALS:
       case SWFDEC_ABC_OPCODE_LESS_THAN:
