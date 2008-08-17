@@ -22,6 +22,7 @@
 #endif
 
 #include "swfdec_abc_object.h"
+#include "swfdec_abc_function.h"
 #include "swfdec_abc_internal.h"
 #include "swfdec_abc_multiname.h"
 #include "swfdec_abc_scope_chain.h"
@@ -184,11 +185,17 @@ swfdec_abc_object_get_variable (SwfdecAsContext *context, const SwfdecAsValue *o
 	}
 	break;
       case SWFDEC_ABC_TRAIT_METHOD:
-      case SWFDEC_ABC_TRAIT_GET:
-      case SWFDEC_ABC_TRAIT_GETSET:
-	SWFDEC_FIXME ("implement vtables");
+	SWFDEC_FIXME ("implement method getters");
 	SWFDEC_AS_VALUE_SET_UNDEFINED (value);
 	break;
+      case SWFDEC_ABC_TRAIT_GET:
+      case SWFDEC_ABC_TRAIT_GETSET:
+	{
+	  SwfdecAbcObject *o = SWFDEC_ABC_OBJECT (SWFDEC_AS_VALUE_GET_OBJECT (object));
+	  guint slot = SWFDEC_ABC_BINDING_GET_ID (trait->type);
+	  return swfdec_abc_function_call (o->traits->methods[slot], o->scope,
+	      o, 0, NULL, value);
+	}
       case SWFDEC_ABC_TRAIT_SET:
 	swfdec_as_context_throw_abc (context, SWFDEC_ABC_TYPE_REFERENCE_ERROR, 
 	    "Illegal read of write-only property %s on %s.", mn->name, traits->name);
@@ -247,10 +254,19 @@ swfdec_abc_object_set_variable_full (SwfdecAsContext *context, const SwfdecAsVal
 	    "Illegal write to read-only property %s on %s.", mn->name, traits->name);
 	return FALSE;
       case SWFDEC_ABC_TRAIT_METHOD:
+	SWFDEC_FIXME ("implement method getters");
+	break;
       case SWFDEC_ABC_TRAIT_SET:
       case SWFDEC_ABC_TRAIT_GETSET:
-	SWFDEC_FIXME ("implement vtables");
-	break;
+	{
+	  SwfdecAbcObject *o = SWFDEC_ABC_OBJECT (SWFDEC_AS_VALUE_GET_OBJECT (object));
+	  SwfdecAsValue retval, tmp;
+	  guint slot = SWFDEC_ABC_BINDING_GET_ID (trait->type);
+	  /* Need to do this as argv gets coerced */
+	  tmp = *value;
+	  return swfdec_abc_function_call (o->traits->methods[slot + 1], o->scope,
+	      o, 1, &tmp, &retval);
+	}
       case SWFDEC_ABC_TRAIT_NONE:
       case SWFDEC_ABC_TRAIT_ITRAMP:
       default:
