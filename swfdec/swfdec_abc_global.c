@@ -259,7 +259,7 @@ swfdec_abc_global_get_builtin_class (SwfdecAbcGlobal *global, guint id)
   g_return_val_if_fail (global->file, NULL);
   g_return_val_if_fail (id < SWFDEC_ABC_N_TYPES, NULL);
 
-  traits = global->file->classes[id];
+  traits = global->file->instances[id];
 
   swfdec_abc_multiname_init (&mn, traits->name, traits->ns, NULL);
   SWFDEC_AS_VALUE_SET_OBJECT (&val, SWFDEC_AS_OBJECT (global));
