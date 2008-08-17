@@ -466,7 +466,58 @@ swfdec_abc_interpret_new_class (SwfdecAbcTraits *traits, SwfdecAbcClass *base,
   } else {
     SWFDEC_AS_OBJECT (classp)->prototype = SWFDEC_AS_OBJECT (SWFDEC_ABC_GET_CLASS_CLASS (context));
   }
+  /* required so Function init code can use newfunction */
+  if (itraits->name == SWFDEC_AS_STR_Function) {
+    SWFDEC_ABC_GLOBAL (context->global)->classes[SWFDEC_ABC_TYPE_FUNCTION] = classp;
+  }
   swfdec_abc_function_call (traits->construct, chain, SWFDEC_ABC_OBJECT (classp), 0, NULL, &val);
+
+  return classp;
+}
+
+static SwfdecAbcClass *
+swfdec_abc_interpret_new_function (SwfdecAbcFunction *fun, SwfdecAbcScopeChain *chain)
+{
+  SwfdecAsContext *context;
+  SwfdecAbcTraits *traits;
+  SwfdecAbcClass *classp;
+  SwfdecAsValue val;
+
+  g_return_val_if_fail (SWFDEC_IS_ABC_FUNCTION (fun), NULL);
+
+  context = swfdec_gc_object_get_context (fun);
+
+  if (!swfdec_abc_function_resolve (fun))
+    return NULL;
+  traits = fun->bound_traits;
+  if (traits == NULL) {
+    traits = g_object_new (SWFDEC_TYPE_ABC_TRAITS, 
+	"context", context, NULL);
+    traits->pool = fun->pool;
+    traits->ns = context->public_ns;
+    traits->name = swfdec_as_context_get_string (context, "SomeFunction");
+    traits->base = SWFDEC_ABC_FUNCTION_TRAITS (context);
+    traits->instance_traits = SWFDEC_ABC_OBJECT_TRAITS (context);
+    traits->construct = fun;
+    traits->n_slots = traits->base->n_slots;
+    traits->n_methods = traits->base->n_methods;
+    traits->final = TRUE;
+    if (!swfdec_abc_function_bind (fun, traits) ||
+        !swfdec_abc_traits_resolve (traits)) {
+      g_assert_not_reached ();
+    }
+  }
+
+  classp = g_object_new (SWFDEC_TYPE_ABC_CLASS, "context", context,
+      "traits", traits, NULL);
+  SWFDEC_ABC_OBJECT (classp)->scope = swfdec_abc_scope_chain_ref (chain);
+
+  SWFDEC_AS_OBJECT (classp)->prototype = SWFDEC_AS_OBJECT (
+      SWFDEC_ABC_GET_FUNCTION_CLASS (context)->prototype);
+  classp->prototype = swfdec_abc_object_new (SWFDEC_ABC_OBJECT_TRAITS (context), NULL);
+  SWFDEC_AS_VALUE_SET_OBJECT (&val, SWFDEC_AS_OBJECT (classp));
+  swfdec_as_object_set_variable_and_flags (SWFDEC_AS_OBJECT (classp->prototype),
+      SWFDEC_AS_STR_constructor, &val, SWFDEC_AS_VARIABLE_HIDDEN);
 
   return classp;
 }
@@ -618,6 +669,21 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun, SwfdecAbcScopeChain *outer_scope)
 	  SWFDEC_AS_VALUE_SET_OBJECT (val, SWFDEC_AS_OBJECT (classp));
 	}
 	continue;
+      case SWFDEC_ABC_OPCODE_NEW_FUNCTION:
+	{
+	  SwfdecAbcClass *classp;
+	  SwfdecAbcScopeChain *chain;
+	  i = swfdec_bits_get_vu32 (&bits);
+	  chain = swfdec_abc_scope_chain_new (context, outer_scope, 
+	      scope_start, scope_end, scope_with);
+	  classp = swfdec_abc_interpret_new_function (pool->functions[i], chain);
+	  swfdec_abc_scope_chain_unref (context, chain);
+	  if (classp == NULL)
+	    break;
+	  SWFDEC_AS_VALUE_SET_OBJECT (swfdec_as_stack_push (context),
+	      SWFDEC_AS_OBJECT (classp));
+	}
+	continue;
       case SWFDEC_ABC_OPCODE_POP_SCOPE:
 	scope_end--;
 	if (scope_end == scope_with)
@@ -709,7 +775,6 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun, SwfdecAbcScopeChain *outer_scope)
       case SWFDEC_ABC_OPCODE_DUP:
       case SWFDEC_ABC_OPCODE_SWAP:
       case SWFDEC_ABC_OPCODE_HAS_NEXT2:
-      case SWFDEC_ABC_OPCODE_NEW_FUNCTION:
       case SWFDEC_ABC_OPCODE_CALL:
       case SWFDEC_ABC_OPCODE_CONSTRUCT:
       case SWFDEC_ABC_OPCODE_CALL_METHOD:
