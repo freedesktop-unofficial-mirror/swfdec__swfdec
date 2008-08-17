@@ -37,7 +37,7 @@ swfdec_abc_method_dispose (GObject *object)
 {
   SwfdecAbcMethod *method = SWFDEC_ABC_METHOD (object);
 
-  swfdec_abc_scope_chain_free (swfdec_gc_object_get_context (method),
+  swfdec_abc_scope_chain_unref (swfdec_gc_object_get_context (method),
       method->scope);
 
   G_OBJECT_CLASS (swfdec_abc_method_parent_class)->dispose (object);
@@ -84,7 +84,7 @@ swfdec_abc_method_new (SwfdecAbcFunction *function, SwfdecAbcScopeChain *chain)
       "context", swfdec_gc_object_get_context (function), 
       "traits", function->bound_traits, NULL);
   method->function = function;
-  method->scope = chain;
+  method->scope = swfdec_abc_scope_chain_ref (chain);
 
   return method;
 }

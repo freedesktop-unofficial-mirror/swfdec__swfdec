@@ -33,6 +33,7 @@ struct _SwfdecAbcScopeEntry {
 };
 
 struct _SwfdecAbcScopeChain {
+  guint			refcount;
   guint			n_entries;
   SwfdecAbcScopeEntry	entries[1];
 };
@@ -42,7 +43,8 @@ SwfdecAbcScopeChain *	swfdec_abc_scope_chain_new	(SwfdecAsContext *		context,
 							 SwfdecAsValue *		start,
 							 SwfdecAsValue *		end,
 							 SwfdecAsValue *		with);
-void			swfdec_abc_scope_chain_free	(SwfdecAsContext *		context,
+SwfdecAbcScopeChain *	swfdec_abc_scope_chain_ref	(SwfdecAbcScopeChain *		chain);
+void			swfdec_abc_scope_chain_unref	(SwfdecAsContext *		context,
 							 SwfdecAbcScopeChain *		chain);
 
 void			swfdec_abc_scope_chain_mark	(const SwfdecAbcScopeChain *	chain);

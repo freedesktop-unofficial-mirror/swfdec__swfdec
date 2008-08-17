@@ -601,6 +601,7 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun)
       case SWFDEC_ABC_OPCODE_NEW_CLASS:
 	{
 	  SwfdecAbcClass *classp;
+	  SwfdecAbcScopeChain *chain;
 	  i = swfdec_bits_get_vu32 (&bits);
 	  val = swfdec_as_stack_peek (context, 1);
 	  if (!swfdec_abc_traits_coerce (SWFDEC_ABC_CLASS_TRAITS (context), val)) {
@@ -609,9 +610,13 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun)
 		swfdec_as_value_get_type_name (val), "Class");
 	    break;
 	  }
+	  chain = swfdec_abc_scope_chain_new (context, outer_scope, 
+	      scope_start, scope_end, scope_with);
 	  classp = swfdec_abc_interpret_new_class (pool->classes[i], 
-	      SWFDEC_AS_VALUE_IS_NULL (val) ? NULL : SWFDEC_ABC_CLASS (SWFDEC_AS_VALUE_GET_OBJECT (val)),
-	      swfdec_abc_scope_chain_new (context, outer_scope, scope_start, scope_end, scope_with));
+	      SWFDEC_AS_VALUE_IS_NULL (val) ? NULL : 
+	      SWFDEC_ABC_CLASS (SWFDEC_AS_VALUE_GET_OBJECT (val)),
+	      chain);
+	  swfdec_abc_scope_chain_unref (context, chain);
 	  if (classp == NULL)
 	    break;
 	  SWFDEC_AS_VALUE_SET_OBJECT (val, SWFDEC_AS_OBJECT (classp));

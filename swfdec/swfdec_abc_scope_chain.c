@@ -45,6 +45,9 @@ swfdec_abc_scope_chain_new (SwfdecAsContext *context, const SwfdecAbcScopeChain 
   g_return_val_if_fail (start <= end, NULL);
   g_return_val_if_fail (start <= with, NULL);
 
+  if (start == end)
+    return swfdec_abc_scope_chain_ref (chain);
+
   n_entries = base ? base->n_entries : 0;
   n_entries += end - start;
   if (n_entries == 0)
@@ -58,6 +61,7 @@ swfdec_abc_scope_chain_new (SwfdecAsContext *context, const SwfdecAbcScopeChain 
   }
 
   chain = g_slice_alloc0 (size);
+  chain->refcount = 1;
   chain->n_entries = n_entries;
   if (base) {
     memcpy (chain->entries, base->entries, base->n_entries * sizeof (SwfdecAbcScopeEntry));
@@ -78,14 +82,27 @@ swfdec_abc_scope_chain_new (SwfdecAsContext *context, const SwfdecAbcScopeChain 
   return chain;
 }
 
+SwfdecAbcScopeChain *
+swfdec_abc_scope_chain_ref (SwfdecAbcScopeChain *chain)
+{
+  if (chain == NULL)
+    return NULL;
+
+  chain->refcount++;
+  return chain;
+}
+
 void
-swfdec_abc_scope_chain_free (SwfdecAsContext *context, SwfdecAbcScopeChain *chain)
+swfdec_abc_scope_chain_unref (SwfdecAsContext *context, SwfdecAbcScopeChain *chain)
 {
   gsize size;
   
   g_return_if_fail (SWFDEC_IS_AS_CONTEXT (context));
 
   if (chain == NULL)
+    return;
+  chain->refcount--;
+  if (chain->refcount > 0)
     return;
   size = SWFDEC_ABC_SCOPE_CHAIN_SIZE (chain->n_entries);
   swfdec_as_context_unuse_mem (context, size);
