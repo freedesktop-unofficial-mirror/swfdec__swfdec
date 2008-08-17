@@ -20,7 +20,6 @@
 #ifndef _SWFDEC_ABC_FILE_H_
 #define _SWFDEC_ABC_FILE_H_
 
-#include <swfdec/swfdec_abc_function.h>
 #include <swfdec/swfdec_abc_global.h>
 #include <swfdec/swfdec_abc_multiname.h>
 #include <swfdec/swfdec_abc_namespace.h>

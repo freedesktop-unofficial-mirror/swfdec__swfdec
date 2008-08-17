@@ -26,6 +26,7 @@
 #include <string.h>
 
 #include "swfdec_abc_file.h"
+#include "swfdec_abc_function.h"
 #include "swfdec_abc_global.h"
 #include "swfdec_abc_internal.h"
 #include "swfdec_abc_multiname.h"

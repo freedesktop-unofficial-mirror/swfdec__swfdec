@@ -25,8 +25,8 @@
 
 #include <math.h>
 
+#include "swfdec_abc_function.h"
 #include "swfdec_abc_internal.h"
-#include "swfdec_abc_method.h" /* default stub */
 #include "swfdec_abc_script.h"
 #include "swfdec_abc_traits.h"
 #include "swfdec_as_frame.h" /* default stub */
@@ -552,7 +552,7 @@ swfdec_abc_file_parse_traits (SwfdecAbcFile *file, SwfdecAbcTraits *traits, Swfd
 	    fun = file->functions[method_id];
 	  }
 	  if (!swfdec_abc_function_bind (fun, traits)) {
-	    THROW (file, "Function %s has already been bound to %s.", fun->name,
+	    THROW (file, "Function %s has already been bound to %s.", traits->name,
 		fun->bound_traits->name);
 	  }
 
@@ -652,11 +652,59 @@ swfdec_abc_default_stub (SwfdecAsContext *cx, SwfdecAsObject *obj, guint argc,
     SwfdecAsValue *argv, SwfdecAsValue *ret)
 {
   SwfdecAsFrame *frame = swfdec_as_context_get_frame (cx);
-  SwfdecAbcMethod *method = SWFDEC_ABC_METHOD (swfdec_as_frame_get_function (frame));
+  SwfdecAbcFunction *function = SWFDEC_ABC_FUNCTION (swfdec_as_frame_get_function (frame));
+  SwfdecAbcTraits *traits;
   char *name;
+  guint i, id;
 
-  name = g_strconcat (SWFDEC_ABC_OBJECT (obj)->traits->name, ".",
-      method->function->bound_traits->name, NULL);
+  /* find id of our function in pool */
+  for (id = 0; id < function->pool->n_functions; id++) {
+    if (function->pool->functions[id] == function)
+      break;
+  }
+
+  traits = function->bound_traits;
+  if (traits->construct == function) {
+    /* we're the constructor */
+    name = g_strdup_printf ("function %u %s", id, traits->name);
+  } else {
+    /* we're method, getter or setter, find out what */
+    do {
+      for (i = 0; i < traits->n_traits; i++) {
+	SwfdecAbcTrait *trait = &traits->traits[i];
+	guint slot = SWFDEC_ABC_BINDING_GET_ID (trait->type);
+	switch (SWFDEC_ABC_BINDING_GET_TYPE (trait->type)) {
+	  case SWFDEC_ABC_TRAIT_METHOD:
+	    if (traits->methods[slot] == function) {
+	      name = g_strdup_printf ("method %u %s.%s", id, traits->name, trait->name);
+	      goto out;
+	    }
+	    break;
+	  case SWFDEC_ABC_TRAIT_GET:
+	  case SWFDEC_ABC_TRAIT_SET:
+	  case SWFDEC_ABC_TRAIT_GETSET:
+	    if (traits->methods[slot] == function) {
+	      name = g_strdup_printf ("getter %u %s.%s", id, traits->name, trait->name);
+	      goto out;
+	    } else if (traits->methods[slot + 1] == function) {
+	      name = g_strdup_printf ("setter %u %s.%s", id, traits->name, trait->name);
+	      goto out;
+	    }
+	    break;
+	  case SWFDEC_ABC_TRAIT_NONE:
+	  case SWFDEC_ABC_TRAIT_SLOT:
+	  case SWFDEC_ABC_TRAIT_CONST:
+	  case SWFDEC_ABC_TRAIT_ITRAMP:
+	  default:
+	  break;
+	}
+      }
+      traits = traits->base;
+    } while (traits);
+    /* huh? */
+    name = g_strdup_printf ("function %u %s.???", i, function->bound_traits->name);
+  }
+out:
   SWFDEC_STUB (name);
   g_free (name);
 }
