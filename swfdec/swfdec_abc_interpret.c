@@ -464,11 +464,14 @@ swfdec_abc_interpret_new_class (SwfdecAbcTraits *traits, SwfdecAbcClass *base,
       SWFDEC_ERROR ("cannot set prototype for %s class to Class", traits->name);
     }
   } else {
-    SWFDEC_AS_OBJECT (classp)->prototype = SWFDEC_AS_OBJECT (SWFDEC_ABC_GET_CLASS_CLASS (context));
+    SWFDEC_AS_OBJECT (classp)->prototype = SWFDEC_AS_OBJECT (SWFDEC_ABC_GET_CLASS_CLASS (context)->prototype);
   }
   /* required so Function init code can use newfunction */
   if (itraits->name == SWFDEC_AS_STR_Function) {
     SWFDEC_ABC_GLOBAL (context->global)->classes[SWFDEC_ABC_TYPE_FUNCTION] = classp;
+    context->global->prototype = SWFDEC_AS_OBJECT (SWFDEC_ABC_GET_OBJECT_CLASS (context)->prototype);
+    SWFDEC_AS_OBJECT (SWFDEC_ABC_GET_OBJECT_CLASS (context))->prototype = 
+      SWFDEC_AS_OBJECT (SWFDEC_ABC_GET_CLASS_CLASS (context)->prototype);
   }
   swfdec_abc_function_call (traits->construct, chain, SWFDEC_ABC_OBJECT (classp), 0, NULL, &val);
 
