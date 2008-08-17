@@ -73,10 +73,12 @@ swfdec_abc_scope_chain_new (SwfdecAsContext *context, const SwfdecAbcScopeChain 
   for (;start < min; start++) {
     cur->value = *start;
     cur->with = FALSE;
+    cur++;
   }
   for (;start < end; start++) {
     cur->value = *start;
     cur->with = TRUE;
+    cur++;
   }
 
   return chain;
