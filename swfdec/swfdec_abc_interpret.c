@@ -609,6 +609,10 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun, SwfdecAbcScopeChain *outer_scope)
 	  }
 	}
 	continue;
+      case SWFDEC_ABC_OPCODE_GET_LOCAL:
+	i = swfdec_bits_get_vu32 (&bits);
+	*swfdec_as_stack_push (context) = locals[i];
+	continue;
       case SWFDEC_ABC_OPCODE_GET_LOCAL_0:
 	*swfdec_as_stack_push (context) = locals[0];
 	continue;
@@ -749,6 +753,22 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun, SwfdecAbcScopeChain *outer_scope)
       case SWFDEC_ABC_OPCODE_RETURN_VOID:
 	swfdec_as_frame_return (frame, NULL);
 	return TRUE;
+      case SWFDEC_ABC_OPCODE_SET_LOCAL:
+	i = swfdec_bits_get_vu32 (&bits);
+	locals[i] = *swfdec_as_stack_pop (context);
+	continue;
+      case SWFDEC_ABC_OPCODE_SET_LOCAL_0:
+	locals[0] = *swfdec_as_stack_pop (context);
+	continue;
+      case SWFDEC_ABC_OPCODE_SET_LOCAL_1:
+	locals[1] = *swfdec_as_stack_pop (context);
+	continue;
+      case SWFDEC_ABC_OPCODE_SET_LOCAL_2:
+	locals[2] = *swfdec_as_stack_pop (context);
+	continue;
+      case SWFDEC_ABC_OPCODE_SET_LOCAL_3:
+	locals[3] = *swfdec_as_stack_pop (context);
+	continue;
       case SWFDEC_ABC_OPCODE_SWAP:
 	{
 	  SwfdecAsValue tmp = *swfdec_as_stack_peek (context, 1);
@@ -820,7 +840,6 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun, SwfdecAbcScopeChain *outer_scope)
       case SWFDEC_ABC_OPCODE_GET_GLOBAL_SCOPE:
       case SWFDEC_ABC_OPCODE_GET_GLOBAL_SLOT:
       case SWFDEC_ABC_OPCODE_GET_LEX:
-      case SWFDEC_ABC_OPCODE_GET_LOCAL:
       case SWFDEC_ABC_OPCODE_GET_SCOPE_OBJECT:
       case SWFDEC_ABC_OPCODE_GET_SLOT:
       case SWFDEC_ABC_OPCODE_GET_SUPER:
@@ -877,11 +896,6 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun, SwfdecAbcScopeChain *outer_scope)
       case SWFDEC_ABC_OPCODE_RSHIFT:
       case SWFDEC_ABC_OPCODE_SEND_ENTER:
       case SWFDEC_ABC_OPCODE_SET_GLOBAL_SLOT:
-      case SWFDEC_ABC_OPCODE_SET_LOCAL:
-      case SWFDEC_ABC_OPCODE_SET_LOCAL_0:
-      case SWFDEC_ABC_OPCODE_SET_LOCAL_1:
-      case SWFDEC_ABC_OPCODE_SET_LOCAL_2:
-      case SWFDEC_ABC_OPCODE_SET_LOCAL_3:
       case SWFDEC_ABC_OPCODE_SET_PROPERTY:
       case SWFDEC_ABC_OPCODE_SET_SLOT:
       case SWFDEC_ABC_OPCODE_SET_SUPER:
