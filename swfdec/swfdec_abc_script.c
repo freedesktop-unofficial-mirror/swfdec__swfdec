@@ -22,7 +22,9 @@
 #endif
 
 #include "swfdec_abc_script.h"
-#include "swfdec_abc_method.h"
+
+#include "swfdec_abc_function.h"
+#include "swfdec_abc_object.h"
 #include "swfdec_abc_traits.h"
 #include "swfdec_as_context.h"
 #include "swfdec_debug.h"
@@ -61,13 +63,11 @@ swfdec_abc_script_get_global (SwfdecAbcScript *script)
 
   if (script->global == NULL) {
     SwfdecAbcTraits* traits = script->traits;
-    SwfdecAbcMethod *method;
     SwfdecAsValue ret;
     
     swfdec_abc_traits_resolve (traits);
     script->global = swfdec_abc_object_new (traits, NULL);
-    method = swfdec_abc_method_new (traits->construct, NULL);
-    swfdec_abc_method_call (method, script->global, 0, NULL, &ret);
+    swfdec_abc_function_call (traits->construct, NULL, script->global, 0, NULL, &ret);
   }
   return script->global;
 }

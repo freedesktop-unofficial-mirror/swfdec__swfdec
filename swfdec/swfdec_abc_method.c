@@ -24,10 +24,7 @@
 #include "swfdec_abc_method.h"
 #include "swfdec_abc_function.h"
 #include "swfdec_abc_internal.h"
-#include "swfdec_abc_interpret.h"
 #include "swfdec_abc_traits.h"
-#include "swfdec_as_context.h"
-#include "swfdec_as_frame_internal.h"
 #include "swfdec_debug.h"
 
 G_DEFINE_TYPE (SwfdecAbcMethod, swfdec_abc_method, SWFDEC_TYPE_ABC_OBJECT)
@@ -95,7 +92,6 @@ swfdec_abc_method_call (SwfdecAbcMethod *method, SwfdecAbcObject *thisp,
 {
   SwfdecAsContext *context;
   SwfdecAbcFunction *fun;
-  SwfdecAsFrame frame = { NULL, };
   guint i;
 
   g_return_if_fail (SWFDEC_IS_ABC_METHOD (method));
@@ -128,18 +124,7 @@ swfdec_abc_method_call (SwfdecAbcMethod *method, SwfdecAbcObject *thisp,
 
   if (!swfdec_abc_function_verify (fun))
     return;
-  swfdec_as_frame_init_native (&frame, context);
-  /* HACK! */
-  frame.function = (SwfdecAsFunction *) method;
-  frame.thisp = SWFDEC_AS_OBJECT (thisp);
-  frame.argc = argc;
-  frame.argv = argv;
-  frame.return_value = ret;
-  frame.target = frame.next ? frame.next->original_target : SWFDEC_AS_OBJECT (thisp);
-  frame.original_target = frame.target;
-  if (fun->native) {
-    ((SwfdecAsNative) fun->native) (context, frame.thisp, argc, argv, ret);
-  } else {
-    swfdec_abc_interpret (fun);
-  }
+
+  swfdec_abc_function_call (fun, method->scope, thisp, argc, argv, ret);
 }
+

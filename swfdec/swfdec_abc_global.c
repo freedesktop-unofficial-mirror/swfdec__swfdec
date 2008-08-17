@@ -32,7 +32,6 @@
 #include "swfdec_abc_function.h"
 #include "swfdec_abc_initialize.h"
 #include "swfdec_abc_internal.h"
-#include "swfdec_abc_method.h"
 #include "swfdec_abc_native.h"
 #include "swfdec_abc_script.h"
 #include "swfdec_abc_traits.h"
@@ -98,7 +97,6 @@ swfdec_abc_global_new (SwfdecAsContext *context)
 {
   SwfdecAbcTraits *traits;
   SwfdecAbcGlobal *global;
-  SwfdecAbcMethod *method;
   SwfdecAsValue ret;
   SwfdecBits bits;
 
@@ -145,8 +143,7 @@ swfdec_abc_global_new (SwfdecAsContext *context)
 
   /* run main script */
   global->file->main->global = SWFDEC_ABC_OBJECT (global);
-  method = swfdec_abc_method_new (traits->construct, NULL);
-  swfdec_abc_method_call (method, SWFDEC_ABC_OBJECT (global), 0, NULL, &ret);
+  swfdec_abc_function_call (traits->construct, NULL, SWFDEC_ABC_OBJECT (global), 0, NULL, &ret);
 }
 
 void

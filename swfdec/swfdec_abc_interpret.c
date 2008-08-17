@@ -29,7 +29,6 @@
 #include "swfdec_abc_file.h"
 #include "swfdec_abc_function.h"
 #include "swfdec_abc_internal.h"
-#include "swfdec_abc_method.h"
 #include "swfdec_abc_scope_chain.h"
 #include "swfdec_abc_script.h"
 #include "swfdec_abc_traits.h"
@@ -417,7 +416,6 @@ swfdec_abc_interpret_new_class (SwfdecAbcTraits *traits, SwfdecAbcClass *base,
 {
   SwfdecAsContext *context;
   SwfdecAbcTraits *itraits;
-  SwfdecAbcMethod *method;
   SwfdecAbcClass *classp;
   SwfdecAsValue val;
   
@@ -467,18 +465,16 @@ swfdec_abc_interpret_new_class (SwfdecAbcTraits *traits, SwfdecAbcClass *base,
   } else {
     SWFDEC_AS_OBJECT (classp)->prototype = SWFDEC_AS_OBJECT (SWFDEC_ABC_GET_CLASS_CLASS (context));
   }
-  method = swfdec_abc_method_new (traits->construct, chain);
-  swfdec_abc_method_call (method, SWFDEC_ABC_OBJECT (classp), 0, NULL, &val);
+  swfdec_abc_function_call (traits->construct, chain, SWFDEC_ABC_OBJECT (classp), 0, NULL, &val);
 
   return classp;
 }
 
 void
-swfdec_abc_interpret (SwfdecAbcFunction *fun)
+swfdec_abc_interpret (SwfdecAbcFunction *fun, SwfdecAbcScopeChain *outer_scope)
 {
   SwfdecAsContext *context;
   SwfdecAsValue *locals, *scope_start, *scope_end, *scope_with;
-  SwfdecAbcScopeChain *outer_scope;
   SwfdecAsFrame *frame;
   SwfdecBits bits;
   guint i, opcode;
@@ -493,7 +489,6 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun)
   context = swfdec_gc_object_get_context (fun);
   frame = context->frame;
   pool = fun->bound_traits->pool;
-  outer_scope = SWFDEC_ABC_METHOD (frame->function)->scope;
 
   if (!swfdec_as_context_check_continue (context))
     return;

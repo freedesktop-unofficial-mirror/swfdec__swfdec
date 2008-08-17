@@ -26,8 +26,10 @@
 #include "swfdec_abc_file.h"
 #include "swfdec_abc_global.h"
 #include "swfdec_abc_internal.h"
+#include "swfdec_abc_interpret.h"
 #include "swfdec_abc_traits.h"
 #include "swfdec_as_context.h"
+#include "swfdec_as_frame_internal.h"
 #include "swfdec_debug.h"
 
 G_DEFINE_TYPE (SwfdecAbcFunction, swfdec_abc_function, SWFDEC_TYPE_GC_OBJECT)
@@ -174,4 +176,32 @@ swfdec_abc_function_is_override (SwfdecAbcFunction *fun, SwfdecAbcFunction *base
 
   SWFDEC_FIXME ("implement");
   return TRUE;
+}
+
+void
+swfdec_abc_function_call (SwfdecAbcFunction *fun, SwfdecAbcScopeChain *scope,
+    SwfdecAbcObject *thisp, guint argc, SwfdecAsValue *argv, SwfdecAsValue *ret)
+{
+  SwfdecAsFrame frame = { NULL, };
+  SwfdecAsContext *context;
+
+  g_return_if_fail (SWFDEC_IS_ABC_FUNCTION (fun));
+
+  context = swfdec_gc_object_get_context (fun);
+  swfdec_as_frame_init_native (&frame, context);
+  /* HACK! */
+  frame.function = (SwfdecAsFunction *) fun;
+  frame.thisp = SWFDEC_AS_OBJECT (thisp);
+  frame.argc = argc;
+  frame.argv = argv;
+  frame.return_value = ret;
+  frame.target = frame.next ? frame.next->original_target : SWFDEC_AS_OBJECT (thisp);
+  frame.original_target = frame.target;
+  if (fun->native) {
+    SwfdecAsValue rval;
+    ((SwfdecAsNative) fun->native) (context, frame.thisp, argc, argv, &rval);
+    swfdec_as_frame_return (&frame, &rval);
+  } else {
+    swfdec_abc_interpret (fun, scope);
+  }
 }
