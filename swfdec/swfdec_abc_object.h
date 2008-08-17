@@ -39,6 +39,7 @@ struct _SwfdecAbcObject {
   SwfdecAsObject	object;
 
   SwfdecAbcTraits *	traits;		/* the traits that created us - we have a ref so it stays alive until we dispose */
+  SwfdecAbcScopeChain *	scope;		/* the scope chain to use for slot functions */
   SwfdecAsValue *	slots;		/* traits->n_slots values */
 };
 
@@ -48,7 +49,8 @@ struct _SwfdecAbcObjectClass {
 
 GType			swfdec_abc_object_get_type	(void);
 
-SwfdecAbcObject *	swfdec_abc_object_new		(SwfdecAbcTraits *		traits);
+SwfdecAbcObject *	swfdec_abc_object_new		(SwfdecAbcTraits *		traits,
+							 SwfdecAbcScopeChain *		scopes);
 
 gboolean		swfdec_abc_object_get_variable	(SwfdecAsContext *		context,
 							 const SwfdecAsValue *		object,

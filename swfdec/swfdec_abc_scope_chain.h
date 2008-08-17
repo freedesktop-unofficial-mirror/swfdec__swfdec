@@ -20,11 +20,12 @@
 #ifndef _SWFDEC_ABC_SCOPE_CHAIN_H_
 #define _SWFDEC_ABC_SCOPE_CHAIN_H_
 
+#include <swfdec/swfdec_abc_types.h>
 #include <swfdec/swfdec_as_context.h>
 
 G_BEGIN_DECLS
 
-typedef struct _SwfdecAbcScopeChain SwfdecAbcScopeChain;
+//typedef struct _SwfdecAbcScopeChain SwfdecAbcScopeChain;
 typedef struct _SwfdecAbcScopeEntry SwfdecAbcScopeEntry;
 
 struct _SwfdecAbcScopeEntry {

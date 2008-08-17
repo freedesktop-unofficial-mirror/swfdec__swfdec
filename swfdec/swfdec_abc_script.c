@@ -65,7 +65,7 @@ swfdec_abc_script_get_global (SwfdecAbcScript *script)
     SwfdecAsValue ret;
     
     swfdec_abc_traits_resolve (traits);
-    script->global = swfdec_abc_object_new (traits);
+    script->global = swfdec_abc_object_new (traits, NULL);
     method = swfdec_abc_method_new (traits->construct, NULL);
     swfdec_abc_method_call (method, script->global, 0, NULL, &ret);
   }

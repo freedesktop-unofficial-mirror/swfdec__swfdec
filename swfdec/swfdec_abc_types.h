@@ -62,6 +62,7 @@ typedef struct _SwfdecAbcFile SwfdecAbcFile;
 typedef struct _SwfdecAbcFunction SwfdecAbcFunction;
 typedef struct _SwfdecAbcMultiname SwfdecAbcMultiname;
 typedef struct _SwfdecAbcObject SwfdecAbcObject;
+typedef struct _SwfdecAbcScopeChain SwfdecAbcScopeChain;
 typedef struct _SwfdecAbcScript SwfdecAbcScript;
 typedef struct _SwfdecAbcTraits SwfdecAbcTraits;
 

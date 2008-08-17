@@ -24,6 +24,7 @@
 #include "swfdec_abc_object.h"
 #include "swfdec_abc_internal.h"
 #include "swfdec_abc_multiname.h"
+#include "swfdec_abc_scope_chain.h"
 #include "swfdec_abc_traits.h"
 #include "swfdec_as_context.h"
 #include "swfdec_debug.h"
@@ -96,6 +97,7 @@ swfdec_abc_object_dispose (GObject *gobject)
     object->slots = NULL;
   }
   g_object_unref (object->traits);
+  swfdec_abc_scope_chain_unref (context, object->scope);
 
   G_OBJECT_CLASS (swfdec_abc_object_parent_class)->dispose (gobject);
 }
@@ -123,7 +125,7 @@ swfdec_abc_object_init (SwfdecAbcObject *function)
 }
 
 SwfdecAbcObject *
-swfdec_abc_object_new (SwfdecAbcTraits *traits)
+swfdec_abc_object_new (SwfdecAbcTraits *traits, SwfdecAbcScopeChain *scope)
 {
   SwfdecAbcObject *object;
 
@@ -135,6 +137,7 @@ swfdec_abc_object_new (SwfdecAbcTraits *traits)
   object = g_object_new (traits->type_func (), 
       "context", swfdec_gc_object_get_context (traits),
       "traits", traits, NULL);
+  object->scope = swfdec_abc_scope_chain_ref (scope);
 
   return object;
 }
