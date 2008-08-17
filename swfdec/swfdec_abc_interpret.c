@@ -769,6 +769,13 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun, SwfdecAbcScopeChain *outer_scope)
       case SWFDEC_ABC_OPCODE_SET_LOCAL_3:
 	locals[3] = *swfdec_as_stack_pop (context);
 	continue;
+      case SWFDEC_ABC_OPCODE_SET_PROPERTY:
+	i = swfdec_bits_get_vu32 (&bits);
+	val = swfdec_as_stack_pop (context);
+	if (!swfdec_abc_interpret_resolve_multiname (context, &mn, &pool->multinames[i]) ||
+	    !swfdec_abc_object_set_variable (context, swfdec_as_stack_pop (context), &mn, val))
+	  break;
+	continue;
       case SWFDEC_ABC_OPCODE_SWAP:
 	{
 	  SwfdecAsValue tmp = *swfdec_as_stack_peek (context, 1);
@@ -896,7 +903,6 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun, SwfdecAbcScopeChain *outer_scope)
       case SWFDEC_ABC_OPCODE_RSHIFT:
       case SWFDEC_ABC_OPCODE_SEND_ENTER:
       case SWFDEC_ABC_OPCODE_SET_GLOBAL_SLOT:
-      case SWFDEC_ABC_OPCODE_SET_PROPERTY:
       case SWFDEC_ABC_OPCODE_SET_SLOT:
       case SWFDEC_ABC_OPCODE_SET_SUPER:
       case SWFDEC_ABC_OPCODE_STRICT_EQUALS:
