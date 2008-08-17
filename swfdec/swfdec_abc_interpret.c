@@ -589,6 +589,10 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun, SwfdecAbcScopeChain *outer_scope)
 	opcode, swfdec_abc_opcode_get_name (opcode));
     /* order of opcodes is alphabetical */
     switch (opcode) {
+      case SWFDEC_ABC_OPCODE_DUP:
+	val = swfdec_as_stack_peek (context, 1);
+	*swfdec_as_stack_push (context) = *val;
+	continue;
       case SWFDEC_ABC_OPCODE_FIND_PROP_STRICT:
       case SWFDEC_ABC_OPCODE_FIND_PROPERTY:
 	i = swfdec_bits_get_vu32 (&bits);
@@ -684,6 +688,9 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun, SwfdecAbcScopeChain *outer_scope)
 	      SWFDEC_AS_OBJECT (classp));
 	}
 	continue;
+      case SWFDEC_ABC_OPCODE_POP:
+	swfdec_as_stack_pop (context);
+	continue;
       case SWFDEC_ABC_OPCODE_POP_SCOPE:
 	scope_end--;
 	if (scope_end == scope_with)
@@ -742,6 +749,13 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun, SwfdecAbcScopeChain *outer_scope)
       case SWFDEC_ABC_OPCODE_RETURN_VOID:
 	swfdec_as_frame_return (frame, NULL);
 	return TRUE;
+      case SWFDEC_ABC_OPCODE_SWAP:
+	{
+	  SwfdecAsValue tmp = *swfdec_as_stack_peek (context, 1);
+	  *swfdec_as_stack_peek (context, 1) = *swfdec_as_stack_peek (context, 2);
+	  *swfdec_as_stack_peek (context, 2) = tmp;
+	}
+	continue;
       case SWFDEC_ABC_OPCODE_BREAKPOINT:
       case SWFDEC_ABC_OPCODE_NOP:
       case SWFDEC_ABC_OPCODE_THROW:
@@ -771,9 +785,6 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun, SwfdecAbcScopeChain *outer_scope)
       case SWFDEC_ABC_OPCODE_NEXT_NAME:
       case SWFDEC_ABC_OPCODE_HAS_NEXT:
       case SWFDEC_ABC_OPCODE_NEXT_VALUE:
-      case SWFDEC_ABC_OPCODE_POP:
-      case SWFDEC_ABC_OPCODE_DUP:
-      case SWFDEC_ABC_OPCODE_SWAP:
       case SWFDEC_ABC_OPCODE_HAS_NEXT2:
       case SWFDEC_ABC_OPCODE_CALL:
       case SWFDEC_ABC_OPCODE_CONSTRUCT:
