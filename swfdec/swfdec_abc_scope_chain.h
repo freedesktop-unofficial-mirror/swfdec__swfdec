@@ -29,14 +29,15 @@ G_BEGIN_DECLS
 typedef struct _SwfdecAbcScopeEntry SwfdecAbcScopeEntry;
 
 struct _SwfdecAbcScopeEntry {
-  SwfdecAsValue		value;
-  gboolean		with;
+  SwfdecAsValue		value;		/* the scope value */
+  gboolean		with;		/* with scope or normal scope? */
 };
 
 struct _SwfdecAbcScopeChain {
   guint			refcount;
-  guint			n_entries;
-  SwfdecAbcScopeEntry	entries[1];
+  SwfdecAbcScopeChain *	base;		/* base scope chain (for super calls) - FIXME: Want vtables instead? */
+  guint			n_entries;	/* number of entries in following array */
+  SwfdecAbcScopeEntry	entries[1];	/* array of entries */
 };
 
 SwfdecAbcScopeChain *	swfdec_abc_scope_chain_new	(SwfdecAsContext *		context,

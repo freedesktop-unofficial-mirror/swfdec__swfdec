@@ -106,6 +106,7 @@ swfdec_abc_scope_chain_unref (SwfdecAsContext *context, SwfdecAbcScopeChain *cha
   chain->refcount--;
   if (chain->refcount > 0)
     return;
+  swfdec_abc_scope_chain_unref (context, chain->base);
   size = SWFDEC_ABC_SCOPE_CHAIN_SIZE (chain->n_entries);
   swfdec_as_context_unuse_mem (context, size);
   g_slice_free1 (size, chain);
@@ -119,6 +120,7 @@ swfdec_abc_scope_chain_mark (const SwfdecAbcScopeChain *chain)
   if (chain == NULL)
     return;
 
+  swfdec_abc_scope_chain_mark (chain->base);
   for (i = 0; i < chain->n_entries; i++) {
     swfdec_as_value_mark (&chain->entries[i].value);
   }
