@@ -27,9 +27,10 @@
 G_BEGIN_DECLS
 
 #define SWFDEC_ABC_NATIVE(id, func) void func (SwfdecAsContext *cx, \
-    SwfdecAsObject *object, guint argc, SwfdecAsValue *argv, SwfdecAsValue *ret);
+    guint argc, SwfdecAsValue *argv, SwfdecAsValue *ret);
 #define SWFDEC_ABC_FLASH(id, func) void func (SwfdecAsContext *cx, \
-    SwfdecAsObject *object, guint argc, SwfdecAsValue *argv, SwfdecAsValue *ret);
+    guint argc, SwfdecAsValue *argv, SwfdecAsValue *ret);
+typedef void (* SwfdecAbcNative) (SwfdecAsContext *cx, guint argc, SwfdecAsValue *argv, SwfdecAsValue *ret);
 
 /* This header contains all private symbols of Abc handling that should not be 
  * exported in the API */

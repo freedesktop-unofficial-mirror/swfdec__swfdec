@@ -45,6 +45,11 @@ struct _SwfdecAbcObject {
 
 struct _SwfdecAbcObjectClass {
   SwfdecAsObjectClass	object_class;
+
+  gboolean		(* call)			(SwfdecAbcObject *		object,
+							 guint				argc,
+							 SwfdecAsValue *		argv,
+							 SwfdecAsValue *		ret);
 };
 
 GType			swfdec_abc_object_get_type	(void);
@@ -52,6 +57,11 @@ GType			swfdec_abc_object_get_type	(void);
 SwfdecAbcObject *	swfdec_abc_object_new		(SwfdecAbcTraits *		traits,
 							 SwfdecAbcScopeChain *		scopes);
 SwfdecAbcObject *	swfdec_abc_object_new_from_class(SwfdecAbcClass *		classp);
+
+gboolean		swfdec_abc_object_call		(SwfdecAbcObject *		object,
+							 guint				argc,
+							 SwfdecAsValue *		argv,
+							 SwfdecAsValue *		ret);
 
 gboolean		swfdec_abc_object_get_variable	(SwfdecAsContext *		context,
 							 const SwfdecAsValue *		object,
@@ -65,6 +75,12 @@ gboolean		swfdec_abc_object_init_variable	(SwfdecAsContext *		context,
 							 const SwfdecAsValue *		object,
 							 const SwfdecAbcMultiname *	mn,
 							 const SwfdecAsValue *		value);
+gboolean		swfdec_abc_object_call_variable	(SwfdecAsContext *		context,
+							 const SwfdecAsValue *		object,
+							 const SwfdecAbcMultiname *	mn,
+							 guint				argc,
+							 SwfdecAsValue *		argv,
+							 SwfdecAsValue *		ret);
 
 
 G_END_DECLS

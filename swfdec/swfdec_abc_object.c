@@ -106,6 +106,15 @@ swfdec_abc_object_dispose (GObject *gobject)
   G_OBJECT_CLASS (swfdec_abc_object_parent_class)->dispose (gobject);
 }
 
+static gboolean
+swfdec_abc_object_do_call (SwfdecAbcObject *object, guint argc, 
+    SwfdecAsValue *argv, SwfdecAsValue *ret)
+{
+  swfdec_as_context_throw_abc (swfdec_gc_object_get_context (object), 
+      SWFDEC_ABC_TYPE_REFERENCE_ERROR, "value is not a function.");
+  return FALSE;
+}
+
 static void
 swfdec_abc_object_class_init (SwfdecAbcObjectClass *klass)
 {
@@ -121,6 +130,8 @@ swfdec_abc_object_class_init (SwfdecAbcObjectClass *klass)
 	  SWFDEC_TYPE_ABC_TRAITS, G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 
   gc_class->mark = swfdec_abc_object_mark;
+
+  klass->call = swfdec_abc_object_do_call;
 }
 
 static void
@@ -153,6 +164,20 @@ swfdec_abc_object_new_from_class (SwfdecAbcClass *classp)
 
   return swfdec_abc_object_new (SWFDEC_ABC_OBJECT (classp)->traits->instance_traits,
       classp->instance_scope);
+}
+
+gboolean
+swfdec_abc_object_call (SwfdecAbcObject *object, guint argc, 
+    SwfdecAsValue *argv, SwfdecAsValue *ret)
+{
+  SwfdecAbcObjectClass *klass;
+
+  g_return_val_if_fail (SWFDEC_IS_ABC_OBJECT (object), FALSE);
+  g_return_val_if_fail (argv != NULL, FALSE);
+  g_return_val_if_fail (ret != NULL, FALSE);
+
+  klass = SWFDEC_ABC_OBJECT_GET_CLASS (object);
+  return klass->call (object, argc, argv, ret);
 }
 
 gboolean
@@ -325,3 +350,49 @@ swfdec_abc_object_init_variable (SwfdecAsContext *context, const SwfdecAsValue *
   return swfdec_abc_object_set_variable_full (context, object, TRUE, mn, value);
 }
 
+gboolean
+swfdec_abc_object_call_variable	(SwfdecAsContext *context, const SwfdecAsValue *object,
+    const SwfdecAbcMultiname *mn, guint argc, SwfdecAsValue *argv, SwfdecAsValue *ret)
+{
+  SwfdecAbcTraits *traits;
+  const SwfdecAbcTrait *trait;
+
+  if (!SWFDEC_AS_VALUE_IS_OBJECT (object)) {
+    /* FIXME: This is way too strict, but our API doesn't allow the this object
+     * to be anything but objects yet.
+     */
+    swfdec_as_context_throw_abc (context, SWFDEC_ABC_TYPE_REFERENCE_ERROR,
+	"%s is not a function.", mn->name);
+    return FALSE;
+  }
+  traits = swfdec_as_value_to_traits (context, object);
+  trait = swfdec_abc_traits_find_trait_multi (traits, mn);
+  if (trait == SWFDEC_ABC_TRAIT_AMBIGUOUS) {
+    swfdec_as_context_throw_abc (context, SWFDEC_ABC_TYPE_REFERENCE_ERROR,
+	"%s is ambiguous; Found more than one matching binding.", mn->name);
+    return FALSE;
+  } else if (trait != NULL && 
+      SWFDEC_ABC_BINDING_GET_TYPE (trait->type) == SWFDEC_ABC_TRAIT_METHOD) {
+    guint slot = SWFDEC_ABC_BINDING_GET_ID (trait->type);
+    SwfdecAbcScopeChain *scope;
+    if (SWFDEC_AS_VALUE_IS_OBJECT (object)) {
+      SwfdecAsObject *o = SWFDEC_AS_VALUE_GET_OBJECT (object);
+      scope = SWFDEC_IS_ABC_OBJECT (o) ? SWFDEC_ABC_OBJECT (o)->scope : NULL;
+    } else {
+      scope = NULL;
+    }
+    argv[0] = *object;
+    return swfdec_abc_function_call (traits->methods[slot], scope, argc, argv, ret);
+  } else {
+    SwfdecAsValue tmp;
+    swfdec_abc_object_get_variable (context, object, mn, &tmp);
+    if (SWFDEC_AS_VALUE_IS_OBJECT (&tmp)) {
+      return swfdec_abc_object_call (SWFDEC_ABC_OBJECT (SWFDEC_AS_VALUE_GET_OBJECT (&tmp)),
+	  argc, argv, ret);
+    } else {
+      swfdec_as_context_throw_abc (context, SWFDEC_ABC_TYPE_REFERENCE_ERROR,
+	  "value is not a function.");
+      return FALSE;
+    }
+  }
+}

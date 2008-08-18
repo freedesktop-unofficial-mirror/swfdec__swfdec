@@ -32,7 +32,6 @@
 #include "swfdec_abc_internal.h"
 #include "swfdec_abc_scope_chain.h"
 #include "swfdec_as_context.h"
-#include "swfdec_as_native_function.h"
 #include "swfdec_debug.h"
 
 G_DEFINE_TYPE (SwfdecAbcClass, swfdec_abc_class, SWFDEC_TYPE_ABC_OBJECT)
@@ -101,12 +100,10 @@ swfdec_abc_class_init (SwfdecAbcClass *class)
 
 SWFDEC_ABC_NATIVE (29, swfdec_abc_class_get_prototype)
 void
-swfdec_abc_class_get_prototype (SwfdecAsContext *cx, SwfdecAsObject *object,
+swfdec_abc_class_get_prototype (SwfdecAsContext *cx,
     guint argc, SwfdecAsValue *argv, SwfdecAsValue *ret)
 {
-  SwfdecAbcClass *classp;
-
-  SWFDEC_AS_CHECK (SWFDEC_TYPE_ABC_CLASS, &classp, "");
+  SwfdecAbcClass *classp = SWFDEC_ABC_CLASS (SWFDEC_AS_VALUE_GET_OBJECT (&argv[0]));
 
   if (classp->prototype) {
     SWFDEC_AS_VALUE_SET_OBJECT (ret, SWFDEC_AS_OBJECT (classp->prototype));

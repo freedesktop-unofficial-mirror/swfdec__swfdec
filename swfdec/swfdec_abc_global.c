@@ -314,13 +314,13 @@ swfdec_abc_global_get_script_variable (SwfdecAbcGlobal *global,
 /* FIXME: just here to make stuff compile */
 SWFDEC_ABC_NATIVE(0, swfdec_abc_global_trace)
 void
-swfdec_abc_global_trace (SwfdecAsContext *cx, SwfdecAsObject *object,
+swfdec_abc_global_trace (SwfdecAsContext *cx,
     guint argc, SwfdecAsValue *argv, SwfdecAsValue *ret)
 {
   GString *string = g_string_new ("");
   guint i;
 
-  for (i = 0; i < argc; i++) {
+  for (i = 1; i < argc; i++) {
     const char *s = swfdec_as_value_to_string (cx, &argv[i]);
     g_string_append (string, s);
   }
@@ -330,13 +330,13 @@ swfdec_abc_global_trace (SwfdecAsContext *cx, SwfdecAsObject *object,
 
 SWFDEC_ABC_FLASH(0, swfdec_abc_global_trace2)
 void
-swfdec_abc_global_trace2 (SwfdecAsContext *cx, SwfdecAsObject *object,
+swfdec_abc_global_trace2 (SwfdecAsContext *cx,
     guint argc, SwfdecAsValue *argv, SwfdecAsValue *ret)
 {
   GString *string = g_string_new ("");
   guint i;
 
-  for (i = 0; i < argc; i++) {
+  for (i = 1; i < argc; i++) {
     const char *s = swfdec_as_value_to_string (cx, &argv[i]);
     g_string_append (string, s);
   }

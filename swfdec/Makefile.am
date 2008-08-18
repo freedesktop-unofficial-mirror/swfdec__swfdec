@@ -385,18 +385,20 @@ CLEANFILES = \
 
 swfdec_abc_native.c: $(libswfdec_source_files)
 	(cd $(srcdir) \
-	  && echo "#include \"swfdec_as_types.h\"" \
+	  && echo "#include \"swfdec_abc_internal.h\"" \
+	  && echo "#undef SWFDEC_ABC_NATIVE" \
+	  && echo "#undef SWFDEC_ABC_FLASH" \
 	  && echo "#define SWFDEC_ABC_NATIVE(id,func) void func (SwfdecAsContext *cx, \\" \
-	  && echo "    SwfdecAsObject *object, guint argc, SwfdecAsValue *argv, SwfdecAsValue *ret);" \
+	  && echo "    guint argc, SwfdecAsValue *argv, SwfdecAsValue *ret);" \
 	  && echo "#define SWFDEC_ABC_FLASH SWFDEC_ABC_NATIVE" \
 	  && grep -he "^SWFDEC_ABC_NATIVE" $(libswfdec_source_files) \
 	  && grep -he "^SWFDEC_ABC_FLASH" $(libswfdec_source_files) \
 	  && echo "#undef SWFDEC_ABC_NATIVE" \
 	  && echo "#define SWFDEC_ABC_NATIVE(id,func) [id] = func," \
-	  && echo "const SwfdecAsNative swfdec_abc_natives[585] = {" \
+	  && echo "const SwfdecAbcNative swfdec_abc_natives[585] = {" \
 	  && grep -he "^SWFDEC_ABC_NATIVE" $(libswfdec_source_files) \
 	  && echo "};" \
-	  && echo "const SwfdecAsNative swfdec_abc_natives_flash[1944] = {" \
+	  && echo "const SwfdecAbcNative swfdec_abc_natives_flash[1944] = {" \
 	  && grep -he "^SWFDEC_ABC_FLASH" $(libswfdec_source_files) \
 	  && echo "};" \
 	  && echo "#undef SWFDEC_ABC_NATIVE" \

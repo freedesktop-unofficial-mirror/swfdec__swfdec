@@ -74,11 +74,22 @@ swfdec_as_stack_push (SwfdecAsContext *cx)
   cx->cur->type = SWFDEC_AS_TYPE_OBJECT + 1;
   return cx->cur++;
 }
+
+static inline void
+swfdec_as_stack_push_n (SwfdecAsContext *cx, guint n)
+{
+  guint i;
+
+  for (i = 0; i < n; i++) {
+    swfdec_as_stack_push (cx);
+  }
+}
 #else /* SWFDEC_MAD_CHECKS */
 #define swfdec_as_stack_peek(cx,n) (&(cx)->cur[-(gssize)(n)])
 #define swfdec_as_stack_pop(cx) (--(cx)->cur)
 #define swfdec_as_stack_pop_n(cx, n) ((cx)->cur -= (n))
 #define swfdec_as_stack_push(cx) ((cx)->cur++)
+#define swfdec_as_stack_push_n(cx, n) ((cx)->cur += (n))
 #endif
 #define swfdec_as_stack_swap(cx,x,y) G_STMT_START { \
   SwfdecAsContext *__cx = (cx); \

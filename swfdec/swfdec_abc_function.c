@@ -209,9 +209,9 @@ swfdec_abc_function_call (SwfdecAbcFunction *fun, SwfdecAbcScopeChain *scope,
   /* FIXME: coerce arguments */
   if (fun->native) {
     SwfdecAsValue rval;
-    ((SwfdecAsNative) fun->native) (context, frame.thisp, argc, argv, &rval);
+    ((SwfdecAbcNative) fun->native) (context, argc, argv, &rval);
     swfdec_as_frame_return (&frame, &rval);
-    return TRUE;
+    return context->exception ? FALSE : TRUE;
   } else {
     return swfdec_abc_interpret (fun, scope);
   }
