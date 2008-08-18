@@ -442,6 +442,7 @@ swfdec_abc_interpret_new_class (SwfdecAbcTraits *traits, SwfdecAbcClass *base,
       swfdec_as_context_throw_abc (context, SWFDEC_ABC_TYPE_VERIFY_ERROR,
 	  "The OP_newclass opcode was used with the incorrect base class.");
     }
+    chain->base = swfdec_abc_scope_chain_ref (base->instance_scope);
   }
 
   if (!swfdec_abc_traits_resolve (traits) ||
@@ -600,7 +601,7 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun, SwfdecAbcScopeChain *outer_scope)
      * giant switch statement.
      */
     g_print ("  %s%02X %s\n", frame->next ? frame->next->next ? "    " : "  " : "",
-	opcode, swfdec_abc_opcode_get_name (opcode));
+    	opcode, swfdec_abc_opcode_get_name (opcode));
     /* order of opcodes is alphabetical */
     switch (opcode) {
       case SWFDEC_ABC_OPCODE_CALL_PROPERTY:
@@ -642,6 +643,15 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun, SwfdecAbcScopeChain *outer_scope)
 	      swfdec_as_value_to_string (context, val));
 	}
 	/* else NULL stays the same */
+	continue;
+      case SWFDEC_ABC_OPCODE_CONSTRUCT_SUPER:
+	i = swfdec_bits_get_vu32 (&bits);
+	val = swfdec_as_stack_peek (context, i + 1);
+	if (swfdec_abc_interpreter_throw_null (context, val))
+	  break;
+	swfdec_abc_function_call (fun->bound_traits->base->construct,
+	    outer_scope ? outer_scope->base : NULL, i, val, val);
+	swfdec_as_stack_pop_n (context, i + 1);
 	continue;
       case SWFDEC_ABC_OPCODE_DIVIDE:
 	val = swfdec_as_stack_peek (context, 1);
@@ -904,7 +914,6 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun, SwfdecAbcScopeChain *outer_scope)
       case SWFDEC_ABC_OPCODE_CONCAT:
       case SWFDEC_ABC_OPCODE_CONSTRUCT:
       case SWFDEC_ABC_OPCODE_CONSTRUCT_PROP:
-      case SWFDEC_ABC_OPCODE_CONSTRUCT_SUPER:
       case SWFDEC_ABC_OPCODE_CONVERT_B:
       case SWFDEC_ABC_OPCODE_CONVERT_D:
       case SWFDEC_ABC_OPCODE_CONVERT_I:
