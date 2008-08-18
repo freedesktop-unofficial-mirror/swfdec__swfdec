@@ -302,13 +302,23 @@ gboolean
 swfdec_abc_global_get_script_variable (SwfdecAbcGlobal *global,
     const SwfdecAbcMultiname *mn, SwfdecAsValue *value)
 {
+  SwfdecAsContext *context;
+  SwfdecAbcScript *script;
+  SwfdecAsValue val;
+
   g_return_val_if_fail (SWFDEC_IS_ABC_GLOBAL (global), FALSE);
   g_return_val_if_fail (mn != NULL, FALSE);
   g_return_val_if_fail (value != NULL, FALSE);
 
-  SWFDEC_FIXME ("global variables, please");
-  SWFDEC_AS_VALUE_SET_UNDEFINED (value);
-  return FALSE;
+  context = swfdec_gc_object_get_context (global);
+  script = swfdec_abc_global_get_script_multi (global, mn);
+  if (script) {
+    SWFDEC_AS_VALUE_SET_OBJECT (&val,
+	SWFDEC_AS_OBJECT (swfdec_abc_script_get_global (script)));
+  } else {
+    SWFDEC_AS_VALUE_SET_OBJECT (&val, SWFDEC_AS_OBJECT (global));
+  }
+  return swfdec_abc_object_get_variable (context, &val, mn, value);
 }
 
 /*** ABC CODE ***/
