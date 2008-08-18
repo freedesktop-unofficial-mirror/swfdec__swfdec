@@ -111,7 +111,16 @@ swfdec_abc_object_do_call (SwfdecAbcObject *object, guint argc,
     SwfdecAsValue *argv, SwfdecAsValue *ret)
 {
   swfdec_as_context_throw_abc (swfdec_gc_object_get_context (object), 
-      SWFDEC_ABC_TYPE_REFERENCE_ERROR, "value is not a function.");
+      SWFDEC_ABC_TYPE_TYPE_ERROR, "value is not a function.");
+  return FALSE;
+}
+
+static gboolean
+swfdec_abc_object_do_construct (SwfdecAbcObject *object, guint argc, 
+    SwfdecAsValue *argv, SwfdecAsValue *ret)
+{
+  swfdec_as_context_throw_abc (swfdec_gc_object_get_context (object), 
+      SWFDEC_ABC_TYPE_TYPE_ERROR, "Instantiation attempted on a non-constructor.");
   return FALSE;
 }
 
@@ -132,6 +141,7 @@ swfdec_abc_object_class_init (SwfdecAbcObjectClass *klass)
   gc_class->mark = swfdec_abc_object_mark;
 
   klass->call = swfdec_abc_object_do_call;
+  klass->construct = swfdec_abc_object_do_construct;
 }
 
 static void
@@ -168,6 +178,20 @@ swfdec_abc_object_new_from_class (SwfdecAbcClass *classp)
 
 gboolean
 swfdec_abc_object_call (SwfdecAbcObject *object, guint argc, 
+    SwfdecAsValue *argv, SwfdecAsValue *ret)
+{
+  SwfdecAbcObjectClass *klass;
+
+  g_return_val_if_fail (SWFDEC_IS_ABC_OBJECT (object), FALSE);
+  g_return_val_if_fail (argv != NULL, FALSE);
+  g_return_val_if_fail (ret != NULL, FALSE);
+
+  klass = SWFDEC_ABC_OBJECT_GET_CLASS (object);
+  return klass->call (object, argc, argv, ret);
+}
+
+gboolean
+swfdec_abc_object_construct (SwfdecAbcObject *object, guint argc, 
     SwfdecAsValue *argv, SwfdecAsValue *ret)
 {
   SwfdecAbcObjectClass *klass;

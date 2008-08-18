@@ -50,6 +50,10 @@ struct _SwfdecAbcObjectClass {
 							 guint				argc,
 							 SwfdecAsValue *		argv,
 							 SwfdecAsValue *		ret);
+  gboolean		(* construct)			(SwfdecAbcObject *		object,
+							 guint				argc,
+							 SwfdecAsValue *		argv,
+							 SwfdecAsValue *		ret);
 };
 
 GType			swfdec_abc_object_get_type	(void);
@@ -59,6 +63,10 @@ SwfdecAbcObject *	swfdec_abc_object_new		(SwfdecAbcTraits *		traits,
 SwfdecAbcObject *	swfdec_abc_object_new_from_class(SwfdecAbcClass *		classp);
 
 gboolean		swfdec_abc_object_call		(SwfdecAbcObject *		object,
+							 guint				argc,
+							 SwfdecAsValue *		argv,
+							 SwfdecAsValue *		ret);
+gboolean		swfdec_abc_object_construct	(SwfdecAbcObject *		object,
 							 guint				argc,
 							 SwfdecAsValue *		argv,
 							 SwfdecAsValue *		ret);
