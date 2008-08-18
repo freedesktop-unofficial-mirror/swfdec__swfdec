@@ -376,6 +376,12 @@ swfdec_resource_stream_target_init (SwfdecStreamTargetInterface *iface)
 }
 
 static void
+mark_value (gpointer key, gpointer value, gpointer unused)
+{
+  swfdec_gc_object_mark (value);
+}
+
+static void
 swfdec_resource_mark (SwfdecGcObject *object)
 {
   SwfdecResource *resource = SWFDEC_RESOURCE (object);
@@ -388,6 +394,7 @@ swfdec_resource_mark (SwfdecGcObject *object)
     swfdec_gc_object_mark (resource->sandbox);
   if (resource->target)
     swfdec_gc_object_mark (resource->target);
+  g_hash_table_foreach (resource->abc_classes, mark_value, NULL);
 
   SWFDEC_GC_OBJECT_CLASS (swfdec_resource_parent_class)->mark (object);
 }
@@ -435,7 +442,7 @@ swfdec_resource_init (SwfdecResource *instance)
   instance->export_names = g_hash_table_new_full (g_direct_hash, g_direct_equal, 
       g_object_unref, g_free);
   instance->abc_classes = g_hash_table_new_full (g_direct_hash, g_direct_equal, 
-      NULL, g_free);
+      NULL, NULL);
 }
 
 static void
