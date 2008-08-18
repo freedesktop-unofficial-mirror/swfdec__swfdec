@@ -535,6 +535,7 @@ swfdec_player_perform_abc (SwfdecPlayer *player)
   SwfdecPlayerPrivate *priv = player->priv;
   SwfdecMovie **entry, *movie;
   SwfdecAbcClass *classp;
+  SwfdecAsValue val = { 0, };
 
   do {
     entry = swfdec_ring_buffer_pop (priv->abc_constructors);
@@ -546,11 +547,18 @@ swfdec_player_perform_abc (SwfdecPlayer *player)
     g_object_unref (movie);
   } while (TRUE);
 
-  g_object_unref (movie);
+  swfdec_sandbox_use (movie->resource->sandbox);
   g_assert (movie->abc == NULL);
   classp = swfdec_resource_get_abc_class (movie->resource, movie);
-  SWFDEC_ERROR ("run constructor %s for movie %s\n", 
-      classp ? SWFDEC_ABC_OBJECT (classp)->traits->name : "FIXME: THIS SHOULD NOT HAPPEN", movie->name);
+  if (!swfdec_abc_object_construct (SWFDEC_ABC_OBJECT (classp), 0, &val, &val)) {
+    g_assert (SWFDEC_AS_VALUE_IS_OBJECT (&val));
+    movie->abc = SWFDEC_ABC_OBJECT (SWFDEC_AS_VALUE_GET_OBJECT (&val));
+  } else {
+    SWFDEC_FIXME ("constructor %s for movie %s failed, what now?", 
+      SWFDEC_ABC_OBJECT (classp)->traits->name, movie->name);
+  }
+  swfdec_sandbox_unuse (movie->resource->sandbox);
+  g_object_unref (movie);
 }
 
 void

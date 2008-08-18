@@ -26,6 +26,8 @@
 #include <string.h>
 #include "swfdec_resource.h"
 #include "swfdec_abc_class.h"
+#include "swfdec_abc_internal.h"
+#include "swfdec_abc_multiname.h"
 #include "swfdec_access.h"
 #include "swfdec_as_object.h"
 #include "swfdec_as_internal.h"
@@ -809,8 +811,15 @@ swfdec_resource_get_abc_class (SwfdecResource *resource,
   }
   if (ret)
     return ret;
-  SWFDEC_FIXME ("return proper class here");
-  /* should be: get_builtin_class (magic) */
-  return NULL;
+
+  {
+    SwfdecAsContext *context = swfdec_gc_object_get_context (resource);
+    SwfdecAbcMultiname mn;
+    SwfdecAsValue val;
+    SWFDEC_FIXME ("do proper class lookup here");
+    swfdec_abc_multiname_init_from_string (&mn, context, "Sprite");
+    swfdec_as_context_get_abc_variable (context, &mn, &val);
+    return SWFDEC_ABC_CLASS (SWFDEC_AS_VALUE_GET_OBJECT (&val));;
+  }
 }
 
