@@ -813,9 +813,20 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun, SwfdecAbcScopeChain *outer_scope)
       case SWFDEC_ABC_OPCODE_PUSH_UNDEFINED:
 	SWFDEC_AS_VALUE_SET_UNDEFINED (swfdec_as_stack_push (context));
 	continue;
-      case SWFDEC_ABC_OPCODE_RETURN_VOID:
-	swfdec_as_frame_return (frame, NULL);
+      case SWFDEC_ABC_OPCODE_RETURN_VALUE:
+	val = swfdec_as_stack_peek (context, 1);
+	if (fun->return_traits && !swfdec_abc_traits_coerce (fun->return_traits, val))
+	  break;
+	swfdec_as_frame_return (frame, val);
 	return TRUE;
+      case SWFDEC_ABC_OPCODE_RETURN_VOID:
+	{
+	  SwfdecAsValue tmp = { 0, };
+	  if (fun->return_traits && !swfdec_abc_traits_coerce (fun->return_traits, &tmp))
+	    break;
+	  swfdec_as_frame_return (frame, &tmp);
+	  return TRUE;
+	}
       case SWFDEC_ABC_OPCODE_SET_LOCAL:
 	i = swfdec_bits_get_vu32 (&bits);
 	locals[i] = *swfdec_as_stack_pop (context);
@@ -954,7 +965,6 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun, SwfdecAbcScopeChain *outer_scope)
       case SWFDEC_ABC_OPCODE_NOT:
       case SWFDEC_ABC_OPCODE_PROLOGUE:
       case SWFDEC_ABC_OPCODE_PUSH_WITH:
-      case SWFDEC_ABC_OPCODE_RETURN_VALUE:
       case SWFDEC_ABC_OPCODE_RSHIFT:
       case SWFDEC_ABC_OPCODE_SEND_ENTER:
       case SWFDEC_ABC_OPCODE_SET_GLOBAL_SLOT:
