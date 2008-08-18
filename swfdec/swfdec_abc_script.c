@@ -63,11 +63,12 @@ swfdec_abc_script_get_global (SwfdecAbcScript *script)
 
   if (script->global == NULL) {
     SwfdecAbcTraits* traits = script->traits;
-    SwfdecAsValue ret;
+    SwfdecAsValue val;
     
     swfdec_abc_traits_resolve (traits);
     script->global = swfdec_abc_object_new (traits, NULL);
-    swfdec_abc_function_call (traits->construct, NULL, script->global, 0, NULL, &ret);
+    SWFDEC_AS_VALUE_SET_OBJECT (&val, SWFDEC_AS_OBJECT (script->global));
+    swfdec_abc_function_call (traits->construct, NULL, 0, &val, &val);
   }
   return script->global;
 }

@@ -203,10 +203,17 @@ swfdec_abc_object_get_variable (SwfdecAsContext *context, const SwfdecAsValue *o
       case SWFDEC_ABC_TRAIT_GET:
       case SWFDEC_ABC_TRAIT_GETSET:
 	{
-	  SwfdecAbcObject *o = SWFDEC_ABC_OBJECT (SWFDEC_AS_VALUE_GET_OBJECT (object));
 	  guint slot = SWFDEC_ABC_BINDING_GET_ID (trait->type);
-	  return swfdec_abc_function_call (o->traits->methods[slot], o->scope,
-	      o, 0, NULL, value);
+	  SwfdecAbcScopeChain *chain;
+	  SwfdecAsValue tmp;
+	  if (SWFDEC_AS_VALUE_IS_OBJECT (object) &&
+	      SWFDEC_IS_ABC_OBJECT (SWFDEC_AS_VALUE_GET_OBJECT (object))) {
+	    chain = SWFDEC_ABC_OBJECT (SWFDEC_AS_VALUE_GET_OBJECT (object))->scope;
+	  } else {
+	    chain = NULL;
+	  }
+	  tmp = *object;
+	  return swfdec_abc_function_call (traits->methods[slot], chain, 0, &tmp, value);
 	}
       case SWFDEC_ABC_TRAIT_SET:
 	swfdec_as_context_throw_abc (context, SWFDEC_ABC_TYPE_REFERENCE_ERROR, 
@@ -252,10 +259,10 @@ swfdec_abc_object_set_variable_full (SwfdecAsContext *context, const SwfdecAsVal
       case SWFDEC_ABC_TRAIT_SLOT:
 	{
 	  SwfdecAbcObject *o = SWFDEC_ABC_OBJECT (SWFDEC_AS_VALUE_GET_OBJECT (object));
-	  SwfdecAsValue tmp = *value;
 	  guint slot = SWFDEC_ABC_BINDING_GET_ID (trait->type);
-	  //if (!swfdec_abc_traits_coerce (trait->traits, &tmp))
-	  //  return FALSE;
+	  SwfdecAsValue tmp = *value;
+	  if (trait->traits && !swfdec_abc_traits_coerce (trait->traits, &tmp))
+	    return FALSE;
 	  g_assert (slot < o->traits->n_slots);
 	  o->slots[slot] = tmp;
 	}
@@ -271,13 +278,19 @@ swfdec_abc_object_set_variable_full (SwfdecAsContext *context, const SwfdecAsVal
       case SWFDEC_ABC_TRAIT_SET:
       case SWFDEC_ABC_TRAIT_GETSET:
 	{
-	  SwfdecAbcObject *o = SWFDEC_ABC_OBJECT (SWFDEC_AS_VALUE_GET_OBJECT (object));
-	  SwfdecAsValue retval, tmp;
+	  SwfdecAbcScopeChain *chain;
+	  SwfdecAsValue retval, argv[2];
 	  guint slot = SWFDEC_ABC_BINDING_GET_ID (trait->type);
-	  /* Need to do this as argv gets coerced */
-	  tmp = *value;
-	  return swfdec_abc_function_call (o->traits->methods[slot + 1], o->scope,
-	      o, 1, &tmp, &retval);
+	  if (SWFDEC_AS_VALUE_IS_OBJECT (object) &&
+	      SWFDEC_IS_ABC_OBJECT (SWFDEC_AS_VALUE_GET_OBJECT (object))) {
+	    chain = SWFDEC_ABC_OBJECT (SWFDEC_AS_VALUE_GET_OBJECT (object))->scope;
+	  } else {
+	    chain = NULL;
+	  }
+	  argv[0] = *object;
+	  argv[1] = *value;
+	  return swfdec_abc_function_call (traits->methods[slot + 1], chain, 
+	      1, argv, &retval);
 	}
       case SWFDEC_ABC_TRAIT_NONE:
       case SWFDEC_ABC_TRAIT_ITRAMP:

@@ -87,7 +87,7 @@ swfdec_abc_method_new (SwfdecAbcFunction *function, SwfdecAbcScopeChain *chain)
 }
 
 void
-swfdec_abc_method_call (SwfdecAbcMethod *method, SwfdecAbcObject *thisp,
+swfdec_abc_method_call (SwfdecAbcMethod *method, 
     guint argc, SwfdecAsValue *argv, SwfdecAsValue *ret)
 {
   SwfdecAsContext *context;
@@ -95,8 +95,7 @@ swfdec_abc_method_call (SwfdecAbcMethod *method, SwfdecAbcObject *thisp,
   guint i;
 
   g_return_if_fail (SWFDEC_IS_ABC_METHOD (method));
-  g_return_if_fail (SWFDEC_IS_ABC_OBJECT (thisp));
-  g_return_if_fail (argc == 0 || argv != NULL);
+  g_return_if_fail (argv != NULL);
   g_return_if_fail (ret != NULL);
 
   fun = method->function;
@@ -125,6 +124,6 @@ swfdec_abc_method_call (SwfdecAbcMethod *method, SwfdecAbcObject *thisp,
   if (!swfdec_abc_function_verify (fun))
     return;
 
-  swfdec_abc_function_call (fun, method->scope, thisp, argc, argv, ret);
+  swfdec_abc_function_call (fun, method->scope, argc, argv, ret);
 }
 

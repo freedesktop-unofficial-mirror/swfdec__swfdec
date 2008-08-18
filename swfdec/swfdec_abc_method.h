@@ -53,7 +53,6 @@ SwfdecAbcMethod *	swfdec_abc_method_new		(SwfdecAbcFunction *	function,
 							 SwfdecAbcScopeChain *	chain);
 
 void			swfdec_abc_method_call		(SwfdecAbcMethod *	method,
-							 SwfdecAbcObject *	thisp,
 							 guint			argc,
 							 SwfdecAsValue *	argv,
 							 SwfdecAsValue *	ret);

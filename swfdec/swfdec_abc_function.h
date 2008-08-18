@@ -111,7 +111,6 @@ gboolean		swfdec_abc_function_verify	(SwfdecAbcFunction *	fun);
 
 gboolean		swfdec_abc_function_call	(SwfdecAbcFunction *	fun,
 							 SwfdecAbcScopeChain *	scope,
-							 SwfdecAbcObject *	thisp,
 							 guint			argc,
 							 SwfdecAsValue *	argv,
 							 SwfdecAsValue *	ret);

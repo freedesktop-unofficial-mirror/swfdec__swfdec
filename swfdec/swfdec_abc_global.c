@@ -97,7 +97,7 @@ swfdec_abc_global_new (SwfdecAsContext *context)
 {
   SwfdecAbcTraits *traits;
   SwfdecAbcGlobal *global;
-  SwfdecAsValue ret;
+  SwfdecAsValue val;
   SwfdecBits bits;
 
   g_return_if_fail (SWFDEC_IS_AS_CONTEXT (context));
@@ -143,7 +143,8 @@ swfdec_abc_global_new (SwfdecAsContext *context)
 
   /* run main script */
   global->file->main->global = SWFDEC_ABC_OBJECT (global);
-  swfdec_abc_function_call (traits->construct, NULL, SWFDEC_ABC_OBJECT (global), 0, NULL, &ret);
+  SWFDEC_AS_VALUE_SET_OBJECT (&val, SWFDEC_AS_OBJECT (global));
+  swfdec_abc_function_call (traits->construct, NULL, 0, &val, &val);
 }
 
 void

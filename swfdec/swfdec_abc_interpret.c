@@ -483,7 +483,7 @@ swfdec_abc_interpret_new_class (SwfdecAbcTraits *traits, SwfdecAbcClass *base,
     SWFDEC_AS_OBJECT (SWFDEC_ABC_GET_OBJECT_CLASS (context))->prototype = 
       SWFDEC_AS_OBJECT (SWFDEC_ABC_GET_CLASS_CLASS (context)->prototype);
   }
-  swfdec_abc_function_call (traits->construct, chain, SWFDEC_ABC_OBJECT (classp), 0, NULL, &val);
+  swfdec_abc_function_call (traits->construct, chain, 0, &val, &val);
 
   return classp;
 }
@@ -564,12 +564,11 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun, SwfdecAbcScopeChain *outer_scope)
 
   /* init local variables */
   locals = context->cur;
-  SWFDEC_AS_VALUE_SET_OBJECT (swfdec_as_stack_push (context), frame->thisp);
-  for (i = 0; i < MIN (frame->argc, fun->n_args); i++) {
+  for (i = 0; i <= MIN (frame->argc, fun->n_args); i++) {
     *swfdec_as_stack_push (context) = frame->argv[i];
   }
-  for (; i < fun->n_args; i++) {
-    *swfdec_as_stack_push (context) = fun->args[i].default_value;
+  for (; i <= fun->n_args; i++) {
+    *swfdec_as_stack_push (context) = fun->args[i-1].default_value;
   }
   if (fun->need_rest) {
     SWFDEC_FIXME ("implement rest argument");

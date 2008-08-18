@@ -182,14 +182,13 @@ swfdec_abc_function_is_override (SwfdecAbcFunction *fun, SwfdecAbcFunction *base
 
 gboolean
 swfdec_abc_function_call (SwfdecAbcFunction *fun, SwfdecAbcScopeChain *scope,
-    SwfdecAbcObject *thisp, guint argc, SwfdecAsValue *argv, SwfdecAsValue *ret)
+    guint argc, SwfdecAsValue *argv, SwfdecAsValue *ret)
 {
   SwfdecAsFrame frame = { NULL, };
   SwfdecAsContext *context;
 
   g_return_val_if_fail (SWFDEC_IS_ABC_FUNCTION (fun), FALSE);
-  g_return_val_if_fail (SWFDEC_IS_ABC_OBJECT (thisp), FALSE);
-  g_return_val_if_fail (argc == 0 || argv != NULL, FALSE);
+  g_return_val_if_fail (argv != NULL, FALSE);
   g_return_val_if_fail (ret != NULL, FALSE);
 
   if (!swfdec_abc_function_verify (fun))
@@ -199,12 +198,15 @@ swfdec_abc_function_call (SwfdecAbcFunction *fun, SwfdecAbcScopeChain *scope,
   swfdec_as_frame_init_native (&frame, context);
   /* HACK! */
   frame.function = (SwfdecAsFunction *) fun;
-  frame.thisp = SWFDEC_AS_OBJECT (thisp);
+  if (SWFDEC_AS_VALUE_IS_OBJECT (&argv[0])) {
+    frame.thisp = SWFDEC_AS_VALUE_GET_OBJECT (&argv[0]);
+  }
   frame.argc = argc;
   frame.argv = argv;
   frame.return_value = ret;
-  frame.target = frame.next ? frame.next->original_target : SWFDEC_AS_OBJECT (thisp);
+  frame.target = frame.next ? frame.next->original_target : frame.thisp;
   frame.original_target = frame.target;
+  /* FIXME: coerce arguments */
   if (fun->native) {
     SwfdecAsValue rval;
     ((SwfdecAsNative) fun->native) (context, frame.thisp, argc, argv, &rval);
