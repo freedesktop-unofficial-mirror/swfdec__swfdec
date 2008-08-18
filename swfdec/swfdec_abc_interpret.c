@@ -668,6 +668,20 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun, SwfdecAbcScopeChain *outer_scope)
 	  }
 	}
 	continue;
+      case SWFDEC_ABC_OPCODE_GET_LEX:
+	i = swfdec_bits_get_vu32 (&bits);
+	if (!swfdec_abc_interpret_resolve_multiname (context, &mn, &pool->multinames[i]))
+	  break;
+	val = swfdec_as_stack_push (context);
+	if (!swfdec_abc_interpret_find_property (context, val,
+	      &mn, outer_scope, scope_start, scope_end, scope_with)) {
+	  swfdec_as_context_throw_abc (context, SWFDEC_ABC_TYPE_REFERENCE_ERROR,
+	      "Variable %s is not defined.", mn.name);
+	  break;
+	}
+	if (!swfdec_abc_object_get_variable (context, val, &mn, val))
+	  break;
+	continue;
       case SWFDEC_ABC_OPCODE_GET_LOCAL:
 	i = swfdec_bits_get_vu32 (&bits);
 	*swfdec_as_stack_push (context) = locals[i];
@@ -916,7 +930,6 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun, SwfdecAbcScopeChain *outer_scope)
       case SWFDEC_ABC_OPCODE_GET_DESCENDANTS:
       case SWFDEC_ABC_OPCODE_GET_GLOBAL_SCOPE:
       case SWFDEC_ABC_OPCODE_GET_GLOBAL_SLOT:
-      case SWFDEC_ABC_OPCODE_GET_LEX:
       case SWFDEC_ABC_OPCODE_GET_SLOT:
       case SWFDEC_ABC_OPCODE_GET_SUPER:
       case SWFDEC_ABC_OPCODE_GREATER_EQUALS:
