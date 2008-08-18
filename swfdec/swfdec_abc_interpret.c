@@ -626,6 +626,23 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun, SwfdecAbcScopeChain *outer_scope)
 	    swfdec_as_stack_pop (context);
 	}
 	continue;
+      case SWFDEC_ABC_OPCODE_COERCE_A:
+	continue;
+      case SWFDEC_ABC_OPCODE_COERCE_O:
+	val = swfdec_as_stack_peek (context, 1);
+	if (SWFDEC_AS_VALUE_IS_UNDEFINED (val))
+	  SWFDEC_AS_VALUE_SET_NULL (val);
+	continue;
+      case SWFDEC_ABC_OPCODE_COERCE_S:
+	val = swfdec_as_stack_peek (context, 1);
+	if (SWFDEC_AS_VALUE_IS_UNDEFINED (val)) {
+	  SWFDEC_AS_VALUE_SET_NULL (val);
+	} else if (!SWFDEC_AS_VALUE_IS_NULL (val)) {
+	  SWFDEC_AS_VALUE_SET_STRING (val,
+	      swfdec_as_value_to_string (context, val));
+	}
+	/* else NULL stays the same */
+	continue;
       case SWFDEC_ABC_OPCODE_DUP:
 	val = swfdec_as_stack_peek (context, 1);
 	*swfdec_as_stack_push (context) = *val;
@@ -848,12 +865,9 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun, SwfdecAbcScopeChain *outer_scope)
       case SWFDEC_ABC_OPCODE_CHECK_FILTER:
       case SWFDEC_ABC_OPCODE_CODEGEN:
       case SWFDEC_ABC_OPCODE_COERCE:
-      case SWFDEC_ABC_OPCODE_COERCE_A:
       case SWFDEC_ABC_OPCODE_COERCE_B:
       case SWFDEC_ABC_OPCODE_COERCE_D:
       case SWFDEC_ABC_OPCODE_COERCE_I:
-      case SWFDEC_ABC_OPCODE_COERCE_O:
-      case SWFDEC_ABC_OPCODE_COERCE_S:
       case SWFDEC_ABC_OPCODE_COERCE_U:
       case SWFDEC_ABC_OPCODE_CONCAT:
       case SWFDEC_ABC_OPCODE_CONSTRUCT:
