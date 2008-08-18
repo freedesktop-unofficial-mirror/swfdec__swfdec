@@ -643,6 +643,11 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun, SwfdecAbcScopeChain *outer_scope)
 	}
 	/* else NULL stays the same */
 	continue;
+      case SWFDEC_ABC_OPCODE_DIVIDE:
+	val = swfdec_as_stack_peek (context, 1);
+	SWFDEC_AS_VALUE_SET_NUMBER (val, swfdec_as_value_to_number (context, val) 
+	    / swfdec_as_value_to_number (context, swfdec_as_stack_pop (context)));
+	continue;
       case SWFDEC_ABC_OPCODE_DUP:
 	val = swfdec_as_stack_peek (context, 1);
 	*swfdec_as_stack_push (context) = *val;
@@ -888,7 +893,6 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun, SwfdecAbcScopeChain *outer_scope)
       case SWFDEC_ABC_OPCODE_DECREMENT_I:
       case SWFDEC_ABC_OPCODE_DELETE_PROPERTY:
       case SWFDEC_ABC_OPCODE_DOUBLE_TO_ATOM:
-      case SWFDEC_ABC_OPCODE_DIVIDE:
       case SWFDEC_ABC_OPCODE_DXNS:
       case SWFDEC_ABC_OPCODE_DXNS_LATE:
       case SWFDEC_ABC_OPCODE_EQUALS:
