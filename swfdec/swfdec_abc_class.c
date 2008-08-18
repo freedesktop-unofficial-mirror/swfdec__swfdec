@@ -31,6 +31,7 @@
 #include "swfdec_abc_global.h"
 #include "swfdec_abc_internal.h"
 #include "swfdec_abc_scope_chain.h"
+#include "swfdec_abc_traits.h"
 #include "swfdec_as_context.h"
 #include "swfdec_debug.h"
 
@@ -79,16 +80,53 @@ swfdec_abc_class_mark (SwfdecGcObject *object)
   SWFDEC_GC_OBJECT_CLASS (swfdec_abc_class_parent_class)->mark (object);
 }
 
+static gboolean
+swfdec_abc_class_call (SwfdecAbcObject *object, guint argc, 
+    SwfdecAsValue *argv, SwfdecAsValue *ret)
+{
+  /* Explicit coercion of a class object. */
+  if (argc != 1) {
+    swfdec_as_context_throw_abc (swfdec_gc_object_get_context (object),
+      SWFDEC_ABC_TYPE_ARGUMENT_ERROR, "Argument count mismatch on class coercion.  Expected 1, got %u.",
+      argc);
+    return FALSE;
+  }
+
+  *ret = argv[1];
+  return swfdec_abc_traits_coerce (object->traits->instance_traits, ret);
+}
+
+static gboolean
+swfdec_abc_class_construct (SwfdecAbcObject *object, guint argc, 
+    SwfdecAsValue *argv, SwfdecAsValue *ret)
+{
+  SwfdecAbcClass *classp = SWFDEC_ABC_CLASS (object);
+  SwfdecAbcObject *result;
+
+  result = swfdec_abc_object_new_from_class (classp);
+  SWFDEC_AS_OBJECT (result)->prototype = SWFDEC_AS_OBJECT (classp->prototype);
+  SWFDEC_AS_VALUE_SET_OBJECT (&argv[0], SWFDEC_AS_OBJECT (result));
+  if (!swfdec_abc_function_call (object->traits->instance_traits->construct,
+	classp->instance_scope, argc, argv, ret))
+    return FALSE;
+  SWFDEC_AS_VALUE_SET_OBJECT (ret, SWFDEC_AS_OBJECT (result));
+  return TRUE;
+}
+
 static void
 swfdec_abc_class_class_init (SwfdecAbcClassClass *klass)
 {
   GObjectClass *object_class = G_OBJECT_CLASS (klass);
   SwfdecGcObjectClass *gc_class = SWFDEC_GC_OBJECT_CLASS (klass);
+  SwfdecAbcObjectClass *abc_class = SWFDEC_ABC_OBJECT_CLASS (klass);
 
   object_class->constructor = swfdec_abc_class_constructor;
   object_class->dispose = swfdec_abc_class_dispose;
 
   gc_class->mark = swfdec_abc_class_mark;
+
+  abc_class->call = swfdec_abc_class_call;
+  abc_class->construct = swfdec_abc_class_construct;
 }
 
 static void
