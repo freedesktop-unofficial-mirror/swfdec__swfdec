@@ -201,7 +201,7 @@ swfdec_abc_object_construct (SwfdecAbcObject *object, guint argc,
   g_return_val_if_fail (ret != NULL, FALSE);
 
   klass = SWFDEC_ABC_OBJECT_GET_CLASS (object);
-  return klass->call (object, argc, argv, ret);
+  return klass->construct (object, argc, argv, ret);
 }
 
 gboolean
