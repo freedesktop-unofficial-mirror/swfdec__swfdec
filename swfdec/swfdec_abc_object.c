@@ -22,6 +22,8 @@
 #endif
 
 #include "swfdec_abc_object.h"
+
+#include "swfdec_abc_class.h"
 #include "swfdec_abc_function.h"
 #include "swfdec_abc_internal.h"
 #include "swfdec_abc_multiname.h"
@@ -83,6 +85,7 @@ swfdec_abc_object_mark (SwfdecGcObject *gcobject)
   SwfdecAbcObject *object = SWFDEC_ABC_OBJECT (gcobject);
 
   swfdec_gc_object_mark (object->traits);
+  swfdec_abc_scope_chain_mark (object->scope);
 
   SWFDEC_GC_OBJECT_CLASS (swfdec_abc_object_parent_class)->mark (gcobject);
 }
@@ -141,6 +144,15 @@ swfdec_abc_object_new (SwfdecAbcTraits *traits, SwfdecAbcScopeChain *scope)
   object->scope = swfdec_abc_scope_chain_ref (scope);
 
   return object;
+}
+
+SwfdecAbcObject *
+swfdec_abc_object_new_from_class (SwfdecAbcClass *classp)
+{
+  g_return_val_if_fail (SWFDEC_IS_ABC_CLASS (classp), NULL);
+
+  return swfdec_abc_object_new (SWFDEC_ABC_OBJECT (classp)->traits->instance_traits,
+      classp->instance_scope);
 }
 
 gboolean

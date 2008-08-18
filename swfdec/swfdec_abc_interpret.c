@@ -359,7 +359,7 @@ swfdec_abc_interpret_find_property (SwfdecAsContext *context, SwfdecAsValue *ret
   SwfdecAbcScript *script;
   guint i;
 
-  for (cur = end - 1; end >= with; end--) {
+  for (cur = end - 1; cur >= with; cur--) {
     if (swfdec_as_value_has_property (context, cur, mn)) {
       *ret = *cur;
       return TRUE;
@@ -379,6 +379,10 @@ swfdec_abc_interpret_find_property (SwfdecAsContext *context, SwfdecAsValue *ret
      * consider "this" scope now, but constrain it to the declaringTraits of
      * the current method (verifier ensures this is safe)
      */
+    if (swfdec_as_value_has_property (context, cur, mn)) {
+      *ret = *cur;
+      return TRUE;
+    }
   }
 
   if (chain) {
@@ -447,12 +451,14 @@ swfdec_abc_interpret_new_class (SwfdecAbcTraits *traits, SwfdecAbcClass *base,
   classp = g_object_new (SWFDEC_TYPE_ABC_CLASS, "context", context,
       "traits", traits, NULL);
   SWFDEC_ABC_OBJECT (classp)->scope = swfdec_abc_scope_chain_ref (chain);
+  SWFDEC_AS_VALUE_SET_OBJECT (&val, SWFDEC_AS_OBJECT (classp));
+  /* add class to instance scope */
+  classp->instance_scope = swfdec_abc_scope_chain_new (context, chain, &val, &val + 1, &val + 1);
 
   if (classp->prototype) {
     if (base)
       SWFDEC_AS_OBJECT (classp->prototype)->prototype = SWFDEC_AS_OBJECT (base->prototype);
 
-    SWFDEC_AS_VALUE_SET_OBJECT (&val, SWFDEC_AS_OBJECT (classp));
     swfdec_as_object_set_variable_and_flags (SWFDEC_AS_OBJECT (classp->prototype),
 	SWFDEC_AS_STR_constructor, &val, SWFDEC_AS_VARIABLE_HIDDEN);
   }
@@ -460,6 +466,8 @@ swfdec_abc_interpret_new_class (SwfdecAbcTraits *traits, SwfdecAbcClass *base,
   if (SWFDEC_ABC_GLOBAL (context->global)->classes[SWFDEC_ABC_TYPE_CLASS] == NULL) {
     if (itraits->name == SWFDEC_AS_STR_Class) {
       SWFDEC_ABC_GLOBAL (context->global)->classes[SWFDEC_ABC_TYPE_CLASS] = classp;
+    } else if (itraits->name == SWFDEC_AS_STR_Object) {
+      SWFDEC_ABC_GLOBAL (context->global)->classes[SWFDEC_ABC_TYPE_OBJECT] = classp;
     } else {
       SWFDEC_ERROR ("cannot set prototype for %s class to Class", traits->name);
     }
@@ -469,7 +477,9 @@ swfdec_abc_interpret_new_class (SwfdecAbcTraits *traits, SwfdecAbcClass *base,
   /* required so Function init code can use newfunction */
   if (itraits->name == SWFDEC_AS_STR_Function) {
     SWFDEC_ABC_GLOBAL (context->global)->classes[SWFDEC_ABC_TYPE_FUNCTION] = classp;
+    /* global.__proto__ = Object.prototype */
     context->global->prototype = SWFDEC_AS_OBJECT (SWFDEC_ABC_GET_OBJECT_CLASS (context)->prototype);
+    /* Object.__proto__ = Class.prototype */
     SWFDEC_AS_OBJECT (SWFDEC_ABC_GET_OBJECT_CLASS (context))->prototype = 
       SWFDEC_AS_OBJECT (SWFDEC_ABC_GET_CLASS_CLASS (context)->prototype);
   }
@@ -514,6 +524,8 @@ swfdec_abc_interpret_new_function (SwfdecAbcFunction *fun, SwfdecAbcScopeChain *
   classp = g_object_new (SWFDEC_TYPE_ABC_CLASS, "context", context,
       "traits", traits, NULL);
   SWFDEC_ABC_OBJECT (classp)->scope = swfdec_abc_scope_chain_ref (chain);
+  /* add class to instance scope */
+  classp->instance_scope = swfdec_abc_scope_chain_new (context, chain, &val, &val + 1, &val + 1);
 
   SWFDEC_AS_OBJECT (classp)->prototype = SWFDEC_AS_OBJECT (
       SWFDEC_ABC_GET_FUNCTION_CLASS (context)->prototype);
@@ -736,6 +748,7 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun, SwfdecAbcScopeChain *outer_scope)
 	val = swfdec_as_stack_pop (context);
 	if (swfdec_abc_interpreter_throw_null (context, val))
 	  break;
+	g_print ("- pushing scope %s\n", swfdec_as_value_to_traits (context, val)->name);
 	*scope_end = *val;
 	scope_end++;
 	continue;

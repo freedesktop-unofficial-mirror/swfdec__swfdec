@@ -51,6 +51,7 @@ GType			swfdec_abc_object_get_type	(void);
 
 SwfdecAbcObject *	swfdec_abc_object_new		(SwfdecAbcTraits *		traits,
 							 SwfdecAbcScopeChain *		scopes);
+SwfdecAbcObject *	swfdec_abc_object_new_from_class(SwfdecAbcClass *		classp);
 
 gboolean		swfdec_abc_object_get_variable	(SwfdecAsContext *		context,
 							 const SwfdecAsValue *		object,

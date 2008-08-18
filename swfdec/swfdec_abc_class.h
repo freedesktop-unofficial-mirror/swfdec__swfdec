@@ -38,6 +38,7 @@ struct _SwfdecAbcClass {
   SwfdecAbcObject	object;
 
   SwfdecAbcObject *	prototype;	/* Class.prototype in Javascrpt */
+  SwfdecAbcScopeChain *	instance_scope;	/* scope chain used by instances of this class */
 };
 
 struct _SwfdecAbcClassClass {

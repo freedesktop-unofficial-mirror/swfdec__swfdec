@@ -30,6 +30,7 @@
 #include "swfdec_abc_function.h"
 #include "swfdec_abc_global.h"
 #include "swfdec_abc_internal.h"
+#include "swfdec_abc_scope_chain.h"
 #include "swfdec_as_context.h"
 #include "swfdec_as_native_function.h"
 #include "swfdec_debug.h"
@@ -48,9 +49,11 @@ swfdec_abc_class_constructor (GType type, guint n_construct_properties,
       n_construct_properties, construct_properties);
 
   classp = SWFDEC_ABC_CLASS (object);
-  if (classp->prototype == NULL) {
-    context = swfdec_gc_object_get_context (classp);
-    classp->prototype = swfdec_abc_object_new (SWFDEC_ABC_OBJECT_TRAITS (context), NULL);
+  context = swfdec_gc_object_get_context (classp);
+  if (classp->prototype == NULL && 
+      SWFDEC_ABC_GLOBAL (context->global)->classes[SWFDEC_ABC_TYPE_OBJECT]) {
+    classp->prototype = swfdec_abc_object_new_from_class (
+	SWFDEC_ABC_GET_OBJECT_CLASS (context));
   }
 
   return object;
@@ -59,7 +62,10 @@ swfdec_abc_class_constructor (GType type, guint n_construct_properties,
 static void
 swfdec_abc_class_dispose (GObject *object)
 {
-  //SwfdecAbcClass *class = SWFDEC_ABC_CLASS (object);
+  SwfdecAbcClass *classp = SWFDEC_ABC_CLASS (object);
+  SwfdecAsContext *context = swfdec_gc_object_get_context (classp);
+
+  swfdec_abc_scope_chain_unref (context, classp->instance_scope);
 
   G_OBJECT_CLASS (swfdec_abc_class_parent_class)->dispose (object);
 }
@@ -67,7 +73,9 @@ swfdec_abc_class_dispose (GObject *object)
 static void
 swfdec_abc_class_mark (SwfdecGcObject *object)
 {
-  //SwfdecAbcClass *class = SWFDEC_ABC_CLASS (object);
+  SwfdecAbcClass *classp = SWFDEC_ABC_CLASS (object);
+
+  swfdec_abc_scope_chain_mark (classp->instance_scope);
 
   SWFDEC_GC_OBJECT_CLASS (swfdec_abc_class_parent_class)->mark (object);
 }
@@ -100,6 +108,10 @@ swfdec_abc_class_get_prototype (SwfdecAsContext *cx, SwfdecAsObject *object,
 
   SWFDEC_AS_CHECK (SWFDEC_TYPE_ABC_CLASS, &classp, "");
 
-  SWFDEC_AS_VALUE_SET_OBJECT (ret, SWFDEC_AS_OBJECT (classp->prototype));
+  if (classp->prototype) {
+    SWFDEC_AS_VALUE_SET_OBJECT (ret, SWFDEC_AS_OBJECT (classp->prototype));
+  } else {
+    SWFDEC_AS_VALUE_SET_NULL (ret);
+  }
 }
 
