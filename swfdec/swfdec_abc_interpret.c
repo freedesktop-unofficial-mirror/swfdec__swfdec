@@ -787,7 +787,6 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun, SwfdecAbcScopeChain *outer_scope)
 	val = swfdec_as_stack_pop (context);
 	if (swfdec_abc_interpreter_throw_null (context, val))
 	  break;
-	g_print ("- pushing scope %s\n", swfdec_as_value_to_traits (context, val)->name);
 	*scope_end = *val;
 	scope_end++;
 	continue;
