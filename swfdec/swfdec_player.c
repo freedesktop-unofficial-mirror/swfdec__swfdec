@@ -550,7 +550,7 @@ swfdec_player_perform_abc (SwfdecPlayer *player)
   swfdec_sandbox_use (movie->resource->sandbox);
   g_assert (movie->abc == NULL);
   classp = swfdec_resource_get_abc_class (movie->resource, movie);
-  if (!swfdec_abc_object_construct (SWFDEC_ABC_OBJECT (classp), 0, &val, &val)) {
+  if (swfdec_abc_object_construct (SWFDEC_ABC_OBJECT (classp), 0, &val, &val)) {
     g_assert (SWFDEC_AS_VALUE_IS_OBJECT (&val));
     movie->abc = SWFDEC_ABC_OBJECT (SWFDEC_AS_VALUE_GET_OBJECT (&val));
   } else {
