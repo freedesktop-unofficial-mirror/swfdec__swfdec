@@ -133,6 +133,8 @@ swfdec_abc_global_new (SwfdecAsContext *context)
 
   /* set proper traits here */
   traits = global->file->main->traits;
+  if (!swfdec_abc_traits_resolve (traits))
+    g_assert_not_reached ();
   g_object_unref (SWFDEC_ABC_OBJECT (global)->traits);
   SWFDEC_ABC_OBJECT (global)->traits = traits;
   g_object_ref (traits);
