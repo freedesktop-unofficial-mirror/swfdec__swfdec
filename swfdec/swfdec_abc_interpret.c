@@ -692,6 +692,9 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun, SwfdecAbcScopeChain *outer_scope)
 	if (!swfdec_abc_object_get_variable (context, val, &mn, val))
 	  break;
 	continue;
+      case SWFDEC_ABC_OPCODE_GET_SCOPE_OBJECT:
+	*swfdec_as_stack_push (context) = scope_start[swfdec_bits_get_u8 (&bits)];
+	continue;
       case SWFDEC_ABC_OPCODE_INIT_PROPERTY:
 	{
 	  SwfdecAbcTraits *traits;
@@ -914,7 +917,6 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun, SwfdecAbcScopeChain *outer_scope)
       case SWFDEC_ABC_OPCODE_GET_GLOBAL_SCOPE:
       case SWFDEC_ABC_OPCODE_GET_GLOBAL_SLOT:
       case SWFDEC_ABC_OPCODE_GET_LEX:
-      case SWFDEC_ABC_OPCODE_GET_SCOPE_OBJECT:
       case SWFDEC_ABC_OPCODE_GET_SLOT:
       case SWFDEC_ABC_OPCODE_GET_SUPER:
       case SWFDEC_ABC_OPCODE_GREATER_EQUALS:
