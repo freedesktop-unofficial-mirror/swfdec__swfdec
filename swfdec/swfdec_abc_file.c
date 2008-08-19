@@ -654,7 +654,7 @@ swfdec_abc_default_stub (SwfdecAsContext *cx, SwfdecAsObject *obj, guint argc,
   SwfdecAsFrame *frame = swfdec_as_context_get_frame (cx);
   SwfdecAbcFunction *function = SWFDEC_ABC_FUNCTION (swfdec_as_frame_get_function (frame));
   SwfdecAbcTraits *traits;
-  char *name;
+  GString *name;
   guint i, id;
 
   /* find id of our function in pool */
@@ -664,9 +664,12 @@ swfdec_abc_default_stub (SwfdecAsContext *cx, SwfdecAsObject *obj, guint argc,
   }
 
   traits = function->bound_traits;
+  name = g_string_new ("");
   if (traits->construct == function) {
     /* we're the constructor */
-    name = g_strdup_printf ("function %u %s", id, traits->name);
+    g_string_append_printf (name, "function %u: %s %s", id, 
+	function->return_traits ? function->return_traits->name : "SwfdecAsValue *",
+	traits->name);
   } else {
     /* we're method, getter or setter, find out what */
     do {
@@ -676,7 +679,9 @@ swfdec_abc_default_stub (SwfdecAsContext *cx, SwfdecAsObject *obj, guint argc,
 	switch (SWFDEC_ABC_BINDING_GET_TYPE (trait->type)) {
 	  case SWFDEC_ABC_TRAIT_METHOD:
 	    if (traits->methods[slot] == function) {
-	      name = g_strdup_printf ("method %u %s.%s", id, traits->name, trait->name);
+	      g_string_append_printf (name, "method %u %s %s.%s", id,
+		  function->return_traits ? function->return_traits->name : "SwfdecAsValue *",
+		  traits->name, trait->name);
 	      goto out;
 	    }
 	    break;
@@ -684,10 +689,14 @@ swfdec_abc_default_stub (SwfdecAsContext *cx, SwfdecAsObject *obj, guint argc,
 	  case SWFDEC_ABC_TRAIT_SET:
 	  case SWFDEC_ABC_TRAIT_GETSET:
 	    if (traits->methods[slot] == function) {
-	      name = g_strdup_printf ("getter %u %s.%s", id, traits->name, trait->name);
+	      g_string_append_printf (name, "getter %u %s %s.%s", id,
+		  function->return_traits ? function->return_traits->name : "SwfdecAsValue *",
+		  traits->name, trait->name);
 	      goto out;
 	    } else if (traits->methods[slot + 1] == function) {
-	      name = g_strdup_printf ("setter %u %s.%s", id, traits->name, trait->name);
+	      g_string_append_printf (name, "setter %u %s %s.%s", id,
+		  function->return_traits ? function->return_traits->name : "SwfdecAsValue *",
+		  traits->name, trait->name);
 	      goto out;
 	    }
 	    break;
@@ -702,11 +711,23 @@ swfdec_abc_default_stub (SwfdecAsContext *cx, SwfdecAsObject *obj, guint argc,
       traits = traits->base;
     } while (traits);
     /* huh? */
-    name = g_strdup_printf ("function %u %s.???", i, function->bound_traits->name);
+    g_string_append_printf (name, "function %u %s %s", id,
+	function->return_traits->name, function->bound_traits->name);
   }
 out:
-  SWFDEC_STUB (name);
-  g_free (name);
+  /* append arguments */
+  g_string_append_printf (name, " (%s", function->bound_traits->name);
+  for (i = 0; i < function->n_args; i++) {
+    g_string_append (name, ", ");
+    if (function->args[i].traits)
+      g_string_append (name, function->args[i].traits->name);
+    else 
+      g_string_append (name, "SwfdecAsValue *");
+  }
+  g_string_append (name, ")");
+
+  SWFDEC_STUB (name->str);
+  g_string_free (name, TRUE);
 }
 
 static gboolean
