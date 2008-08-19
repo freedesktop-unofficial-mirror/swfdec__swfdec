@@ -664,7 +664,11 @@ swfdec_abc_describe_function (SwfdecAbcFunction *function)
 
   traits = function->bound_traits;
   name = g_string_new ("");
-  if (traits->construct == function) {
+  if (traits == NULL) {
+    /* we're likely a lambda function */
+    g_string_append_printf (name, "function %u: %s [lambda]", id, 
+	function->return_traits ? function->return_traits->name : "SwfdecAsValue *");
+  } else if (traits->construct == function) {
     /* we're the constructor */
     g_string_append_printf (name, "function %u: %s %s", id, 
 	function->return_traits ? function->return_traits->name : "SwfdecAsValue *",
@@ -1162,6 +1166,30 @@ swfdec_abc_file_new_trusted (SwfdecAsContext *context, SwfdecBits *bits,
 	"Not an ABC file.  major_version=%u minor_version=%u.", major, minor);
     return NULL;
   }
+#if SWFDEC_PRINT_MISSING_STUBS
+  {
+    guint i;
+
+    if (SWFDEC_ABC_GLOBAL (context->global)->file == NULL)
+      SWFDEC_ABC_GLOBAL (context->global)->file = file;
+    g_print ("missing implementations:\n");
+    for (i = 0; i < file->n_functions; i++) {
+      SwfdecAbcFunction *fun = file->functions[i];
+      char *name;
+      if (fun->native != swfdec_abc_default_stub)
+	continue;
+      /* This is why we can't print this stuff by default: We need to resolve
+       * the function, which could throw */
+      if (!swfdec_abc_function_resolve (fun) ||
+	  (fun->bound_traits != NULL && !swfdec_abc_traits_resolve (fun->bound_traits))) {
+	g_assert_not_reached ();
+      }
+      name = swfdec_abc_describe_function (fun);
+      g_print ("  %s\n", name);
+      g_free (name);
+      }
+  }
+#endif
 
   return file;
 }
