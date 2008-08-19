@@ -125,6 +125,7 @@ libswfdec_source_files = \
 	swfdec_path.c \
 	swfdec_pattern.c \
 	swfdec_player.c \
+	swfdec_player_abc.c \
 	swfdec_player_as.c \
 	swfdec_player_scripting.c \
 	swfdec_print_job.c \
