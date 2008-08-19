@@ -1166,7 +1166,9 @@ swfdec_abc_file_new_trusted (SwfdecAsContext *context, SwfdecBits *bits,
 	"Not an ABC file.  major_version=%u minor_version=%u.", major, minor);
     return NULL;
   }
-#if SWFDEC_PRINT_MISSING_STUBS
+  
+//#define SWFDEC_PRINT_STUBS
+#ifdef SWFDEC_PRINT_STUBS
   {
     guint i;
 
@@ -1176,7 +1178,7 @@ swfdec_abc_file_new_trusted (SwfdecAsContext *context, SwfdecBits *bits,
     for (i = 0; i < file->n_functions; i++) {
       SwfdecAbcFunction *fun = file->functions[i];
       char *name;
-      if (fun->native != swfdec_abc_default_stub)
+      if (fun->native == NULL)
 	continue;
       /* This is why we can't print this stuff by default: We need to resolve
        * the function, which could throw */
@@ -1185,7 +1187,7 @@ swfdec_abc_file_new_trusted (SwfdecAsContext *context, SwfdecBits *bits,
 	g_assert_not_reached ();
       }
       name = swfdec_abc_describe_function (fun);
-      g_print ("  %s\n", name);
+      g_print ("%s %s\n", fun->native == swfdec_abc_default_stub ? "XXX" : "   ", name);
       g_free (name);
       }
   }
