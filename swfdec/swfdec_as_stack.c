@@ -58,7 +58,7 @@ swfdec_as_stack_set (SwfdecAsContext *context, SwfdecAsStack *stack)
   context->end = context->base + SWFDEC_AS_STACK_SIZE;
 }
 
-gboolean
+void
 swfdec_as_stack_push_segment (SwfdecAsContext *context)
 {
   SwfdecAsStack *stack;
@@ -70,12 +70,9 @@ swfdec_as_stack_push_segment (SwfdecAsContext *context)
   }
 
   stack = swfdec_as_stack_new (context, SWFDEC_AS_STACK_SIZE);
-  if (stack == NULL)
-    return FALSE;
   SWFDEC_DEBUG ("pushing new stack segment %p", stack);
   stack->next = context->stack;
   swfdec_as_stack_set (context, stack);
-  return TRUE;
 }
 
 static void
@@ -170,8 +167,7 @@ swfdec_as_stack_ensure_free (SwfdecAsContext *context, guint n_elements)
   if (G_LIKELY ((guint) (context->end - context->cur) >= n_elements))
     return;
 
-  if (!swfdec_as_stack_push_segment (context))
-    context->cur = context->end - n_elements;
+  swfdec_as_stack_push_segment (context);
 }
 
 guint

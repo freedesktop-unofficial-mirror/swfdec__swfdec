@@ -34,6 +34,7 @@ libswfdec_source_files = \
 	swfdec_as_debugger.c \
 	swfdec_as_frame.c \
 	swfdec_as_function.c \
+	swfdec_as_global.c \
 	swfdec_as_interpret.c \
 	swfdec_as_math.c \
 	swfdec_as_native_function.c \
@@ -213,6 +214,7 @@ public_headers = \
 	swfdec_as_debugger.h \
 	swfdec_as_frame.h \
 	swfdec_as_function.h \
+	swfdec_as_global.h \
 	swfdec_as_native_function.h \
 	swfdec_as_object.h \
 	swfdec_as_types.h \

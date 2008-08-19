@@ -21,17 +21,19 @@
 #include "config.h"
 #endif
 
+#include "swfdec_as_context.h"
+
 #include <math.h>
 #include <string.h>
 #include <stdlib.h>
-#include "swfdec_as_context.h"
+
 #include "swfdec_abc_file.h"
 #include "swfdec_abc_global.h"
 #include "swfdec_abc_internal.h"
 #include "swfdec_as_array.h"
 #include "swfdec_as_frame_internal.h"
 #include "swfdec_as_function.h"
-#include "swfdec_as_initialize.h"
+#include "swfdec_as_global.h"
 #include "swfdec_as_internal.h"
 #include "swfdec_as_interpret.h"
 #include "swfdec_as_native_function.h"
@@ -42,7 +44,6 @@
 #include "swfdec_constant_pool.h"
 #include "swfdec_debug.h"
 #include "swfdec_gc_object.h"
-#include "swfdec_internal.h" /* for swfdec_player_preinit_global() */
 #include "swfdec_script.h"
 
 /*** GARBAGE COLLECTION DOCS ***/
@@ -449,13 +450,8 @@ static void
 swfdec_as_context_do_mark (SwfdecAsContext *context)
 {
   /* This if is needed for SwfdecPlayer */
-  if (context->global) {
+  if (context->global)
     swfdec_gc_object_mark (context->global);
-    swfdec_gc_object_mark (context->Function);
-    swfdec_gc_object_mark (context->Function_prototype);
-    swfdec_gc_object_mark (context->Object);
-    swfdec_gc_object_mark (context->Object_prototype);
-  }
   swfdec_gc_object_mark (context->public_ns);
   if (context->exception)
     swfdec_as_value_mark (&context->exception_value);
@@ -669,6 +665,7 @@ swfdec_as_context_init (SwfdecAsContext *context)
 
   context->public_ns = swfdec_as_context_get_namespace (context,
       SWFDEC_ABC_NAMESPACE_PUBLIC, SWFDEC_AS_STR_EMPTY, SWFDEC_AS_STR_EMPTY);
+  swfdec_as_stack_push_segment (context);
 }
 
 /*** STRINGS ***/
@@ -1325,17 +1322,6 @@ swfdec_as_context_parseFloat (SwfdecAsContext *cx, SwfdecAsObject *object,
   g_free (s);
 }
 
-static void
-swfdec_as_context_init_global (SwfdecAsContext *context)
-{
-  SwfdecAsValue val;
-
-  SWFDEC_AS_VALUE_SET_NUMBER (&val, NAN);
-  swfdec_as_object_set_variable (context->global, SWFDEC_AS_STR_NaN, &val);
-  SWFDEC_AS_VALUE_SET_NUMBER (&val, HUGE_VAL);
-  swfdec_as_object_set_variable (context->global, SWFDEC_AS_STR_Infinity, &val);
-}
-
 void
 swfdec_as_context_run_init_script (SwfdecAsContext *context, const guint8 *data, 
     gsize length, guint version)
@@ -1378,26 +1364,11 @@ swfdec_as_context_startup (SwfdecAsContext *context, gboolean abc)
   g_return_if_fail (SWFDEC_IS_AS_CONTEXT (context));
   g_return_if_fail (context->state == SWFDEC_AS_CONTEXT_NEW);
 
-  if (context->cur == NULL &&
-      !swfdec_as_stack_push_segment (context))
-    return;
   if (abc) {
     g_assert (context->global == NULL);
     swfdec_abc_global_new (context);
   } else {
-    if (context->global == NULL)
-      context->global = swfdec_as_object_new_empty (context);
-    /* init the two internal functions */
-    /* FIXME: remove them for normal contexts? */
-    swfdec_player_preinit_global (context);
-    /* get the necessary objects up to define objects and functions sanely */
-    swfdec_as_function_init_context (context);
-    swfdec_as_object_init_context (context);
-    /* define the global object and other important ones */
-    swfdec_as_context_init_global (context);
-
-    /* run init script */
-    swfdec_as_context_run_init_script (context, swfdec_as_initialize, sizeof (swfdec_as_initialize), 8);
+    context->global = g_object_new (SWFDEC_TYPE_AS_GLOBAL, "context", context, NULL);
   }
 
   if (context->state == SWFDEC_AS_CONTEXT_NEW)

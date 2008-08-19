@@ -22,13 +22,15 @@
 #include "config.h"
 #endif
 
+#include "swfdec_text_format.h"
+
 #include <math.h>
 #include <string.h>
 #include <pango/pangocairo.h>
 
-#include "swfdec_text_format.h"
 #include "swfdec_as_native_function.h"
 #include "swfdec_as_array.h"
+#include "swfdec_as_global.h"
 #include "swfdec_as_object.h"
 #include "swfdec_as_strings.h"
 #include "swfdec_debug.h"
@@ -1017,6 +1019,7 @@ swfdec_text_format_construct (SwfdecAsContext *cx, SwfdecAsObject *object,
   };
   SwfdecAsFunction *function;
   SwfdecAsObject *tmp;
+  SwfdecAsGlobal *global;
   SwfdecAsValue val;
   guint i;
 
@@ -1032,11 +1035,12 @@ swfdec_text_format_construct (SwfdecAsContext *cx, SwfdecAsObject *object,
   swfdec_text_format_clear (SWFDEC_TEXT_FORMAT (object));
 
   // FIXME: Need better way to create function without prototype/constructor
-  tmp = cx->Function;
-  cx->Function = NULL;
+  global = SWFDEC_AS_GLOBAL (cx->global);
+  tmp = global->Function;
+  global->Function = NULL;
   function = swfdec_as_native_function_new (cx, SWFDEC_AS_STR_getTextExtent,
       swfdec_text_format_getTextExtent, NULL);
-  cx->Function = tmp;
+  global->Function = tmp;
   if (function != NULL) {
     SWFDEC_AS_VALUE_SET_OBJECT (&val, SWFDEC_AS_OBJECT (function));
     swfdec_as_object_set_variable (object, SWFDEC_AS_STR_getTextExtent, &val);
@@ -1072,6 +1076,7 @@ swfdec_text_format_new_no_properties (SwfdecAsContext *context)
 {
   SwfdecAsObject *tmp, *ret;
   SwfdecAsFunction *function;
+  SwfdecAsGlobal *global;
   SwfdecAsValue val;
 
   g_return_val_if_fail (SWFDEC_IS_AS_CONTEXT (context), NULL);
@@ -1087,11 +1092,12 @@ swfdec_text_format_new_no_properties (SwfdecAsContext *context)
   swfdec_as_object_set_constructor (ret, SWFDEC_AS_VALUE_GET_OBJECT (&val));
 
   // FIXME: Need better way to create function without prototype/constructor
-  tmp = context->Function;
-  context->Function = NULL;
+  global = SWFDEC_AS_GLOBAL (context->global);
+  tmp = global->Function;
+  global->Function = NULL;
   function = swfdec_as_native_function_new (context, SWFDEC_AS_STR_getTextExtent,
       swfdec_text_format_getTextExtent, NULL);
-  context->Function = tmp;
+  global->Function = tmp;
   if (function != NULL) {
     SWFDEC_AS_VALUE_SET_OBJECT (&val, SWFDEC_AS_OBJECT (function));
     swfdec_as_object_set_variable (ret, SWFDEC_AS_STR_getTextExtent, &val);

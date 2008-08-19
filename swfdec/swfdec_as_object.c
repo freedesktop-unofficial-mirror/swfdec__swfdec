@@ -21,11 +21,13 @@
 #include "config.h"
 #endif
 
+#include "swfdec_as_object.h"
+
 #include <string.h>
 
-#include "swfdec_as_object.h"
 #include "swfdec_as_context.h"
 #include "swfdec_as_frame_internal.h"
+#include "swfdec_as_global.h"
 #include "swfdec_as_internal.h"
 #include "swfdec_as_native_function.h"
 #include "swfdec_as_stack.h"
@@ -781,17 +783,19 @@ SwfdecAsObject *
 swfdec_as_object_new (SwfdecAsContext *context)
 {
   SwfdecAsObject *object;
+  SwfdecAsGlobal *global;
   SwfdecAsValue val;
 
   g_return_val_if_fail (SWFDEC_IS_AS_CONTEXT (context), NULL);
-  g_assert (context->Object);
-  g_assert (context->Object_prototype);
-  
+  g_assert (SWFDEC_AS_GLOBAL (context->global)->Object);
+  g_assert (SWFDEC_AS_GLOBAL (context->global)->Object_prototype);
+
+  global =SWFDEC_AS_GLOBAL (context->global);
   object = swfdec_as_object_new_empty (context);
-  SWFDEC_AS_VALUE_SET_OBJECT (&val, context->Object);
+  SWFDEC_AS_VALUE_SET_OBJECT (&val, global->Object);
   swfdec_as_object_set_variable_and_flags (object, SWFDEC_AS_STR_constructor,
       &val, SWFDEC_AS_VARIABLE_HIDDEN | SWFDEC_AS_VARIABLE_PERMANENT);
-  SWFDEC_AS_VALUE_SET_OBJECT (&val, context->Object_prototype);
+  SWFDEC_AS_VALUE_SET_OBJECT (&val, global->Object_prototype);
   swfdec_as_object_set_variable_and_flags (object, SWFDEC_AS_STR___proto__,
       &val, SWFDEC_AS_VARIABLE_HIDDEN | SWFDEC_AS_VARIABLE_PERMANENT);
   return object;
@@ -1710,12 +1714,14 @@ swfdec_as_object_init_context (SwfdecAsContext *context)
 {
   SwfdecAsValue val;
   SwfdecAsObject *object, *proto;
+  SwfdecAsGlobal *global;
 
+  global = SWFDEC_AS_GLOBAL (context->global);
   proto = swfdec_as_object_new_empty (context);
   object = SWFDEC_AS_OBJECT (swfdec_as_object_add_function (context->global, 
       SWFDEC_AS_STR_Object, swfdec_as_object_construct));
-  context->Object = object;
-  context->Object_prototype = proto;
+  global->Object = object;
+  global->Object_prototype = proto;
   SWFDEC_AS_VALUE_SET_OBJECT (&val, proto);
   /* first, set our own */
   swfdec_as_object_set_variable_and_flags (object, SWFDEC_AS_STR_prototype,
@@ -1724,7 +1730,7 @@ swfdec_as_object_init_context (SwfdecAsContext *context)
 
   /* then finish the function prototype (use this order or 
    * SWFDEC_AS_VARIABLE_CONSTANT won't let us */
-  swfdec_as_object_set_variable_and_flags (context->Function_prototype,
+  swfdec_as_object_set_variable_and_flags (global->Function_prototype,
       SWFDEC_AS_STR___proto__, &val,
       SWFDEC_AS_VARIABLE_HIDDEN | SWFDEC_AS_VARIABLE_PERMANENT);
 

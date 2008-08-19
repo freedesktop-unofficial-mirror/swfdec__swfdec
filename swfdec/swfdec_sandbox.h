@@ -20,7 +20,7 @@
 #ifndef _SWFDEC_SANDBOX_H_
 #define _SWFDEC_SANDBOX_H_
 
-#include <swfdec/swfdec_as_object.h>
+#include <swfdec/swfdec_as_global.h>
 #include <swfdec/swfdec_url.h>
 #include <swfdec/swfdec_player.h>
 #include <swfdec/swfdec_types.h>
@@ -47,30 +47,24 @@ typedef enum {
 
 struct _SwfdecSandbox
 {
-  SwfdecAsObject      	object;
+  SwfdecAsGlobal	global;
 
   SwfdecSandboxType	type;			/* type of this sandbox */
   SwfdecURL *		url;			/* URL this sandbox acts for */
   guint			as_version;		/* Actionscript version */
 
   /* AS 1 + AS 2 */
-  /* global cached objects from context */
-  SwfdecAsObject *	Function;		/* Function */
-  SwfdecAsObject *	Function_prototype;	/* Function.prototype */
-  SwfdecAsObject *	Object;			/* Object */
-  SwfdecAsObject *	Object_prototype;	/* Object.prototype */
-
   /* global player objects */
   SwfdecAsObject *	MovieClip;		/* MovieClip object */
   SwfdecAsObject *	Video;			/* Video object */
 
   /* ABC */
-  SwfdecAsObject *	global;			/* the global ABC object */
+  SwfdecAsObject *	abc_global;		/* the global ABC object */
 };
 
 struct _SwfdecSandboxClass
 {
-  SwfdecAsObjectClass 	object_class;
+  SwfdecAsGlobalClass 	global_class;
 };
 
 GType			swfdec_sandbox_get_type		(void);

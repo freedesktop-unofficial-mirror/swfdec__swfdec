@@ -47,7 +47,7 @@
  * it as the global object.
  */
 
-G_DEFINE_TYPE (SwfdecSandbox, swfdec_sandbox, SWFDEC_TYPE_AS_OBJECT)
+G_DEFINE_TYPE (SwfdecSandbox, swfdec_sandbox, SWFDEC_TYPE_AS_GLOBAL)
 
 static void
 swfdec_sandbox_mark (SwfdecGcObject *object)
@@ -55,14 +55,10 @@ swfdec_sandbox_mark (SwfdecGcObject *object)
   SwfdecSandbox *sandbox = SWFDEC_SANDBOX (object);
 
   if (swfdec_sandbox_is_abc (sandbox)) {
-    swfdec_gc_object_mark (sandbox->Function);
-    swfdec_gc_object_mark (sandbox->Function_prototype);
-    swfdec_gc_object_mark (sandbox->Object);
-    swfdec_gc_object_mark (sandbox->Object_prototype);
+    swfdec_gc_object_mark (sandbox->abc_global);
+  } else {
     swfdec_gc_object_mark (sandbox->MovieClip);
     swfdec_gc_object_mark (sandbox->Video);
-  } else {
-    swfdec_gc_object_mark (sandbox->global);
   }
 
   SWFDEC_GC_OBJECT_CLASS (swfdec_sandbox_parent_class)->mark (object);
@@ -101,24 +97,14 @@ swfdec_sandbox_initialize_as (SwfdecSandbox *sandbox, guint version)
   SwfdecAsContext *context = swfdec_gc_object_get_context (sandbox);
   SwfdecPlayer *player = SWFDEC_PLAYER (context);
 
-  swfdec_sandbox_use (sandbox);
   if (context->state == SWFDEC_AS_CONTEXT_RUNNING)
     context->state = SWFDEC_AS_CONTEXT_NEW;
-  swfdec_as_context_startup (context, FALSE);
-  /* reset state for initialization */
-  /* FIXME: have a better way to do this */
-  context->state = SWFDEC_AS_CONTEXT_NEW;
   swfdec_sprite_movie_init_context (player);
   swfdec_video_movie_init_context (player);
   swfdec_net_stream_init_context (player);
 
   swfdec_as_context_run_init_script (context, swfdec_initialize, 
       sizeof (swfdec_initialize), version);
-
-  sandbox->Function = context->Function;
-  sandbox->Function_prototype = context->Function_prototype;
-  sandbox->Object = context->Object;
-  sandbox->Object_prototype = context->Object_prototype;
 
   if (context->state == SWFDEC_AS_CONTEXT_NEW)
     context->state = SWFDEC_AS_CONTEXT_RUNNING;
@@ -133,7 +119,7 @@ swfdec_sandbox_initialize_abc (SwfdecSandbox *sandbox, guint version)
 
   swfdec_as_context_startup (context, TRUE);
 
-  sandbox->global = context->global;
+  sandbox->abc_global = context->global;
   swfdec_bits_init_data (&bits, swfdec_initialize_abc, sizeof (swfdec_initialize_abc));
   swfdec_abc_file_new_trusted (context, &bits, swfdec_abc_natives_flash,
       G_N_ELEMENTS (swfdec_abc_natives_flash));
@@ -298,14 +284,9 @@ swfdec_sandbox_use (SwfdecSandbox *sandbox)
 
   context = swfdec_gc_object_get_context (sandbox);
   if (swfdec_sandbox_is_abc (sandbox)) {
-    context->global = sandbox->global;
+    context->global = sandbox->abc_global;
   } else {
     context->global = SWFDEC_AS_OBJECT (sandbox);
-
-    context->Function = sandbox->Function;
-    context->Function_prototype = sandbox->Function_prototype;
-    context->Object = sandbox->Object;
-    context->Object_prototype = sandbox->Object_prototype;
   }
 }
 
@@ -348,16 +329,12 @@ swfdec_sandbox_unuse (SwfdecSandbox *sandbox)
 
   g_return_if_fail (SWFDEC_IS_SANDBOX (sandbox));
   if (swfdec_sandbox_is_abc (sandbox)) {
-    g_return_if_fail (swfdec_gc_object_get_context (sandbox)->global == sandbox->global);
+    g_return_if_fail (swfdec_gc_object_get_context (sandbox)->global == sandbox->abc_global);
   } else {
     g_return_if_fail (swfdec_gc_object_get_context (sandbox)->global == SWFDEC_AS_OBJECT (sandbox));
   }
 
   context = swfdec_gc_object_get_context (sandbox);
   context->global = NULL;
-  context->Function = NULL;
-  context->Function_prototype = NULL;
-  context->Object = NULL;
-  context->Object_prototype = NULL;
 }
 

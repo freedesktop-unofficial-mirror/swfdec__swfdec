@@ -31,7 +31,7 @@ struct _SwfdecAsStack {
   SwfdecAsValue		elements[0];	/* the elements */
 };
 
-gboolean	swfdec_as_stack_push_segment  	(SwfdecAsContext *	context);
+void		swfdec_as_stack_push_segment  	(SwfdecAsContext *	context);
 void		swfdec_as_stack_pop_segment   	(SwfdecAsContext *	context);
 
 //#define SWFDEC_MAD_CHECKS
