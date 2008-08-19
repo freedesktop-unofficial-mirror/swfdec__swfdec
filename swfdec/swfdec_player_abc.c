@@ -22,11 +22,13 @@
 #endif
 
 #include "swfdec_player_internal.h"
-#include "swfdec_abc_internal.h"
 
-SWFDEC_ABC_FLASH (0, swfdec_abc_global_trace)
+#include "swfdec_abc_internal.h"
+#include "swfdec_resource.h"
+
+SWFDEC_ABC_FLASH (0, swfdec_player_abc_trace)
 void
-swfdec_abc_global_trace (SwfdecAsContext *cx,
+swfdec_player_abc_trace (SwfdecAsContext *cx,
     guint argc, SwfdecAsValue *argv, SwfdecAsValue *ret)
 {
   GString *string = g_string_new ("");
@@ -42,3 +44,16 @@ swfdec_abc_global_trace (SwfdecAsContext *cx,
   g_string_free (string, TRUE);
 }
 
+SWFDEC_ABC_FLASH (203, swfdec_player_abc_fscommand)
+void
+swfdec_player_abc_fscommand (SwfdecAsContext *cx,
+    guint argc, SwfdecAsValue *argv, SwfdecAsValue *ret)
+{
+  const char *command, *target;
+  
+  command = swfdec_as_value_to_string (cx, &argv[1]);
+  target = swfdec_as_value_to_string (cx, &argv[2]);
+
+  /* FIXME: emit here or (as in older Flash) later? */
+  g_signal_emit_by_name (cx, "fscommand", command, target);
+}
