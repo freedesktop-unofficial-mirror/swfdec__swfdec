@@ -155,6 +155,6 @@ swfdec_test_plugin_swfdec_new (SwfdecTestPlugin *plugin)
   url = swfdec_url_new_from_input (plugin->filename);
   swfdec_player_set_url (player, url);
   swfdec_url_free (url);
-  while (swfdec_player_get_next_event (player) == 0)
+  while (plugin->data && swfdec_player_get_next_event (player) == 0)
     swfdec_player_advance (player, 0);
 }
