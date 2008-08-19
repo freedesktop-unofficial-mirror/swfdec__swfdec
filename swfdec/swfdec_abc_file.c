@@ -647,15 +647,14 @@ swfdec_abc_file_parse_traits (SwfdecAbcFile *file, SwfdecAbcTraits *traits, Swfd
   return TRUE;
 }
 
-static void
-swfdec_abc_default_stub (SwfdecAsContext *cx, SwfdecAsObject *obj, guint argc,
-    SwfdecAsValue *argv, SwfdecAsValue *ret)
+static char *
+swfdec_abc_describe_function (SwfdecAbcFunction *function)
 {
-  SwfdecAsFrame *frame = swfdec_as_context_get_frame (cx);
-  SwfdecAbcFunction *function = SWFDEC_ABC_FUNCTION (swfdec_as_frame_get_function (frame));
   SwfdecAbcTraits *traits;
   GString *name;
   guint i, id;
+
+  g_assert (function->resolved);
 
   /* find id of our function in pool */
   for (id = 0; id < function->pool->n_functions; id++) {
@@ -726,8 +725,19 @@ out:
   }
   g_string_append (name, ")");
 
-  SWFDEC_STUB (name->str);
-  g_string_free (name, TRUE);
+  return g_string_free (name, FALSE);
+}
+
+static void
+swfdec_abc_default_stub (SwfdecAsContext *cx, SwfdecAsObject *obj, guint argc,
+    SwfdecAsValue *argv, SwfdecAsValue *ret)
+{
+  SwfdecAsFrame *frame = swfdec_as_context_get_frame (cx);
+  SwfdecAbcFunction *function = SWFDEC_ABC_FUNCTION (swfdec_as_frame_get_function (frame));
+  char *name = swfdec_abc_describe_function (function);
+
+  SWFDEC_STUB (name);
+  g_free (name);
 }
 
 static gboolean
