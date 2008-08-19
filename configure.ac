@@ -284,6 +284,7 @@ swfdec/jpeg/Makefile
 swfdec-gtk/Makefile
 player/Makefile
 test/Makefile
+test/abctrace/Makefile
 test/custom/Makefile
 test/gnash/Makefile
 test/gnash/media/Makefile
