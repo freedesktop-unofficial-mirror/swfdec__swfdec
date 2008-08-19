@@ -678,6 +678,14 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun, SwfdecAbcScopeChain *outer_scope)
 	  }
 	}
 	continue;
+      case SWFDEC_ABC_OPCODE_GET_GLOBAL_SCOPE:
+	val = swfdec_as_stack_push (context);
+	if (outer_scope) {
+	  *val = outer_scope->entries[0].value;
+	} else {
+	  *val = scope_start[0];
+	}
+	continue;
       case SWFDEC_ABC_OPCODE_GET_LEX:
 	i = swfdec_bits_get_vu32 (&bits);
 	if (!swfdec_abc_interpret_resolve_multiname (context, &mn, &pool->multinames[i]))
@@ -937,7 +945,6 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun, SwfdecAbcScopeChain *outer_scope)
       case SWFDEC_ABC_OPCODE_ESC_XELEM:
       case SWFDEC_ABC_OPCODE_FIND_DEF:
       case SWFDEC_ABC_OPCODE_GET_DESCENDANTS:
-      case SWFDEC_ABC_OPCODE_GET_GLOBAL_SCOPE:
       case SWFDEC_ABC_OPCODE_GET_GLOBAL_SLOT:
       case SWFDEC_ABC_OPCODE_GET_SLOT:
       case SWFDEC_ABC_OPCODE_GET_SUPER:
