@@ -604,6 +604,44 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun, SwfdecAbcScopeChain *outer_scope)
     //	opcode, swfdec_abc_opcode_get_name (opcode));
     /* order of opcodes is alphabetical */
     switch (opcode) {
+      case SWFDEC_ABC_OPCODE_ADD:
+	{
+	  SwfdecAsValue *lhs, *rhs, ltmp, rtmp;
+	  SwfdecAbcTraits *ltraits, *rtraits;
+	  rhs = swfdec_as_stack_pop (context);
+	  lhs = swfdec_as_stack_peek (context, 1);
+	  ltraits = swfdec_as_value_to_traits (context, lhs);
+	  rtraits = swfdec_as_value_to_traits (context, rhs);
+	  if (SWFDEC_AS_VALUE_IS_NUMBER (lhs) && SWFDEC_AS_VALUE_IS_NUMBER (rhs)) {
+	    SWFDEC_AS_VALUE_SET_NUMBER (lhs,
+		SWFDEC_AS_VALUE_GET_NUMBER (lhs) + SWFDEC_AS_VALUE_GET_NUMBER (rhs));
+	    continue;
+	  } else if (SWFDEC_AS_VALUE_IS_STRING (lhs) || SWFDEC_AS_VALUE_IS_STRING (rhs) ||
+	      (ltraits == SWFDEC_ABC_DATE_TRAITS (context)) ||
+	      (rtraits == SWFDEC_ABC_DATE_TRAITS (context))) {
+	    SWFDEC_AS_VALUE_SET_STRING (lhs, swfdec_as_str_concat (context, 
+		swfdec_as_value_to_string (context, lhs), 
+		swfdec_as_value_to_string (context, rhs)));
+	    continue;
+	  }
+	  if ((ltraits == SWFDEC_ABC_XML_TRAITS (context) || ltraits == SWFDEC_ABC_XML_LIST_TRAITS (context)) &&
+	      (rtraits == SWFDEC_ABC_XML_TRAITS (context) || rtraits == SWFDEC_ABC_XML_LIST_TRAITS (context))) {
+	    SWFDEC_FIXME ("handle add opcode for XML objects");
+	  }
+	  ltmp = *lhs;
+	  swfdec_as_value_to_primitive (&ltmp);
+	  rtmp = *rhs;
+	  swfdec_as_value_to_primitive (&rtmp);
+	  if (SWFDEC_AS_VALUE_IS_STRING (&ltmp) || SWFDEC_AS_VALUE_IS_STRING (&rtmp)) {
+	    SWFDEC_AS_VALUE_SET_STRING (lhs, swfdec_as_str_concat (context, 
+		swfdec_as_value_to_string (context, &ltmp), 
+		swfdec_as_value_to_string (context, &rtmp)));
+	  } else {
+	    SWFDEC_AS_VALUE_SET_NUMBER (lhs,
+		swfdec_as_value_to_number (context, lhs) + swfdec_as_value_to_number (context, rhs));
+	  }
+	}
+	continue;
       case SWFDEC_ABC_OPCODE_CALL_PROPERTY:
       case SWFDEC_ABC_OPCODE_CALL_PROP_LEX:
       case SWFDEC_ABC_OPCODE_CALL_PROP_VOID:
@@ -915,7 +953,6 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun, SwfdecAbcScopeChain *outer_scope)
 	}
 	continue;
       case SWFDEC_ABC_OPCODE_ABS_JUMP:
-      case SWFDEC_ABC_OPCODE_ADD:
       case SWFDEC_ABC_OPCODE_ADD_D:
       case SWFDEC_ABC_OPCODE_ADD_I:
       case SWFDEC_ABC_OPCODE_ALLOC:
