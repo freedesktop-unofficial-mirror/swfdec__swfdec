@@ -40,7 +40,7 @@ swfdec_abc_function_dispose (GObject *object)
   SwfdecAbcFunction *fun = SWFDEC_ABC_FUNCTION (object);
   SwfdecAsContext *context = swfdec_gc_object_get_context (object);
 
-  if (fun->n_args) {
+  if (fun->args) {
     swfdec_as_context_free (context, (fun->n_args + 1) * sizeof (SwfdecAbcFunctionArgument), fun->args);
     fun->args = NULL;
     fun->n_args = 0;
