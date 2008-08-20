@@ -442,7 +442,6 @@ swfdec_abc_interpret_new_class (SwfdecAbcTraits *traits, SwfdecAbcClass *base,
       swfdec_as_context_throw_abc (context, SWFDEC_ABC_TYPE_VERIFY_ERROR,
 	  "The OP_newclass opcode was used with the incorrect base class.");
     }
-    chain->base = swfdec_abc_scope_chain_ref (base->instance_scope);
   }
 
   if (!swfdec_abc_traits_resolve (traits) ||
@@ -455,6 +454,8 @@ swfdec_abc_interpret_new_class (SwfdecAbcTraits *traits, SwfdecAbcClass *base,
   SWFDEC_AS_VALUE_SET_OBJECT (&val, SWFDEC_AS_OBJECT (classp));
   /* add class to instance scope */
   classp->instance_scope = swfdec_abc_scope_chain_new (context, chain, &val, &val + 1, &val + 1);
+  if (base)
+    classp->instance_scope->base = swfdec_abc_scope_chain_ref (base->instance_scope);
 
   if (classp->prototype) {
     if (base)
@@ -474,6 +475,8 @@ swfdec_abc_interpret_new_class (SwfdecAbcTraits *traits, SwfdecAbcClass *base,
     }
   } else {
     SWFDEC_AS_OBJECT (classp)->prototype = SWFDEC_AS_OBJECT (SWFDEC_ABC_GET_CLASS_CLASS (context)->prototype);
+    if (chain)
+      chain->base = swfdec_abc_scope_chain_ref (SWFDEC_ABC_OBJECT (SWFDEC_ABC_GET_CLASS_CLASS (context))->scope);
   }
   /* required so Function init code can use newfunction */
   if (itraits->name == SWFDEC_AS_STR_Function) {
