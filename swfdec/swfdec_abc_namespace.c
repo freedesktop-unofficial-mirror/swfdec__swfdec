@@ -87,7 +87,7 @@ swfdec_abc_namespace_hash (gconstpointer a)
   /* no type checking here due to swfdec_as_context_get_namespace() hack */
   SwfdecAbcNamespace *nsa = (SwfdecAbcNamespace *) a;
 
-  return g_str_hash (nsa->uri) << 3 | nsa->type;
+  return GPOINTER_TO_UINT (nsa->uri) ^ nsa->type;
 }
 
 gboolean
@@ -97,5 +97,5 @@ swfdec_abc_namespace_equal (gconstpointer a, gconstpointer b)
   SwfdecAbcNamespace *nsa = (SwfdecAbcNamespace *) a;
   SwfdecAbcNamespace *nsb = (SwfdecAbcNamespace *) b;
 
-  return nsa->uri == nsb->uri;
+  return nsa->uri == nsb->uri && nsa->type == nsb->type;
 }
