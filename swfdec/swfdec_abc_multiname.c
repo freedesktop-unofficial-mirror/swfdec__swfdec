@@ -22,7 +22,9 @@
 #endif
 
 #include "swfdec_abc_multiname.h"
+
 #include <string.h>
+
 #include "swfdec_abc_internal.h"
 #include "swfdec_as_context.h"
 #include "swfdec_debug.h"
@@ -40,22 +42,31 @@ swfdec_abc_multiname_init (SwfdecAbcMultiname *multi, const char *name,
   multi->nsset = set;
 }
 
+/**
+ * swfdec_abc_multiname_init_from_string:
+ * @multi: the multiname to be initialized
+ * @context: context to use for interning the strings
+ * @string: a String in the form [namespace.]name to intern
+ *
+ * extracts the name and namespace out of a dot-seperated @string and sets them
+ * on the given multiname.
+ **/
 void
 swfdec_abc_multiname_init_from_string (SwfdecAbcMultiname *multi,
     SwfdecAsContext *context, const char *string)
 {
-  const char *colons;
+  const char *dot;
 
   g_return_if_fail (multi != NULL);
   g_return_if_fail (SWFDEC_IS_AS_CONTEXT (context));
   g_return_if_fail (string != NULL);
 
-  colons = strstr (string, "::");
-  if (colons != NULL) {
-    char *s = g_strndup (string, colons - string);
+  dot = strrchr (string, '.');
+  if (dot != NULL) {
+    char *s = g_strndup (string, dot - string);
     multi->ns = swfdec_as_context_get_namespace (context, SWFDEC_ABC_NAMESPACE_PUBLIC,
 	NULL, swfdec_as_context_give_string (context, s));
-    string = colons + 2;
+    string = dot + 1;
   } else {
     multi->ns = context->public_ns;
   }
