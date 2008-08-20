@@ -825,7 +825,7 @@ swfdec_resource_get_abc_class (SwfdecResource *resource,
     SwfdecAbcMultiname mn;
     SwfdecAsValue val;
     SWFDEC_FIXME ("do proper class lookup here");
-    swfdec_abc_multiname_init_from_string (&mn, context, "Sprite");
+    swfdec_abc_multiname_init_from_string (&mn, context, "flash.display::Sprite");
     swfdec_as_context_get_abc_variable (context, &mn, &val);
     return SWFDEC_ABC_CLASS (SWFDEC_AS_VALUE_GET_OBJECT (&val));;
   }
