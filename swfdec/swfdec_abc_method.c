@@ -90,40 +90,10 @@ void
 swfdec_abc_method_call (SwfdecAbcMethod *method, 
     guint argc, SwfdecAsValue *argv, SwfdecAsValue *ret)
 {
-  SwfdecAsContext *context;
-  SwfdecAbcFunction *fun;
-  guint i;
-
   g_return_if_fail (SWFDEC_IS_ABC_METHOD (method));
   g_return_if_fail (argv != NULL);
   g_return_if_fail (ret != NULL);
 
-  fun = method->function;
-  context = swfdec_gc_object_get_context (method);
-  SWFDEC_AS_VALUE_SET_UNDEFINED (ret);
-  if (argc < fun->min_args || (argc > fun->n_args &&
-	!fun->need_arguments && ! fun->need_rest)) {
-    swfdec_as_context_throw_abc (context, SWFDEC_ABC_TYPE_ARGUMENT_ERROR, 
-      "Argument count mismatch on %s. Expected %u, got %u.", 
-      fun->name ? fun->name : "[unnamed]", fun->n_args, fun->min_args);
-    return;
-  }
-
-  if (!swfdec_abc_function_resolve (fun))
-    return;
-
-  for (i = 0; i < argc; i++) {
-    if (!swfdec_abc_traits_coerce (fun->args[i].traits, &argv[i])) {
-      swfdec_as_context_throw_abc (context, SWFDEC_ABC_TYPE_TYPE_ERROR, 
-	"Type Coercion failed: cannot convert %s to %s.",
-	swfdec_as_value_get_type_name (&argv[i]), fun->args[i].traits->name);
-      return;
-    }
-  }
-
-  if (!swfdec_abc_function_verify (fun))
-    return;
-
-  swfdec_abc_function_call (fun, method->scope, argc, argv, ret);
+  swfdec_abc_function_call (method->function, method->scope, argc, argv, ret);
 }
 
