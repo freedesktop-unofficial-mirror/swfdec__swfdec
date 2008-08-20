@@ -41,7 +41,7 @@ swfdec_abc_function_dispose (GObject *object)
   SwfdecAsContext *context = swfdec_gc_object_get_context (object);
 
   if (fun->n_args) {
-    swfdec_as_context_free (context, fun->n_args * sizeof (SwfdecAbcFunctionArgument), fun->args);
+    swfdec_as_context_free (context, (fun->n_args + 1) * sizeof (SwfdecAbcFunctionArgument), fun->args);
     fun->args = NULL;
     fun->n_args = 0;
   }
@@ -81,6 +81,7 @@ swfdec_abc_function_bind (SwfdecAbcFunction *fun, SwfdecAbcTraits *traits)
     return FALSE;
 
   fun->bound_traits = traits;
+  fun->args[0].traits = traits;
   return TRUE;
 }
 
@@ -124,7 +125,11 @@ swfdec_abc_function_resolve (SwfdecAbcFunction *fun)
   if (fun->bound_traits == NULL)
     fun->bound_traits = SWFDEC_ABC_OBJECT_TRAITS (context);
 
-  for (i = 0; i < fun->n_args; i++) {
+  if (fun->args[0].traits == NULL)
+    fun->args[0].traits = SWFDEC_ABC_OBJECT_TRAITS (context);
+  /* do we need the SET_UNDEFINED? */
+  SWFDEC_AS_VALUE_SET_UNDEFINED (&fun->args[0].default_value);
+  for (i = 1; i <= fun->n_args; i++) {
     if (fun->args[i].type == NULL) {
       fun->args[i].traits = NULL;
     } else {
@@ -205,11 +210,11 @@ swfdec_abc_function_call (SwfdecAbcFunction *fun, SwfdecAbcScopeChain *scope,
   if (!swfdec_abc_function_resolve (fun))
     return FALSE;
 
-  for (i = 0; i < MIN (argc, fun->n_args); i++) {
-    if (!swfdec_abc_traits_coerce (fun->args[i].traits, &argv[i + 1])) {
+  for (i = 0; i <= MIN (argc, fun->n_args); i++) {
+    if (!swfdec_abc_traits_coerce (fun->args[i].traits, &argv[i])) {
       swfdec_as_context_throw_abc (context, SWFDEC_ABC_TYPE_TYPE_ERROR, 
 	"Type Coercion failed: cannot convert %s to %s.",
-	swfdec_as_value_get_type_name (&argv[i + 1]), fun->args[i].traits->name);
+	swfdec_as_value_get_type_name (&argv[i]), fun->args[i].traits->name);
       return FALSE;
     }
   }

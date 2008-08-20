@@ -569,7 +569,7 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun, SwfdecAbcScopeChain *outer_scope)
     *swfdec_as_stack_push (context) = frame->argv[i];
   }
   for (; i <= fun->n_args; i++) {
-    *swfdec_as_stack_push (context) = fun->args[i-1].default_value;
+    *swfdec_as_stack_push (context) = fun->args[i].default_value;
   }
   if (fun->need_rest) {
     SWFDEC_FIXME ("implement rest argument");

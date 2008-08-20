@@ -245,7 +245,7 @@ fail:
     traits->slots = NULL;
   }
   if (traits->n_methods) {
-    swfdec_as_context_free (context, traits->n_slots * sizeof (SwfdecAsFunction *), traits->methods);
+    swfdec_as_context_free (context, traits->n_methods * sizeof (SwfdecAsFunction *), traits->methods);
     traits->methods = NULL;
   }
   return FALSE;

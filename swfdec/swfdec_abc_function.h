@@ -79,7 +79,7 @@ struct _SwfdecAbcFunction {
   };
   guint			n_args;			/* number of arguments */
   guint			min_args;     		/* minimum required number of arguments */
-  SwfdecAbcFunctionArgument *args;		/* n_args arguments */ 
+  SwfdecAbcFunctionArgument *args;		/* n_args + 1 arguments (this and arguments) */ 
 
   SwfdecAbcTraits *	bound_traits;		/* traits of objects we construct or NULL */
   

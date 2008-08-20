@@ -719,9 +719,10 @@ swfdec_abc_describe_function (SwfdecAbcFunction *function)
   }
 out:
   /* append arguments */
-  g_string_append_printf (name, " (%s", function->bound_traits->name);
+  g_string_append (name, " (");
   for (i = 0; i < function->n_args; i++) {
-    g_string_append (name, ", ");
+    if (i > 0)
+      g_string_append (name, ", ");
     if (function->args[i].traits)
       g_string_append (name, function->args[i].traits->name);
     else 
@@ -767,13 +768,11 @@ swfdec_abc_file_parse_methods (SwfdecAbcFile *file, SwfdecBits *bits,
       fun->pool = file;
       READ_U30 (len, bits);
       SWFDEC_LOG ("  function %u:", i);
-      if (len) {
-	fun->args = swfdec_as_context_try_new (context, SwfdecAbcFunctionArgument, len);
-	if (fun->args == NULL)
-	  return FALSE;
-	fun->n_args = len;
-	fun->min_args = len;
-      }
+      fun->args = swfdec_as_context_try_new (context, SwfdecAbcFunctionArgument, len + 1);
+      if (fun->args == NULL)
+	return FALSE;
+      fun->n_args = len;
+      fun->min_args = len;
       READ_U30 (id, bits);
       if (id == 0) {
 	fun->return_type = NULL;
@@ -783,7 +782,7 @@ swfdec_abc_file_parse_methods (SwfdecAbcFile *file, SwfdecBits *bits,
 	THROW (file, "Cpool index %u is out of range %u.", id, file->n_multinames);
       }
       SWFDEC_LOG ("    return type: %s", fun->return_type ? ((SwfdecAbcMultiname *) fun->return_type)->name : "void");
-      for (j = 0; j < fun->n_args; j++) {
+      for (j = 1; j <= fun->n_args; j++) {
 	READ_U30 (id, bits);
 	if (id == 0) {
 	  fun->args[j].type = NULL;
@@ -825,7 +824,7 @@ swfdec_abc_file_parse_methods (SwfdecAbcFile *file, SwfdecBits *bits,
 	if (len == 0 || len > fun->n_args)
 	  return FALSE;
 	fun->min_args -= len;
-	for (j = fun->min_args; j < fun->n_args; j++) {
+	for (j = fun->min_args + 1; j <= fun->n_args; j++) {
 	  READ_U30 (id, bits);
 	  fun->args[j].default_index = id;
 	  fun->args[j].default_type = swfdec_bits_get_u8 (bits);
@@ -833,10 +832,10 @@ swfdec_abc_file_parse_methods (SwfdecAbcFile *file, SwfdecBits *bits,
       }
       if (param_names) {
 	/* Tamarin doesn't parse this, so we must not error out here */
-	for (j = 0; j < fun->n_args; j++) {
+	for (j = 1; j <= fun->n_args; j++) {
 	  id = swfdec_bits_get_vu32 (bits);
 	  if (id > 0 && id < file->n_strings)
-	    fun->args[j].name = file->strings[i];
+	    fun->args[j].name = file->strings[id];
 	}
       }
     }
