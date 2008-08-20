@@ -538,6 +538,17 @@ swfdec_abc_interpret_new_function (SwfdecAbcFunction *fun, SwfdecAbcScopeChain *
   return classp;
 }
 
+static gboolean
+swfdec_abc_interpret_jump (SwfdecAsContext *context, SwfdecBits *bits, int offset)
+{
+  if (offset < 0) {
+    if (!swfdec_as_context_check_continue (context))
+      return FALSE;
+  }
+  bits->ptr += offset;
+  return TRUE;
+}
+
 gboolean
 swfdec_abc_interpret (SwfdecAbcFunction *fun, SwfdecAbcScopeChain *outer_scope)
 {
@@ -558,6 +569,8 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun, SwfdecAbcScopeChain *outer_scope)
   frame = context->frame;
   pool = fun->bound_traits->pool;
 
+  if (swfdec_as_context_is_aborted (context))
+    return FALSE;
   if (!swfdec_as_context_check_continue (context))
     return TRUE;
 
@@ -807,6 +820,11 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun, SwfdecAbcScopeChain *outer_scope)
 	  }
 	}
 	continue;
+      case SWFDEC_ABC_OPCODE_JUMP:
+	i = swfdec_bits_get_s24 (&bits);
+	if (!swfdec_abc_interpret_jump (context, &bits, i))
+	  break;
+	continue;
       case SWFDEC_ABC_OPCODE_KILL:
 	i = swfdec_bits_get_vu32 (&bits);
 	SWFDEC_AS_VALUE_SET_UNDEFINED (&locals[i]);
@@ -1031,7 +1049,6 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun, SwfdecAbcScopeChain *outer_scope)
       case SWFDEC_ABC_OPCODE_INSTANCE_OF:
       case SWFDEC_ABC_OPCODE_IS_TYPE:
       case SWFDEC_ABC_OPCODE_IS_TYPE_LATE:
-      case SWFDEC_ABC_OPCODE_JUMP:
       case SWFDEC_ABC_OPCODE_LABEL:
       case SWFDEC_ABC_OPCODE_LESS_EQUALS:
       case SWFDEC_ABC_OPCODE_LESS_THAN:
