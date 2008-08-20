@@ -627,6 +627,21 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun, SwfdecAbcScopeChain *outer_scope)
 	    swfdec_as_stack_pop (context);
 	}
 	continue;
+      case SWFDEC_ABC_OPCODE_COERCE:
+	{
+	  SwfdecAbcTraits *traits;
+	  i = swfdec_bits_get_vu32 (&bits);
+	  traits = swfdec_abc_global_get_traits_for_multiname (
+	      SWFDEC_ABC_GLOBAL (context->global), &pool->multinames[i]);
+	  val = swfdec_as_stack_peek (context, 1);
+	  if (!swfdec_abc_traits_coerce (traits, val)) {
+	    swfdec_as_context_throw_abc (context, SWFDEC_ABC_TYPE_REFERENCE_ERROR,
+		"Type Coercion failed: cannot convert %s to %s.", 
+		swfdec_as_value_get_type_name (val), traits->name);
+	    break;
+	  }
+	}
+	continue;
       case SWFDEC_ABC_OPCODE_COERCE_A:
 	continue;
       case SWFDEC_ABC_OPCODE_COERCE_O:
@@ -921,7 +936,6 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun, SwfdecAbcScopeChain *outer_scope)
       case SWFDEC_ABC_OPCODE_CALL_SUPER_VOID:
       case SWFDEC_ABC_OPCODE_CHECK_FILTER:
       case SWFDEC_ABC_OPCODE_CODEGEN:
-      case SWFDEC_ABC_OPCODE_COERCE:
       case SWFDEC_ABC_OPCODE_COERCE_B:
       case SWFDEC_ABC_OPCODE_COERCE_D:
       case SWFDEC_ABC_OPCODE_COERCE_I:
