@@ -33,6 +33,7 @@
 #include "swfdec_decoder.h"
 #include "swfdec_internal.h"
 #include "swfdec_player_internal.h"
+#include "swfdec_sandbox_as.h"
 #include "swfdec_sprite.h"
 #include "swfdec_sprite_movie.h"
 #include "swfdec_swf_decoder.h"
@@ -805,7 +806,7 @@ swfdec_sprite_movie_attachMovie (SwfdecAsContext *cx, SwfdecAsObject *object,
   /* run init and construct */
   constructor = swfdec_player_get_export_class (SWFDEC_PLAYER (cx), export);
   if (constructor == NULL)
-    constructor = movie->resource->sandbox->MovieClip;
+    constructor = SWFDEC_SANDBOX_AS (movie->resource->sandbox)->MovieClip;
   swfdec_as_object_set_constructor (SWFDEC_AS_OBJECT (ret), constructor);
 
   swfdec_sprite_movie_init_from_object (ret, initObject);
@@ -964,7 +965,7 @@ swfdec_sprite_movie_init_context (SwfdecPlayer *player)
 
   movie = SWFDEC_AS_OBJECT (swfdec_as_object_add_function (context->global, 
       SWFDEC_AS_STR_MovieClip, NULL));
-  SWFDEC_SANDBOX (context->global)->MovieClip = movie;
+  SWFDEC_SANDBOX_AS (context->global)->MovieClip = movie;
   proto = swfdec_as_object_new (context);
   SWFDEC_AS_VALUE_SET_OBJECT (&val, proto);
   swfdec_as_object_set_variable_and_flags (movie,

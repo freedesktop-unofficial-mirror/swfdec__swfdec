@@ -46,7 +46,103 @@ struct _SwfdecAbcGlobalScript {
   SwfdecAbcScript *	script;
 };
 
+enum {
+  PROP_0,
+  PROP_TRAITS
+};
+
 G_DEFINE_TYPE (SwfdecAbcGlobal, swfdec_abc_global, SWFDEC_TYPE_ABC_OBJECT)
+
+static GObject *
+swfdec_abc_global_constructor (GType type, guint n_construct_properties,
+    GObjectConstructParam *construct_properties)
+{
+  GObject *object;
+  SwfdecAsContext *context;
+  SwfdecAbcGlobal *global;
+  SwfdecAbcTraits *traits;
+  SwfdecAsValue val;
+  SwfdecBits bits;
+
+  object = G_OBJECT_CLASS (swfdec_abc_global_parent_class)->constructor (type, 
+      n_construct_properties, construct_properties);
+
+  global = SWFDEC_ABC_GLOBAL (object);
+  context = swfdec_gc_object_get_context (object);
+
+  context->global = SWFDEC_AS_OBJECT (global);
+
+  /* create builtin traits */
+  global->void_traits = g_object_new (SWFDEC_TYPE_ABC_TRAITS, "context", context, NULL);
+  global->void_traits->pool = NULL;
+  global->void_traits->ns = context->public_ns;
+  global->void_traits->name = SWFDEC_AS_STR_void;
+  global->void_traits->final = TRUE;
+  global->void_traits->resolved = TRUE;
+  global->null_traits = g_object_new (SWFDEC_TYPE_ABC_TRAITS, "context", context, NULL);
+  global->null_traits->pool = NULL;
+  global->null_traits->ns = context->public_ns;
+  global->null_traits->name = SWFDEC_AS_STR_null;
+  global->null_traits->final = TRUE;
+  global->null_traits->resolved = TRUE;
+  swfdec_abc_global_add_traits (global, global->void_traits);
+  swfdec_abc_global_add_traits (global, global->null_traits);
+
+  /* init default pool */
+  swfdec_bits_init_data (&bits, swfdec_abc_initialize, sizeof (swfdec_abc_initialize));
+  global->file = swfdec_abc_file_new_trusted (context, &bits, 
+      swfdec_abc_natives, G_N_ELEMENTS (swfdec_abc_natives));
+  /* must work and not throw exceptions */
+  g_assert (global->file);
+
+  /* set proper traits here */
+  traits = global->file->main->traits;
+  if (!swfdec_abc_traits_resolve (traits)) {
+    g_assert_not_reached ();
+  }
+  g_object_unref (SWFDEC_ABC_OBJECT (global)->traits);
+  SWFDEC_ABC_OBJECT (global)->traits = traits;
+  g_object_ref (traits);
+  g_assert (SWFDEC_ABC_OBJECT (global)->slots == NULL);
+  if (traits->n_slots)
+    SWFDEC_ABC_OBJECT (global)->slots = swfdec_as_context_new (context,
+       SwfdecAsValue, traits->n_slots);
+
+  /* run main script */
+  global->file->main->global = SWFDEC_ABC_OBJECT (global);
+  SWFDEC_AS_VALUE_SET_OBJECT (&val, SWFDEC_AS_OBJECT (global));
+  swfdec_abc_function_call (traits->construct, NULL, 0, &val, &val);
+  return object;
+}
+
+static void
+swfdec_abc_global_get_property (GObject *object, guint param_id, GValue *value, 
+    GParamSpec * pspec)
+{
+  switch (param_id) {
+    case PROP_TRAITS:
+      g_value_set_object (value, SWFDEC_ABC_OBJECT (object)->traits);
+      break;
+    default:
+      G_OBJECT_WARN_INVALID_PROPERTY_ID (object, param_id, pspec);
+      break;
+  }
+}
+
+static void
+swfdec_abc_global_set_property (GObject *object, guint param_id, const GValue *value, 
+    GParamSpec * pspec)
+{
+  switch (param_id) {
+    case PROP_TRAITS:
+      /* big cheat here: we ignore traits during creation, so asserts dont trigger.
+       * We'll assign proper traits later in the constructor */
+      break;
+    default:
+      G_OBJECT_WARN_INVALID_PROPERTY_ID (object, param_id, pspec);
+      break;
+  }
+}
 
 static void
 swfdec_abc_global_dispose (GObject *object)
@@ -80,7 +176,12 @@ swfdec_abc_global_class_init (SwfdecAbcGlobalClass *klass)
   GObjectClass *object_class = G_OBJECT_CLASS (klass);
   SwfdecGcObjectClass *gc_class = SWFDEC_GC_OBJECT_CLASS (klass);
 
+  object_class->constructor = swfdec_abc_global_constructor;
   object_class->dispose = swfdec_abc_global_dispose;
+  object_class->get_property = swfdec_abc_global_get_property;
+  object_class->set_property = swfdec_abc_global_set_property;
+
+  g_object_class_override_property (object_class, PROP_TRAITS, "traits");
 
   gc_class->mark = swfdec_abc_global_mark;
 }
@@ -90,63 +191,6 @@ swfdec_abc_global_init (SwfdecAbcGlobal *global)
 {
   global->traits = g_ptr_array_new ();
   global->scripts = g_array_new (FALSE, FALSE, sizeof (SwfdecAbcGlobalScript));
-}
-
-void
-swfdec_abc_global_new (SwfdecAsContext *context)
-{
-  SwfdecAbcTraits *traits;
-  SwfdecAbcGlobal *global;
-  SwfdecAsValue val;
-  SwfdecBits bits;
-
-  g_return_if_fail (SWFDEC_IS_AS_CONTEXT (context));
-
-  /* big cheat here: we use void traits for creation, so asserts dont trigger.
-   * We'll assign proper traits later */
-  traits = g_object_new (SWFDEC_TYPE_ABC_TRAITS, "context", context, NULL);
-  traits->pool = NULL;
-  traits->ns = context->public_ns;
-  traits->name = SWFDEC_AS_STR_void;
-  traits->final = TRUE;
-  traits->resolved = TRUE;
-  global = g_object_new (SWFDEC_TYPE_ABC_GLOBAL, "context", context, "traits", traits, NULL);
-  context->global = SWFDEC_AS_OBJECT (global);
-
-  /* create builtin traits */
-  global->void_traits = traits;
-  global->null_traits = g_object_new (SWFDEC_TYPE_ABC_TRAITS, "context", context, NULL);
-  global->null_traits->pool = global->file;
-  global->null_traits->ns = context->public_ns;
-  global->null_traits->name = SWFDEC_AS_STR_null;
-  global->null_traits->final = TRUE;
-  global->null_traits->resolved = TRUE;
-  swfdec_abc_global_add_traits (global, global->void_traits);
-  swfdec_abc_global_add_traits (global, global->null_traits);
-
-  /* init default pool */
-  swfdec_bits_init_data (&bits, swfdec_abc_initialize, sizeof (swfdec_abc_initialize));
-  global->file = swfdec_abc_file_new_trusted (context, &bits, 
-      swfdec_abc_natives, G_N_ELEMENTS (swfdec_abc_natives));
-  /* must work and not throw exceptions */
-  g_assert (global->file);
-
-  /* set proper traits here */
-  traits = global->file->main->traits;
-  if (!swfdec_abc_traits_resolve (traits))
-    g_assert_not_reached ();
-  g_object_unref (SWFDEC_ABC_OBJECT (global)->traits);
-  SWFDEC_ABC_OBJECT (global)->traits = traits;
-  g_object_ref (traits);
-  g_assert (SWFDEC_ABC_OBJECT (global)->slots == NULL);
-  if (traits->n_slots)
-    SWFDEC_ABC_OBJECT (global)->slots = swfdec_as_context_new (context,
-       SwfdecAsValue, traits->n_slots);
-
-  /* run main script */
-  global->file->main->global = SWFDEC_ABC_OBJECT (global);
-  SWFDEC_AS_VALUE_SET_OBJECT (&val, SWFDEC_AS_OBJECT (global));
-  swfdec_abc_function_call (traits->construct, NULL, 0, &val, &val);
 }
 
 void

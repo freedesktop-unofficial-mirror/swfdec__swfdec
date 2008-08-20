@@ -31,7 +31,7 @@ swfdec_player_allow_by_matrix (SwfdecPlayer *player, SwfdecSandbox *sandbox,
 {
   SwfdecAccessPermission perm;
   SwfdecAccessType type;
-  SwfdecURL *url;
+  SwfdecURL *url, *sandbox_url;
 
   g_return_if_fail (SWFDEC_IS_PLAYER (player));
   g_return_if_fail (SWFDEC_IS_SANDBOX (sandbox));
@@ -44,15 +44,16 @@ swfdec_player_allow_by_matrix (SwfdecPlayer *player, SwfdecSandbox *sandbox,
     return;
   }
 
+  sandbox_url = swfdec_sandbox_get_url (sandbox);
   if (swfdec_url_is_local (url)) {
     type = SWFDEC_ACCESS_LOCAL;
-  } else if (swfdec_url_host_equal (url, sandbox->url)) {
+  } else if (swfdec_url_host_equal (url, sandbox_url)) {
     type = SWFDEC_ACCESS_SAME_HOST;
   } else {
     type = SWFDEC_ACCESS_NET;
   }
 
-  perm = matrix[sandbox->type][type];
+  perm = matrix[swfdec_sandbox_get_sandbox_type (sandbox)][type];
 
   if (perm == SWFDEC_ACCESS_YES) {
     func (player, TRUE, data);
@@ -62,10 +63,11 @@ swfdec_player_allow_by_matrix (SwfdecPlayer *player, SwfdecSandbox *sandbox,
     SwfdecURL *load_url = swfdec_url_new_components (
 	swfdec_url_get_protocol (url), swfdec_url_get_host (url), 
 	swfdec_url_get_port (url), "crossdomain.xml", NULL);
-    swfdec_player_allow_or_load (player, sandbox->url, url, load_url, func, data);
+    swfdec_player_allow_or_load (player, sandbox_url, url, load_url, func, data);
     swfdec_url_free (load_url);
   }
 
+  swfdec_url_free (sandbox_url);
   swfdec_url_free (url);
 }
 

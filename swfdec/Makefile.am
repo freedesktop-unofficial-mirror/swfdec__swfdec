@@ -137,6 +137,8 @@ libswfdec_source_files = \
 	swfdec_resource.c \
 	swfdec_ringbuffer.c \
 	swfdec_sandbox.c \
+	swfdec_sandbox_abc.c \
+	swfdec_sandbox_as.c \
 	swfdec_script.c \
 	swfdec_selection.c \
 	swfdec_shape.c \
@@ -334,6 +336,8 @@ noinst_HEADERS = \
 	swfdec_resource.h \
 	swfdec_ringbuffer.h \
 	swfdec_sandbox.h \
+	swfdec_sandbox_abc.h \
+	swfdec_sandbox_as.h \
 	swfdec_script_internal.h \
 	swfdec_shape.h \
 	swfdec_shape_parser.h \

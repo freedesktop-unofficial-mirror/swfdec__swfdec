@@ -44,6 +44,7 @@
 #include "swfdec_movie.h"
 #include "swfdec_renderer_internal.h"
 #include "swfdec_resource.h"
+#include "swfdec_sandbox_abc.h"
 #include "swfdec_script_internal.h"
 #include "swfdec_sprite_movie.h"
 #include "swfdec_text_field_movie.h"
@@ -571,7 +572,7 @@ swfdec_player_queue_abc_constructor (SwfdecPlayer *player, SwfdecMovie *movie)
   g_return_if_fail (SWFDEC_MOVIE (movie));
 
   if (movie->resource->sandbox == NULL ||
-      !swfdec_sandbox_is_abc (movie->resource->sandbox))
+      !SWFDEC_IS_SANDBOX_ABC (movie->resource->sandbox))
     return;
 
   priv = player->priv;

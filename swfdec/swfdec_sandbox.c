@@ -22,149 +22,89 @@
 #endif
 
 #include "swfdec_sandbox.h"
-#include "swfdec_abc_file.h"
-#include "swfdec_abc_native.h"
-#include "swfdec_as_internal.h"
+
 #include "swfdec_debug.h"
-#include "swfdec_initialize.h"
-#include "swfdec_initialize_abc.h"
-#include "swfdec_internal.h"
+#include "swfdec_loader_internal.h"
 #include "swfdec_player_internal.h"
+#include "swfdec_sandbox_abc.h"
+#include "swfdec_sandbox_as.h"
 
-/*** GTK-DOC ***/
-
-/**
- * SECTION:SwfdecSandbox
- * @title: SwfdecSandbox
- * @short_description: global object used for security
- *
- * The SwfdecSandbox object is a garbage-collected script object that does two
- * things. The simple thing is its use as the global object while code is 
- * executed in a #SwfdecPlayer. So you can always assume that the global object
- * is a #SwfdecSandbox. The second task it fulfills is acting as the security
- * mechanism used by native functions to determine if a given action should be
- * allowed or not. This is easy, because script functions can always refer to
- * it as the global object.
- */
-
-G_DEFINE_TYPE (SwfdecSandbox, swfdec_sandbox, SWFDEC_TYPE_AS_GLOBAL)
-
-static void
-swfdec_sandbox_mark (SwfdecGcObject *object)
+/* enumerations from "swfdec_as_context.h" */
+GType
+swfdec_sandbox_type_get_type (void)
 {
-  SwfdecSandbox *sandbox = SWFDEC_SANDBOX (object);
-
-  if (swfdec_sandbox_is_abc (sandbox)) {
-    swfdec_gc_object_mark (sandbox->abc_global);
-  } else {
-    swfdec_gc_object_mark (sandbox->MovieClip);
-    swfdec_gc_object_mark (sandbox->Video);
+  static GType etype = 0;
+  if (etype == 0) {
+    static const GEnumValue values[] = {
+      { SWFDEC_SANDBOX_NONE, "SWFDEC_SANDBOX_NONE", "none" },
+      { SWFDEC_SANDBOX_REMOTE, "SWFDEC_SANDBOX_REMOTE", "remote" },
+      { SWFDEC_SANDBOX_LOCAL_FILE, "SWFDEC_SANDBOX_LOCAL_FILE", "local-file" },
+      { SWFDEC_SANDBOX_LOCAL_NETWORK, "SWFDEC_SANDBOX_LOCAL_NETWORK", "local-network" },
+      { SWFDEC_SANDBOX_TRUSTED, "SWFDEC_SANDBOX_TRUSTED", "trusted" },
+      { 0, NULL, NULL }
+    };
+    etype = g_enum_register_static (g_intern_static_string ("SwfdecSandboxType"), values);
   }
-
-  SWFDEC_GC_OBJECT_CLASS (swfdec_sandbox_parent_class)->mark (object);
+  return etype;
 }
 
+#define SWFDEC_FLASH_TO_AS_VERSION(ver) ((ver) < 7 ? 1 : 2)
 static void
-swfdec_sandbox_dispose (GObject *object)
+swfdec_sandbox_class_init (gpointer g_class, gpointer class_data)
 {
-  SwfdecSandbox *sandbox = SWFDEC_SANDBOX (object);
-
-  swfdec_url_free (sandbox->url);
-
-  G_OBJECT_CLASS (swfdec_sandbox_parent_class)->dispose (object);
+  g_object_interface_install_property (g_class,
+      g_param_spec_enum ("sandbox-type", "sandbox type", "type of sandbox",
+	  SWFDEC_TYPE_SANDBOX_TYPE, SWFDEC_SANDBOX_NONE, G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
+  g_object_interface_install_property (g_class,
+      g_param_spec_boxed ("url", "url", "host url handled by this sandbox",
+	  SWFDEC_TYPE_URL, G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 }
 
-static void
-swfdec_sandbox_class_init (SwfdecSandboxClass *klass)
+GType
+swfdec_sandbox_get_type (void)
 {
-  GObjectClass *object_class = G_OBJECT_CLASS (klass);
-  SwfdecGcObjectClass *gc_class = SWFDEC_GC_OBJECT_CLASS (klass);
-
-  object_class->dispose = swfdec_sandbox_dispose;
-
-  gc_class->mark = swfdec_sandbox_mark;
-}
-
-static void
-swfdec_sandbox_init (SwfdecSandbox *sandbox)
-{
-  sandbox->type = SWFDEC_SANDBOX_NONE;
-}
-
-static void
-swfdec_sandbox_initialize_as (SwfdecSandbox *sandbox, guint version)
-{
-  SwfdecAsContext *context = swfdec_gc_object_get_context (sandbox);
-  SwfdecPlayer *player = SWFDEC_PLAYER (context);
-
-  if (context->state == SWFDEC_AS_CONTEXT_RUNNING)
-    context->state = SWFDEC_AS_CONTEXT_NEW;
-  swfdec_sprite_movie_init_context (player);
-  swfdec_video_movie_init_context (player);
-  swfdec_net_stream_init_context (player);
-
-  swfdec_as_context_run_init_script (context, swfdec_initialize, 
-      sizeof (swfdec_initialize), version);
-
-  if (context->state == SWFDEC_AS_CONTEXT_NEW)
-    context->state = SWFDEC_AS_CONTEXT_RUNNING;
-  swfdec_sandbox_unuse (sandbox);
-}
-
-static void
-swfdec_sandbox_initialize_abc (SwfdecSandbox *sandbox, guint version)
-{
-  SwfdecAsContext *context = swfdec_gc_object_get_context (sandbox);
-  SwfdecBits bits;
-
-  swfdec_as_context_startup (context, TRUE);
-
-  sandbox->abc_global = context->global;
-  swfdec_bits_init_data (&bits, swfdec_initialize_abc, sizeof (swfdec_initialize_abc));
-  swfdec_abc_file_new_trusted (context, &bits, swfdec_abc_natives_flash,
-      G_N_ELEMENTS (swfdec_abc_natives_flash));
-  swfdec_sandbox_unuse (sandbox);
+  static GType sandbox_type = 0;
+  
+  if (!sandbox_type) {
+    static const GTypeInfo sandbox_info = {
+      sizeof (SwfdecSandboxInterface),
+      NULL,
+      NULL,
+      swfdec_sandbox_class_init,
+      NULL,
+      NULL,
+      0,
+      0,
+      NULL,
+    };
+    
+    sandbox_type = g_type_register_static (G_TYPE_INTERFACE,
+        "SwfdecSandbox", &sandbox_info, 0);
+    g_type_interface_add_prerequisite (sandbox_type, SWFDEC_TYPE_AS_OBJECT);
+  }
+  
+  return sandbox_type;
 }
 
 /**
- * swfdec_sandbox_set_allow_network:
- * @sandbox: a #SwfdecSandbox
+ * swfdec_sandbox_compute_sandbox_type:
+ * @url: the url to check
  * @network: %TRUE if network access is possible
  *
- * Checks if the given sandbox may be loaded and if so initializes its type. 
- * This function should be called on every new sandbox.
+ * Checks what sandbox type belongs to the given @url and @network.
  *
- * Returns: %TRUE if the sandbox initialization could be finished as requested,
- *          %FALSE if not and it shouldn't be used.
+ * Returns: The computed #SwfdecSandboxType.
  **/
-static gboolean
-swfdec_sandbox_set_allow_network (SwfdecSandbox *sandbox, gboolean network)
+static SwfdecSandboxType
+swfdec_sandbox_compute_sandbox_type (const SwfdecURL *url, gboolean network)
 {
-  g_return_val_if_fail (SWFDEC_IS_SANDBOX (sandbox), FALSE);
+  g_return_val_if_fail (url != NULL, SWFDEC_SANDBOX_NONE);
 
-  switch (sandbox->type) {
-    case SWFDEC_SANDBOX_REMOTE:
-      return TRUE;
-    case SWFDEC_SANDBOX_LOCAL_FILE:
-      return !network;
-    case SWFDEC_SANDBOX_LOCAL_NETWORK:
-      return network;
-    case SWFDEC_SANDBOX_LOCAL_TRUSTED:
-      return TRUE;
-    case SWFDEC_SANDBOX_NONE:
-      break;
-    default:
-      g_assert_not_reached ();
-      break;
-  }
-
-  if (swfdec_url_is_local (sandbox->url)) {
-    sandbox->type = network ? SWFDEC_SANDBOX_LOCAL_NETWORK : SWFDEC_SANDBOX_LOCAL_FILE;
+  if (swfdec_url_is_local (url)) {
+    return network ? SWFDEC_SANDBOX_LOCAL_NETWORK : SWFDEC_SANDBOX_LOCAL_FILE;
   } else {
-    sandbox->type = SWFDEC_SANDBOX_REMOTE;
+    return SWFDEC_SANDBOX_REMOTE;
   }
-
-  return TRUE;
 }
 
 static SwfdecSandbox *
@@ -182,38 +122,39 @@ swfdec_sandbox_get (SwfdecPlayer *player, const SwfdecURL *url,
 
   for (walk = priv->sandboxes; walk; walk = walk->next) {
     sandbox = walk->data;
-    if (sandbox->as_version == as_version &&
-	swfdec_url_equal (sandbox->url, real))
-      break;
+    if ((as_version < 3 && SWFDEC_IS_SANDBOX_AS (sandbox) &&
+	 SWFDEC_FLASH_TO_AS_VERSION (SWFDEC_SANDBOX_AS (sandbox)->flash_version) == as_version) ||
+	(as_version > 2 && SWFDEC_IS_SANDBOX_ABC (sandbox))) {
+      SwfdecURL *sandbox_url = swfdec_sandbox_get_url (sandbox);
+      if (swfdec_url_equal (sandbox_url, real)) {
+	swfdec_url_free (sandbox_url);
+	break;
+      }
+      swfdec_url_free (sandbox_url);
+    }
   }
 
   if (walk) {
-    swfdec_url_free (real);
-
-    if (!swfdec_sandbox_set_allow_network (sandbox, allow_network))
-      return NULL;
+    /* FIXME: Do we need to check globally for network/file, not per as_version? */
+    if (swfdec_sandbox_get_sandbox_type (sandbox) != 
+	swfdec_sandbox_compute_sandbox_type (real, allow_network))
+      sandbox = NULL;
   } else {
     SwfdecAsContext *context = SWFDEC_AS_CONTEXT (player);
 
-    sandbox = g_object_new (SWFDEC_TYPE_SANDBOX, "context", context, NULL);
-    sandbox->url = real;
-    sandbox->as_version = as_version;
+    sandbox = g_object_new (as_version > 2 ? SWFDEC_TYPE_SANDBOX_ABC : SWFDEC_TYPE_SANDBOX_AS,
+	"context", context, "sandbox-type", swfdec_sandbox_compute_sandbox_type (real, allow_network),
+	"url", real, as_version < 3 ? "version" : NULL, flash_version, NULL);
     priv->sandboxes = g_slist_append (priv->sandboxes, sandbox);
-  
-    if (!swfdec_sandbox_set_allow_network (sandbox, allow_network))
-      return NULL;
-
-    if (swfdec_sandbox_is_abc (sandbox))
-      swfdec_sandbox_initialize_abc (sandbox, flash_version);
-    else
-      swfdec_sandbox_initialize_as (sandbox, flash_version);
+    swfdec_sandbox_unuse (sandbox);
   }
 
+  swfdec_url_free (real);
   return sandbox;
 }
 
 /**
- * swfdec_sandbox_get_for_abc:
+ * swfdec_sandbox_abc_get:
  * @player: a #SwfdecPlayer
  * @flash_version: The Flash version for looking up the sandbox
  * @url: the URL this player refers to
@@ -229,7 +170,7 @@ swfdec_sandbox_get (SwfdecPlayer *player, const SwfdecURL *url,
  *          sandbox is allowed.
  */
 SwfdecSandbox *
-swfdec_sandbox_get_for_abc (SwfdecPlayer *player, const SwfdecURL *url,
+swfdec_sandbox_abc_get (SwfdecPlayer *player, const SwfdecURL *url,
     guint flash_version, gboolean allow_network)
 {
   g_return_val_if_fail (SWFDEC_IS_PLAYER (player), NULL);
@@ -240,7 +181,7 @@ swfdec_sandbox_get_for_abc (SwfdecPlayer *player, const SwfdecURL *url,
 
 
 /**
- * swfdec_sandbox_get_for_url:
+ * swfdec_sandbox_as_get:
  * @player: a #SwfdecPlayer
  * @url: the URL this player refers to
  * @flash_version: The Flash version for looking up the sandbox
@@ -256,13 +197,35 @@ swfdec_sandbox_get_for_abc (SwfdecPlayer *player, const SwfdecURL *url,
  *          sandbox is allowed.
  **/
 SwfdecSandbox *
-swfdec_sandbox_get_for_url (SwfdecPlayer *player, const SwfdecURL *url,
+swfdec_sandbox_as_get (SwfdecPlayer *player, const SwfdecURL *url,
     guint flash_version, gboolean allow_network)
 {
   g_return_val_if_fail (SWFDEC_IS_PLAYER (player), NULL);
   g_return_val_if_fail (url != NULL, NULL);
 
-  return swfdec_sandbox_get (player, url, flash_version < 7 ? 1 : 2, flash_version, allow_network);
+  return swfdec_sandbox_get (player, url, SWFDEC_FLASH_TO_AS_VERSION (flash_version), flash_version, allow_network);
+}
+
+SwfdecSandboxType
+swfdec_sandbox_get_sandbox_type (SwfdecSandbox *sandbox)
+{
+  SwfdecSandboxType type = SWFDEC_SANDBOX_NONE;
+
+  g_return_val_if_fail (SWFDEC_IS_SANDBOX (sandbox), SWFDEC_SANDBOX_NONE);
+
+  g_object_get (sandbox, "sandbox-type", &type, NULL);
+  return type;
+}
+
+SwfdecURL *
+swfdec_sandbox_get_url (SwfdecSandbox *sandbox)
+{
+  SwfdecURL *url;
+
+  g_return_val_if_fail (SWFDEC_IS_SANDBOX (sandbox), NULL);
+
+  g_object_get (sandbox, "url", &url, NULL);
+  return url;
 }
 
 /**
@@ -279,15 +242,11 @@ swfdec_sandbox_use (SwfdecSandbox *sandbox)
   SwfdecAsContext *context;
 
   g_return_if_fail (SWFDEC_IS_SANDBOX (sandbox));
-  g_return_if_fail (sandbox->type != SWFDEC_SANDBOX_NONE);
+  g_return_if_fail (swfdec_sandbox_get_sandbox_type (sandbox) != SWFDEC_SANDBOX_NONE);
   g_return_if_fail (swfdec_gc_object_get_context (sandbox)->global == NULL);
 
   context = swfdec_gc_object_get_context (sandbox);
-  if (swfdec_sandbox_is_abc (sandbox)) {
-    context->global = sandbox->abc_global;
-  } else {
-    context->global = SWFDEC_AS_OBJECT (sandbox);
-  }
+  context->global = SWFDEC_AS_OBJECT (sandbox);
 }
 
 /**
@@ -307,7 +266,7 @@ gboolean
 swfdec_sandbox_try_use (SwfdecSandbox *sandbox)
 {
   g_return_val_if_fail (SWFDEC_IS_SANDBOX (sandbox), FALSE);
-  g_return_val_if_fail (sandbox->type != SWFDEC_SANDBOX_NONE, FALSE);
+  g_return_val_if_fail (swfdec_sandbox_get_sandbox_type (sandbox) != SWFDEC_SANDBOX_NONE, FALSE);
 
   if (swfdec_gc_object_get_context (sandbox)->global)
     return FALSE;
@@ -328,11 +287,7 @@ swfdec_sandbox_unuse (SwfdecSandbox *sandbox)
   SwfdecAsContext *context;
 
   g_return_if_fail (SWFDEC_IS_SANDBOX (sandbox));
-  if (swfdec_sandbox_is_abc (sandbox)) {
-    g_return_if_fail (swfdec_gc_object_get_context (sandbox)->global == sandbox->abc_global);
-  } else {
-    g_return_if_fail (swfdec_gc_object_get_context (sandbox)->global == SWFDEC_AS_OBJECT (sandbox));
-  }
+  g_return_if_fail (swfdec_gc_object_get_context (sandbox)->global == SWFDEC_AS_OBJECT (sandbox));
 
   context = swfdec_gc_object_get_context (sandbox);
   context->global = NULL;

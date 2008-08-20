@@ -95,7 +95,7 @@ swfdec_system_security_get_sandboxType (SwfdecAsContext *cx,
     SwfdecAsObject *object, guint argc, SwfdecAsValue *argv,
     SwfdecAsValue *ret)
 {
-  switch (SWFDEC_SANDBOX (cx->global)->type) {
+  switch (swfdec_sandbox_get_sandbox_type (SWFDEC_SANDBOX (cx->global))) {
     case SWFDEC_SANDBOX_REMOTE:
       SWFDEC_AS_VALUE_SET_STRING (ret, SWFDEC_AS_STR_remote);
       break;
@@ -108,7 +108,7 @@ swfdec_system_security_get_sandboxType (SwfdecAsContext *cx,
       SWFDEC_AS_VALUE_SET_STRING (ret, SWFDEC_AS_STR_localWithNetwork);
       break;
 
-    case SWFDEC_SANDBOX_LOCAL_TRUSTED:
+    case SWFDEC_SANDBOX_TRUSTED:
       SWFDEC_AS_VALUE_SET_STRING (ret, SWFDEC_AS_STR_localTrusted);
       break;
 

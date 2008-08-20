@@ -64,9 +64,9 @@ swfdec_abc_object_set_property (GObject *object, guint param_id, const GValue *v
   switch (param_id) {
     case PROP_TRAITS:
       abc->traits = g_value_get_object (value);
+      g_assert (abc->traits != NULL);
       g_object_ref (abc->traits);
       /* traits must exist and be resolved - it's your job to ensure this */
-      g_assert (abc->traits != NULL);
       g_assert (abc->traits->resolved);
       /* we use the traits' context here, our context might not be assigned yet */
       if (abc->traits->n_slots)

@@ -27,6 +27,7 @@
 #include "swfdec_button_movie.h"
 #include "swfdec_player_internal.h"
 #include "swfdec_resource.h"
+#include "swfdec_sandbox_as.h"
 #include "swfdec_sprite_movie.h"
 
 
@@ -206,7 +207,7 @@ swfdec_sprite_movie_set_constructor (SwfdecSpriteMovie *movie)
     }
   }
   if (constructor == NULL)
-    constructor = mov->resource->sandbox->MovieClip;
+    constructor = SWFDEC_SANDBOX_AS (mov->resource->sandbox)->MovieClip;
 
   swfdec_as_object_set_constructor (SWFDEC_AS_OBJECT (movie), constructor);
 }

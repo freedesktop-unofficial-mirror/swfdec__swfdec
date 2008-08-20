@@ -28,7 +28,7 @@
 #include "swfdec_internal.h"
 #include "swfdec_net_stream.h"
 #include "swfdec_player_internal.h"
-#include "swfdec_sandbox.h"
+#include "swfdec_sandbox_as.h"
 
 SWFDEC_AS_NATIVE (667, 1, swfdec_video_attach_video)
 void
@@ -73,7 +73,7 @@ swfdec_video_movie_init_context (SwfdecPlayer *player)
   context = SWFDEC_AS_CONTEXT (player);
   video = SWFDEC_AS_OBJECT (swfdec_as_object_add_function (context->global, 
       SWFDEC_AS_STR_Video, NULL));
-  SWFDEC_SANDBOX (context->global)->Video = video;
+  SWFDEC_SANDBOX_AS (context->global)->Video = video;
   proto = swfdec_as_object_new_empty (context);
   /* set the right properties on the Video object */
   SWFDEC_AS_VALUE_SET_OBJECT (&val, proto);

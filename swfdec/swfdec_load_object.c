@@ -162,8 +162,13 @@ swfdec_load_object_load (SwfdecPlayer *player, gboolean allow, gpointer obj)
   SwfdecLoadObject *load = SWFDEC_LOAD_OBJECT (obj);
 
   if (!allow) {
+#ifndef SWFDEC_DISABLE_DEBUG
+    SwfdecURL *url;
+    url = swfdec_sandbox_get_url (load->sandbox);
     SWFDEC_WARNING ("SECURITY: no access to %s from %s",
-	load->url, swfdec_url_get_url (load->sandbox->url));
+	load->url, swfdec_url_get_url (url));
+    swfdec_url_free (url);
+#endif
 
     /* call finish */
     swfdec_sandbox_use (load->sandbox);

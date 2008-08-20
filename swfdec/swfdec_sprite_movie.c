@@ -40,6 +40,8 @@
 #include "swfdec_graphic_movie.h"
 #include "swfdec_player_internal.h"
 #include "swfdec_ringbuffer.h"
+#include "swfdec_sandbox_abc.h"
+#include "swfdec_sandbox_as.h"
 #include "swfdec_script_internal.h"
 #include "swfdec_sprite.h"
 #include "swfdec_resource.h"
@@ -503,7 +505,7 @@ swfdec_sprite_movie_perform_one_action (SwfdecSpriteMovie *movie, guint tag, Swf
 	guint flags;
 	char *name;
 	sandbox = mov->resource->sandbox;
-	if (!swfdec_sandbox_is_abc (sandbox)) {
+	if (!SWFDEC_IS_SANDBOX_ABC (sandbox)) {
 	  SWFDEC_ERROR ("DoAbc tag in non-ABC sandbox");
 	  return TRUE;
 	}
@@ -531,7 +533,7 @@ swfdec_sprite_movie_perform_one_action (SwfdecSpriteMovie *movie, guint tag, Swf
 	SwfdecAbcMultiname mn;
 	SwfdecAsValue val;
 	guint n_symbols, i;
-	if (!swfdec_sandbox_is_abc (sandbox)) {
+	if (!SWFDEC_IS_SANDBOX_ABC (sandbox)) {
 	  SWFDEC_ERROR ("SymbolClass tag in non-ABC sandbox");
 	  return TRUE;
 	}
@@ -771,7 +773,7 @@ swfdec_sprite_movie_constructor (GType type, guint n_construct_properties,
   movie = SWFDEC_MOVIE (object);
   if (movie->resource->sandbox) {
     swfdec_as_object_set_constructor (SWFDEC_AS_OBJECT (movie), 
-	movie->resource->sandbox->MovieClip);
+	SWFDEC_SANDBOX_AS (movie->resource->sandbox)->MovieClip);
   }
 
   if (movie->graphic) {

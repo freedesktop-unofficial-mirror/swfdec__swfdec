@@ -17,72 +17,57 @@
  * Boston, MA  02110-1301  USA
  */
 
-#ifndef _SWFDEC_SANDBOX_H_
-#define _SWFDEC_SANDBOX_H_
+#ifndef __SWFDEC_SANDBOX_H__
+#define __SWFDEC_SANDBOX_H__
 
-#include <swfdec/swfdec_as_global.h>
-#include <swfdec/swfdec_url.h>
-#include <swfdec/swfdec_player.h>
+#include <swfdec/swfdec.h>
 #include <swfdec/swfdec_types.h>
 
 G_BEGIN_DECLS
 
-//typedef struct _SwfdecSandbox SwfdecSandbox;
-typedef struct _SwfdecSandboxClass SwfdecSandboxClass;
 
 typedef enum {
   SWFDEC_SANDBOX_NONE,
   SWFDEC_SANDBOX_REMOTE,
   SWFDEC_SANDBOX_LOCAL_FILE,
   SWFDEC_SANDBOX_LOCAL_NETWORK,
-  SWFDEC_SANDBOX_LOCAL_TRUSTED
+  SWFDEC_SANDBOX_TRUSTED
 } SwfdecSandboxType;
 
-#define SWFDEC_TYPE_SANDBOX                    (swfdec_sandbox_get_type())
-#define SWFDEC_IS_SANDBOX(obj)                 (G_TYPE_CHECK_INSTANCE_TYPE ((obj), SWFDEC_TYPE_SANDBOX))
-#define SWFDEC_IS_SANDBOX_CLASS(klass)         (G_TYPE_CHECK_CLASS_TYPE ((klass), SWFDEC_TYPE_SANDBOX))
-#define SWFDEC_SANDBOX(obj)                    (G_TYPE_CHECK_INSTANCE_CAST ((obj), SWFDEC_TYPE_SANDBOX, SwfdecSandbox))
-#define SWFDEC_SANDBOX_CLASS(klass)            (G_TYPE_CHECK_CLASS_CAST ((klass), SWFDEC_TYPE_SANDBOX, SwfdecSandboxClass))
-#define SWFDEC_SANDBOX_GET_CLASS(obj)          (G_TYPE_INSTANCE_GET_CLASS ((obj), SWFDEC_TYPE_SANDBOX, SwfdecSandboxClass))
+#define SWFDEC_TYPE_SANDBOX_TYPE           (swfdec_sandbox_type_get_type ())
 
-struct _SwfdecSandbox
-{
-  SwfdecAsGlobal	global;
+#define SWFDEC_TYPE_SANDBOX                (swfdec_sandbox_get_type ())
+#define SWFDEC_SANDBOX(obj)                (G_TYPE_CHECK_INSTANCE_CAST ((obj), SWFDEC_TYPE_SANDBOX, SwfdecSandbox))
+#define SWFDEC_IS_SANDBOX(obj)             (G_TYPE_CHECK_INSTANCE_TYPE ((obj), SWFDEC_TYPE_SANDBOX))
+#define SWFDEC_SANDBOX_GET_INTERFACE(inst) (G_TYPE_INSTANCE_GET_INTERFACE ((inst), SWFDEC_TYPE_SANDBOX, SwfdecSandboxInterface))
 
-  SwfdecSandboxType	type;			/* type of this sandbox */
-  SwfdecURL *		url;			/* URL this sandbox acts for */
-  guint			as_version;		/* Actionscript version */
+//typedef struct _SwfdecSandbox SwfdecSandbox;
+typedef struct _SwfdecSandboxInterface SwfdecSandboxInterface;
 
-  /* AS 1 + AS 2 */
-  /* global player objects */
-  SwfdecAsObject *	MovieClip;		/* MovieClip object */
-  SwfdecAsObject *	Video;			/* Video object */
-
-  /* ABC */
-  SwfdecAsObject *	abc_global;		/* the global ABC object */
+struct _SwfdecSandboxInterface {
+  GTypeInterface	parent;
 };
 
-struct _SwfdecSandboxClass
-{
-  SwfdecAsGlobalClass 	global_class;
-};
+GType			swfdec_sandbox_type_get_type	(void) G_GNUC_CONST;
+GType			swfdec_sandbox_get_type		(void) G_GNUC_CONST;
 
-GType			swfdec_sandbox_get_type		(void);
-
-SwfdecSandbox *		swfdec_sandbox_get_for_url	(SwfdecPlayer *	  	player,
+SwfdecSandbox *		swfdec_sandbox_as_get		(SwfdecPlayer *	  	player,
 							 const SwfdecURL *	url,
 							 guint			flash_version,
 							 gboolean		allow_network);
-SwfdecSandbox *		swfdec_sandbox_get_for_abc	(SwfdecPlayer *		player,
+SwfdecSandbox *		swfdec_sandbox_abc_get		(SwfdecPlayer *		player,
 							 const SwfdecURL *	url,
 							 guint			flash_version,
 							 gboolean		allow_network);
 
-#define swfdec_sandbox_is_abc(sandbox) ((sandbox)->as_version > 2)
+SwfdecSandboxType	swfdec_sandbox_get_sandbox_type	(SwfdecSandbox *	sandbox);
+SwfdecURL *		swfdec_sandbox_get_url		(SwfdecSandbox *	sandbox);
+
 void			swfdec_sandbox_use		(SwfdecSandbox *	sandbox);
 gboolean		swfdec_sandbox_try_use		(SwfdecSandbox *	sandbox);
 void			swfdec_sandbox_unuse		(SwfdecSandbox *	sandbox);
 
 
 G_END_DECLS
-#endif
+
+#endif /* __SWFDEC_SANDBOX_H__ */

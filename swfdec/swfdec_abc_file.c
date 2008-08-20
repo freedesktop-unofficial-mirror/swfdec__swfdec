@@ -886,8 +886,9 @@ swfdec_abc_file_parse_instance (SwfdecAbcFile *file, guint instance_id, SwfdecBi
 	&file->multinames[id]);
     if (base == NULL)
       THROW (file, "Class %s could not be found.", file->multinames[id].name);
-    if (base->final) {
-      /* FIXME: check for CLASS and FUNCTION traits */
+    if (base->final || 
+	(file->global->file != NULL && 
+	 (base == SWFDEC_ABC_CLASS_TRAITS (context) || base == SWFDEC_ABC_FUNCTION_TRAITS (context)))) {
       THROW (file, "Class %s cannot extend final base class.", file->multinames[id].name);
     }
     if (base->interface || traits->interface) {

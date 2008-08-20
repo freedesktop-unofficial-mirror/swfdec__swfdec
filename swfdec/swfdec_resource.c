@@ -41,6 +41,8 @@
 #include "swfdec_movie_clip_loader.h"
 #include "swfdec_player_internal.h"
 #include "swfdec_sandbox.h"
+#include "swfdec_sandbox_abc.h"
+#include "swfdec_sandbox_as.h"
 #include "swfdec_script.h"
 #include "swfdec_sprite.h"
 #include "swfdec_stream_target.h"
@@ -84,11 +86,11 @@ swfdec_resource_stream_target_image (SwfdecResource *instance)
 
     old_sandbox = instance->sandbox;
     if (dec->use_abc) {
-      instance->sandbox = swfdec_sandbox_get_for_abc (player,
+      instance->sandbox = swfdec_sandbox_abc_get (player,
 	  swfdec_loader_get_url (instance->loader), instance->version,
 	  dec->use_network);
     } else {
-      instance->sandbox = swfdec_sandbox_get_for_url (player,
+      instance->sandbox = swfdec_sandbox_as_get (player,
 	  swfdec_loader_get_url (instance->loader), instance->version,
 	  dec->use_network);
     }
@@ -97,10 +99,12 @@ swfdec_resource_stream_target_image (SwfdecResource *instance)
       g_assert (movie->sprite->parse_frame > 0);
       movie->n_frames = movie->sprite->n_frames;
       swfdec_movie_invalidate_last (SWFDEC_MOVIE (movie));
-      if (swfdec_sandbox_is_abc (instance->sandbox))
+      if (SWFDEC_IS_SANDBOX_ABC (instance->sandbox)) {
 	swfdec_player_queue_abc_constructor (player, SWFDEC_MOVIE (movie));
-      else
-	swfdec_as_object_set_constructor (SWFDEC_AS_OBJECT (movie), instance->sandbox->MovieClip);
+      } else {
+	swfdec_as_object_set_constructor (SWFDEC_AS_OBJECT (movie),
+	    SWFDEC_SANDBOX_AS (instance->sandbox)->MovieClip);
+      }
       if (swfdec_resource_is_root (instance)) {
 	swfdec_player_start_ticking (player);
 	swfdec_movie_initialize (SWFDEC_MOVIE (movie));
@@ -590,8 +594,12 @@ swfdec_resource_do_load (SwfdecPlayer *player, gboolean allowed, gpointer loadp)
   }
   resource->sandbox = load->sandbox;
   if (!allowed) {
+#ifndef SWFDEC_DISABLE_DEBUG
+    SwfdecURL *url = swfdec_sandbox_get_url (load->sandbox);
     SWFDEC_WARNING ("SECURITY: no access to %s from %s",
-	load->url, swfdec_url_get_url (load->sandbox->url));
+	load->url, swfdec_url_get_url (url));
+    swfdec_url_free (url);
+#endif
     /* FIXME: is replacing correct? */
     if (load->target_movie) {
       resource->movie = SWFDEC_SPRITE_MOVIE (swfdec_movie_resolve (SWFDEC_MOVIE (load->target_movie)));
@@ -785,7 +793,7 @@ swfdec_resource_add_abc_class (SwfdecResource *resource, guint char_id,
     SwfdecAbcClass *classp)
 {
   g_return_if_fail (SWFDEC_IS_RESOURCE (resource));
-  g_return_if_fail (swfdec_sandbox_is_abc (resource->sandbox));
+  g_return_if_fail (SWFDEC_IS_SANDBOX_ABC (resource->sandbox));
   g_return_if_fail (SWFDEC_IS_ABC_CLASS (classp));
 
   g_hash_table_insert (resource->abc_classes, GUINT_TO_POINTER (char_id), classp);
@@ -798,7 +806,7 @@ swfdec_resource_get_abc_class (SwfdecResource *resource,
   SwfdecAbcClass *ret;
 
   g_return_val_if_fail (SWFDEC_IS_RESOURCE (resource), NULL);
-  g_return_val_if_fail (swfdec_sandbox_is_abc (resource->sandbox), NULL);
+  g_return_val_if_fail (SWFDEC_IS_SANDBOX_ABC (resource->sandbox), NULL);
   g_return_val_if_fail (SWFDEC_IS_MOVIE (movie), NULL);
 
   if (movie->parent == NULL) {

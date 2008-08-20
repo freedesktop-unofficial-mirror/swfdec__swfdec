@@ -27,6 +27,7 @@
 #include "swfdec_player_internal.h"
 #include "swfdec_resource.h"
 #include "swfdec_renderer_internal.h"
+#include "swfdec_sandbox_as.h"
 #include "swfdec_utils.h"
 #include "swfdec_video_provider.h"
 #include "swfdec_video_video_provider.h"
@@ -200,7 +201,8 @@ swfdec_video_movie_constructor (GType type, guint n_construct_properties,
       n_construct_properties, construct_properties);
 
   movie = SWFDEC_MOVIE (object);
-  swfdec_as_object_set_constructor (SWFDEC_AS_OBJECT (movie), movie->resource->sandbox->Video);
+  swfdec_as_object_set_constructor (SWFDEC_AS_OBJECT (movie), 
+      SWFDEC_SANDBOX_AS (movie->resource->sandbox)->Video);
 
   video = SWFDEC_VIDEO (movie->graphic);
 
