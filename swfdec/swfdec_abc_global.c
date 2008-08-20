@@ -100,7 +100,6 @@ swfdec_abc_global_constructor (GType type, guint n_construct_properties,
   if (!swfdec_abc_traits_resolve (traits)) {
     g_assert_not_reached ();
   }
-  g_object_unref (SWFDEC_ABC_OBJECT (global)->traits);
   SWFDEC_ABC_OBJECT (global)->traits = traits;
   g_object_ref (traits);
   g_assert (SWFDEC_ABC_OBJECT (global)->slots == NULL);
