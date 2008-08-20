@@ -139,6 +139,10 @@ swfdec_abc_function_resolve (SwfdecAbcFunction *fun)
 	swfdec_as_context_throw_abc (context, SWFDEC_ABC_TYPE_VERIFY_ERROR,
 	    "Class %s could not be found.", fun->args[i].type->name);
 	return FALSE;
+      } else if (traits == SWFDEC_ABC_VOID_TRAITS (context)) {
+	swfdec_as_context_throw_abc (context, SWFDEC_ABC_TYPE_VERIFY_ERROR,
+	    "Type void may only be used as a function return type.");
+	return FALSE;
       }
       fun->args[i].traits = traits;
     }
