@@ -246,6 +246,32 @@ swfdec_bits_get_s16 (SwfdecBits * b)
 }
 
 guint
+swfdec_bits_get_u24 (SwfdecBits *b)
+{
+  guint r;
+
+  SWFDEC_BYTES_CHECK (b, 3);
+
+  r = b->ptr[0] | (b->ptr[1] << 8) | (b->ptr[2] << 16);
+  b->ptr += 3;
+
+  return r;
+}
+
+int
+swfdec_bits_get_s24 (SwfdecBits *b)
+{
+  int r;
+
+  SWFDEC_BYTES_CHECK (b, 3);
+
+  r = b->ptr[0] | (b->ptr[1] << 8) | ((int) (gint8) b->ptr[2] << 16);
+  b->ptr += 3;
+
+  return r;
+}
+
+guint
 swfdec_bits_get_u32 (SwfdecBits * b)
 {
   guint r;

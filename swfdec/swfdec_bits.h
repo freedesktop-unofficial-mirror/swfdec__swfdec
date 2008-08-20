@@ -50,6 +50,8 @@ guint swfdec_bits_peek_u8 (const SwfdecBits * b);
 guint swfdec_bits_get_u8 (SwfdecBits * b);
 guint swfdec_bits_get_u16 (SwfdecBits * b);
 int swfdec_bits_get_s16 (SwfdecBits * b);
+guint swfdec_bits_get_u24 (SwfdecBits *b);
+int swfdec_bits_get_s24 (SwfdecBits *b);
 guint swfdec_bits_get_u32 (SwfdecBits * b);
 int swfdec_bits_get_s32 (SwfdecBits * b);
 guint swfdec_bits_get_bu16 (SwfdecBits *b);
