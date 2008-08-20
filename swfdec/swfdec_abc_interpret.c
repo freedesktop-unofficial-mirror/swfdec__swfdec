@@ -591,7 +591,7 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun, SwfdecAbcScopeChain *outer_scope)
 
   /* init pc */
   swfdec_bits_init (&bits, fun->code);
-  g_print ("executing %s\n", fun->bound_traits ? fun->bound_traits->name : "unbound function");
+  //g_print ("executing %s\n", fun->bound_traits ? fun->bound_traits->name : "unbound function");
   while (TRUE) {
     opcode = swfdec_bits_get_u8 (&bits);
     /* NB: We use the magic of continue statement in switch clauses here:
@@ -600,8 +600,8 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun, SwfdecAbcScopeChain *outer_scope)
      * break, additional checks like exception handling will happen below the
      * giant switch statement.
      */
-    g_print ("  %s%02X %s\n", frame->next ? frame->next->next ? "    " : "  " : "",
-    	opcode, swfdec_abc_opcode_get_name (opcode));
+    //g_print ("  %s%02X %s\n", frame->next ? frame->next->next ? "    " : "  " : "",
+    //	opcode, swfdec_abc_opcode_get_name (opcode));
     /* order of opcodes is alphabetical */
     switch (opcode) {
       case SWFDEC_ABC_OPCODE_CALL_PROPERTY:
