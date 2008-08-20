@@ -181,12 +181,39 @@ swfdec_abc_function_verify (SwfdecAbcFunction *fun)
 gboolean
 swfdec_abc_function_is_override (SwfdecAbcFunction *fun, SwfdecAbcFunction *base)
 {
+  guint i;
+
   g_return_val_if_fail (SWFDEC_IS_ABC_FUNCTION (fun), FALSE);
   g_return_val_if_fail (fun->resolved, FALSE);
   g_return_val_if_fail (SWFDEC_IS_ABC_FUNCTION (base), FALSE);
   g_return_val_if_fail (base->resolved, FALSE);
 
-  SWFDEC_FIXME ("implement");
+  if (fun->return_traits != base->return_traits) {
+    SWFDEC_WARNING ("return types don't match: %s => %s", 
+	base->return_traits->name, fun->return_traits->name);
+    return FALSE;
+  }
+
+  if (fun->n_args != base->n_args) {
+    SWFDEC_WARNING ("argument count doesn't match: %u => %u", 
+	base->n_args, fun->n_args);
+    return FALSE;
+  }
+
+  if (!swfdec_abc_traits_is_traits (fun->args[0].traits, base->args[0].traits)) {
+    SWFDEC_WARNING ("this traits %s aren't subtraits of %s",
+	fun->args[0].traits->name, base->args[0].traits->name);
+    return FALSE;
+  }
+
+  for (i = 1; i <= fun->n_args; i++) {
+    if (fun->args[i].traits !=  base->args[i].traits) {
+      SWFDEC_WARNING ("traits for argument %u don't match: %s => %s",
+	  i, base->args[i].traits->name, fun->args[i].traits->name);
+      return FALSE;
+    }
+  }
+
   return TRUE;
 }
 
