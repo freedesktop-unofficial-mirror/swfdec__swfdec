@@ -32,7 +32,7 @@
   (sizeof (SwfdecAbcScopeChain) + sizeof (SwfdecAbcScopeEntry) * n_entries)
 
 SwfdecAbcScopeChain *
-swfdec_abc_scope_chain_new (SwfdecAsContext *context, const SwfdecAbcScopeChain *base,
+swfdec_abc_scope_chain_new (SwfdecAsContext *context, SwfdecAbcScopeChain *base,
     SwfdecAsValue *start, SwfdecAsValue *end, SwfdecAsValue *with)
 {
   SwfdecAbcScopeChain *chain;
@@ -46,7 +46,7 @@ swfdec_abc_scope_chain_new (SwfdecAsContext *context, const SwfdecAbcScopeChain 
   g_return_val_if_fail (start <= with, NULL);
 
   if (start == end)
-    return swfdec_abc_scope_chain_ref (chain);
+    return swfdec_abc_scope_chain_ref (base);
 
   n_entries = base ? base->n_entries : 0;
   n_entries += end - start;

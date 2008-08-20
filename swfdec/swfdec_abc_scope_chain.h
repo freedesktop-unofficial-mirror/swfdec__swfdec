@@ -41,7 +41,7 @@ struct _SwfdecAbcScopeChain {
 };
 
 SwfdecAbcScopeChain *	swfdec_abc_scope_chain_new	(SwfdecAsContext *		context,
-							 const SwfdecAbcScopeChain *	base,
+							 SwfdecAbcScopeChain *		base,
 							 SwfdecAsValue *		start,
 							 SwfdecAsValue *		end,
 							 SwfdecAsValue *		with);
