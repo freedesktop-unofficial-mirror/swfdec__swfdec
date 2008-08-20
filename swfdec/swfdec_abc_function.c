@@ -163,12 +163,17 @@ swfdec_abc_function_resolve (SwfdecAbcFunction *fun)
 gboolean
 swfdec_abc_function_verify (SwfdecAbcFunction *fun)
 {
+  static gboolean shut_up = FALSE;
+
   g_return_val_if_fail (SWFDEC_IS_ABC_FUNCTION (fun), FALSE);
   
   if (!swfdec_abc_function_resolve (fun))
     return FALSE;
 
-  SWFDEC_FIXME ("i can has verify?");
+  if (!shut_up) {
+    SWFDEC_FIXME ("i can has verify?");
+    shut_up = TRUE;
+  }
   fun->verified = TRUE;
   return TRUE;
 }
