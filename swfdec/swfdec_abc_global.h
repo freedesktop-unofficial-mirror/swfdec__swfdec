@@ -122,8 +122,6 @@ struct _SwfdecAbcGlobalClass {
 
 GType			swfdec_abc_global_get_type	(void);
 
-void			swfdec_abc_global_new		(SwfdecAsContext *		context);
-
 SwfdecAbcTraits *	swfdec_abc_global_get_builtin_traits 
 							(SwfdecAbcGlobal *		global,
 							 guint				id);
