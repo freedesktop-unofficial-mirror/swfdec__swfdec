@@ -1366,7 +1366,7 @@ swfdec_as_context_startup (SwfdecAsContext *context, gboolean abc)
 
   if (abc) {
     g_assert (context->global == NULL);
-    swfdec_abc_global_new (context);
+    context->global = g_object_new (SWFDEC_TYPE_ABC_GLOBAL, "context", context, NULL);
   } else {
     context->global = g_object_new (SWFDEC_TYPE_AS_GLOBAL, "context", context, NULL);
   }
