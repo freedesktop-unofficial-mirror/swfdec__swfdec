@@ -909,7 +909,7 @@ swfdec_abc_file_parse_instance (SwfdecAbcFile *file, guint instance_id, SwfdecBi
       /* traits->protected_ns = NULL; */
     } else if (id < file->n_namespaces) {
       traits->protected_ns = file->namespaces[id];
-    } else if (i != 0) {
+    } else if (id != 0) {
       THROW (file, "Cpool index %u is out of range %u.", id, file->n_multinames);
     }
   }
