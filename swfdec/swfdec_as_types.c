@@ -496,17 +496,15 @@ swfdec_as_string_to_number (SwfdecAsContext *context, const char *s)
   char *end;
   double d;
   
-  g_return_val_if_fail (SWFDEC_IS_AS_CONTEXT (context), 0);
-  g_return_val_if_fail (s != NULL, 0);
-
   // FIXME: We should most likely copy Tamarin's code here (MathUtils.cpp)
   if (s == SWFDEC_AS_STR_EMPTY)
     return (context->version >= 5) ? NAN : 0.0;
   if (context->version > 5 && s[0] == '0' &&
       (s[1] == 'x' || s[1] == 'X')) {
     d = g_ascii_strtoll (s + 2, &end, 16);
-  } else if (context->version > 5 && s[0] == '0' &&
-      s[strspn (s, "01234567")] == '\0') {
+  } else if (context->version > 5 &&
+      (s[0] == '0' || ((s[0] == '+' || s[0] == '-') && s[1] == '0')) &&
+      s[strspn (s+1, "01234567")+1] == '\0') {
     d = g_ascii_strtoll (s, &end, 8);
   } else {
     if (strpbrk (s, "xXiI") != NULL)
