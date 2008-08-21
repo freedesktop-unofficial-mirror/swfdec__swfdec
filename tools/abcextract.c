@@ -65,7 +65,7 @@ extract (SwfdecAsContext *cx, SwfdecBuffer *buffer, gsize offset, gboolean dump)
   swfdec_bits_skip_bytes (&bits, offset);
   file = swfdec_abc_file_new (cx, &bits);
   if (file) {
-    g_print ("  SUCCESS (%u bytes)\n", bits.ptr - buffer->data - offset);
+    g_print ("  SUCCESS (%"G_GSIZE_FORMAT" bytes)\n", bits.ptr - buffer->data - offset);
   } else {
     g_print ("  failed\n");
   }
@@ -124,7 +124,7 @@ main (int argc, char **argv)
         buffer->data[i + 2] != 0x2E ||
         buffer->data[i + 3] != 0x00)
       continue;
-    g_print ("found data (index %u) at offset %u\n", offsets->len, i);
+    g_print ("found data (index %u) at offset %"G_GSIZE_FORMAT"\n", offsets->len, i);
     g_ptr_array_add (offsets, GSIZE_TO_POINTER (i));
   }
 
