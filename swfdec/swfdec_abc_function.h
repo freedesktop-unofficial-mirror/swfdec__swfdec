@@ -20,6 +20,8 @@
 #ifndef _SWFDEC_ABC_FUNCTION_H_
 #define _SWFDEC_ABC_FUNCTION_H_
 
+#include <ffi.h>
+
 #include <swfdec/swfdec_abc_types.h>
 #include <swfdec/swfdec_as_function.h>
 #include <swfdec/swfdec_buffer.h>
@@ -84,7 +86,8 @@ struct _SwfdecAbcFunction {
   SwfdecAbcTraits *	bound_traits;		/* traits of objects we construct or NULL */
   
   /* native functions only */
-  SwfdecAsNative	native;			/* SwfdecAsNative for now - will become native when we can marhsal */
+  GCallback		native;			/* SwfdecAsNative for now - will become native when we can marhsal */
+  ffi_cif		cif;			/* native call marshaller - prepared during verification */
   /* functions with body only */
   SwfdecBuffer *	code;			/* the code to be executed */
   guint			n_stack;		/* max number of values on stack */
@@ -114,6 +117,8 @@ gboolean		swfdec_abc_function_call	(SwfdecAbcFunction *	fun,
 							 guint			argc,
 							 SwfdecAsValue *	argv,
 							 SwfdecAsValue *	ret);
+
+char *			swfdec_abc_function_describe	(SwfdecAbcFunction *	fun);
 
 
 G_END_DECLS

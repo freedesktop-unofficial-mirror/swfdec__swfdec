@@ -26,6 +26,15 @@
 
 G_BEGIN_DECLS
 
+typedef enum {
+  SWFDEC_ABC_POINTER = 0,
+  SWFDEC_ABC_INT,
+  SWFDEC_ABC_UINT,
+  SWFDEC_ABC_DOUBLE,
+  SWFDEC_ABC_STRING,
+  SWFDEC_ABC_VOID
+} SwfdecAbcMachineType;
+
 /* NB: The indexes for the binding types have a lot of magic associated with 
  * them, so be sure to update this magic. Examples:
  * (type & 6) == 2 => slot or const
@@ -92,6 +101,7 @@ struct _SwfdecAbcTraits {
   SwfdecAbcFunction *		construct;	/* constructor for objects of these traits or NULL */
   SwfdecAbcNamespace *		protected_ns;	/* protected namespace */
   GType				(* type_func)	(void);	/* get_type function for the object type we create */
+  SwfdecAbcMachineType		machine_type;	/* how this type is represented */
 
   SwfdecAbcTrait *		traits;		/* the traits we have */
   guint				n_traits;	/* number of traits */

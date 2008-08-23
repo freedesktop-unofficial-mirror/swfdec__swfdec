@@ -25,9 +25,9 @@
 G_BEGIN_DECLS
 
 
-extern const SwfdecAsNative swfdec_abc_natives[585];
+extern const GCallback swfdec_abc_natives[585];
 
-extern const SwfdecAsNative swfdec_abc_natives_flash[1944];
+extern const GCallback swfdec_abc_natives_flash[1944];
 
 
 G_END_DECLS

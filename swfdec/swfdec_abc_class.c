@@ -136,17 +136,14 @@ swfdec_abc_class_init (SwfdecAbcClass *class)
 
 /*** ABC CODE ***/
 
+void swfdec_abc_class_get_prototype (SwfdecAbcClass *classp, SwfdecAsValue *ret);
 SWFDEC_ABC_NATIVE (29, swfdec_abc_class_get_prototype)
 void
-swfdec_abc_class_get_prototype (SwfdecAsContext *cx,
-    guint argc, SwfdecAsValue *argv, SwfdecAsValue *ret)
+swfdec_abc_class_get_prototype (SwfdecAbcClass *classp, SwfdecAsValue *ret)
 {
-  SwfdecAbcClass *classp = SWFDEC_ABC_CLASS (SWFDEC_AS_VALUE_GET_OBJECT (&argv[0]));
-
-  if (classp->prototype) {
+  if (classp->prototype)
     SWFDEC_AS_VALUE_SET_OBJECT (ret, SWFDEC_AS_OBJECT (classp->prototype));
-  } else {
+  else
     SWFDEC_AS_VALUE_SET_NULL (ret);
-  }
 }
 

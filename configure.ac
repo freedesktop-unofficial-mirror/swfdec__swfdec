@@ -187,16 +187,12 @@ AC_SUBST(AUDIO_TYPE)
 
 LIBOIL_VER=0.3.1
 PKG_CHECK_MODULES(LIBOIL, liboil-0.3 >= $LIBOIL_VER, HAVE_LIBOIL=yes, HAVE_LIBOIL=no)
-AC_SUBST(LIBOIL_LIBS)
-AC_SUBST(LIBOIL_CFLAGS)
 if test "$HAVE_LIBOIL" = "no"; then
   AC_MSG_ERROR([liboil-0.3 >= $LIBOIL_VER is required to build swfdec])
 fi
 
 CAIRO_VER=1.6.0
 PKG_CHECK_MODULES(CAIRO, cairo >= $CAIRO_VER cairo-png >= $CAIRO_VER, HAVE_CAIRO=yes, HAVE_CAIRO=no)
-AC_SUBST(CAIRO_LIBS)
-AC_SUBST(CAIRO_CFLAGS)
 if test "$HAVE_CAIRO" = "no"; then
   AC_MSG_ERROR([cairo and cairo-png = $CAIRO_VER is required to build swfdec])
 fi
@@ -243,12 +239,14 @@ else
 fi
 AM_CONDITIONAL(HAVE_VIVI, [test "x$HAVE_VIVI" = xyes])
 
+FFI_VER=3.0.5
+PKG_CHECK_MODULES(FFI, libffi >= $FFI_VER)
 
 AC_SUBST(GLOBAL_CFLAGS)
 AC_SUBST(GLOBAL_CFLAGS)
 
-SWFDEC_CFLAGS="-I\$(top_srcdir) $GLIB_CFLAGS $CAIRO_CFLAGS"
-SWFDEC_LIBS="\$(top_builddir)/swfdec/libswfdec-$SWFDEC_MAJORMINOR.la $GLIB_LIBS $CAIRO_LIBS -lz -lm"
+SWFDEC_CFLAGS="-I\$(top_srcdir) $GLIB_CFLAGS $CAIRO_CFLAGS $FFI_CFLAGS"
+SWFDEC_LIBS="\$(top_builddir)/swfdec/libswfdec-$SWFDEC_MAJORMINOR.la $GLIB_LIBS $CAIRO_LIBS $FFI_LIBS -lz -lm"
 AC_SUBST(SWFDEC_LIBS)
 AC_SUBST(SWFDEC_CFLAGS)
 

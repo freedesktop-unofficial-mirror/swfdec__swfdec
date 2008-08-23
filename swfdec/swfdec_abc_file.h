@@ -95,7 +95,7 @@ SwfdecAbcFile *	swfdec_abc_file_new		(SwfdecAsContext *	context,
 						 SwfdecBits *		bits);
 SwfdecAbcFile *	swfdec_abc_file_new_trusted	(SwfdecAsContext *	context,
 						 SwfdecBits *		bits,
-						 const SwfdecAsNative *	natives,
+						 const GCallback *	natives,
 						 guint			n_natives);
 
 gboolean	swfdec_abc_file_get_constant	(SwfdecAbcFile *	pool,

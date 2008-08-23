@@ -647,107 +647,9 @@ swfdec_abc_file_parse_traits (SwfdecAbcFile *file, SwfdecAbcTraits *traits, Swfd
   return TRUE;
 }
 
-static char *
-swfdec_abc_describe_function (SwfdecAbcFunction *function)
-{
-  SwfdecAbcTraits *traits;
-  GString *name;
-  guint i, id;
-
-  g_assert (function->resolved);
-
-  /* find id of our function in pool */
-  for (id = 0; id < function->pool->n_functions; id++) {
-    if (function->pool->functions[id] == function)
-      break;
-  }
-
-  traits = function->bound_traits;
-  name = g_string_new ("");
-  if (traits == NULL) {
-    /* we're likely a lambda function */
-    g_string_append_printf (name, "function %u: %s [lambda]", id, 
-	function->return_traits ? function->return_traits->name : "SwfdecAsValue *");
-  } else if (traits->construct == function) {
-    /* we're the constructor */
-    g_string_append_printf (name, "function %u: %s %s", id, 
-	function->return_traits ? function->return_traits->name : "SwfdecAsValue *",
-	traits->name);
-  } else {
-    /* we're method, getter or setter, find out what */
-    do {
-      for (i = 0; i < traits->n_traits; i++) {
-	SwfdecAbcTrait *trait = &traits->traits[i];
-	guint slot = SWFDEC_ABC_BINDING_GET_ID (trait->type);
-	switch (SWFDEC_ABC_BINDING_GET_TYPE (trait->type)) {
-	  case SWFDEC_ABC_TRAIT_METHOD:
-	    if (traits->methods[slot] == function) {
-	      g_string_append_printf (name, "method %u %s %s.%s", id,
-		  function->return_traits ? function->return_traits->name : "SwfdecAsValue *",
-		  traits->name, trait->name);
-	      goto out;
-	    }
-	    break;
-	  case SWFDEC_ABC_TRAIT_GET:
-	  case SWFDEC_ABC_TRAIT_SET:
-	  case SWFDEC_ABC_TRAIT_GETSET:
-	    if (traits->methods[slot] == function) {
-	      g_string_append_printf (name, "getter %u %s %s.%s", id,
-		  function->return_traits ? function->return_traits->name : "SwfdecAsValue *",
-		  traits->name, trait->name);
-	      goto out;
-	    } else if (traits->methods[slot + 1] == function) {
-	      g_string_append_printf (name, "setter %u %s %s.%s", id,
-		  function->return_traits ? function->return_traits->name : "SwfdecAsValue *",
-		  traits->name, trait->name);
-	      goto out;
-	    }
-	    break;
-	  case SWFDEC_ABC_TRAIT_NONE:
-	  case SWFDEC_ABC_TRAIT_SLOT:
-	  case SWFDEC_ABC_TRAIT_CONST:
-	  case SWFDEC_ABC_TRAIT_ITRAMP:
-	  default:
-	  break;
-	}
-      }
-      traits = traits->base;
-    } while (traits);
-    /* huh? */
-    g_string_append_printf (name, "function %u %s %s", id,
-	function->return_traits->name, function->bound_traits->name);
-  }
-out:
-  /* append arguments */
-  g_string_append (name, " (");
-  for (i = 0; i < function->n_args; i++) {
-    if (i > 0)
-      g_string_append (name, ", ");
-    if (function->args[i].traits)
-      g_string_append (name, function->args[i].traits->name);
-    else 
-      g_string_append (name, "SwfdecAsValue *");
-  }
-  g_string_append (name, ")");
-
-  return g_string_free (name, FALSE);
-}
-
-static void
-swfdec_abc_default_stub (SwfdecAsContext *cx, SwfdecAsObject *obj, guint argc,
-    SwfdecAsValue *argv, SwfdecAsValue *ret)
-{
-  SwfdecAsFrame *frame = swfdec_as_context_get_frame (cx);
-  SwfdecAbcFunction *function = SWFDEC_ABC_FUNCTION (swfdec_as_frame_get_function (frame));
-  char *name = swfdec_abc_describe_function (function);
-
-  SWFDEC_STUB (name);
-  g_free (name);
-}
-
 static gboolean
 swfdec_abc_file_parse_methods (SwfdecAbcFile *file, SwfdecBits *bits,
-    const SwfdecAsNative *natives, guint n_natives)
+    const GCallback *natives, guint n_natives)
 {
   SwfdecAsContext *context = swfdec_gc_object_get_context (file);
   guint i;
@@ -816,7 +718,6 @@ swfdec_abc_file_parse_methods (SwfdecAbcFile *file, SwfdecBits *bits,
 	}
 	if (fun->native == NULL) {
 	  SWFDEC_INFO ("no native for index %u, using default stub", i);
-	  fun->native = swfdec_abc_default_stub;
 	}
       }
       if (optional) {
@@ -1120,7 +1021,7 @@ swfdec_abc_file_parse_bodies (SwfdecAbcFile *file, SwfdecBits *bits)
 
 static gboolean
 swfdec_abc_file_parse (SwfdecAbcFile *file, SwfdecBits *bits,
-    const SwfdecAsNative *natives, guint n_natives)
+    const GCallback *natives, guint n_natives)
 {
   return swfdec_abc_file_parse_constants (file, bits) &&
       swfdec_abc_file_parse_methods (file, bits, natives, n_natives) &&
@@ -1139,7 +1040,7 @@ swfdec_abc_file_new (SwfdecAsContext *context, SwfdecBits *bits)
 
 SwfdecAbcFile *
 swfdec_abc_file_new_trusted (SwfdecAsContext *context, SwfdecBits *bits,
-    const SwfdecAsNative *natives, guint n_natives)
+    const GCallback *natives, guint n_natives)
 {
   SwfdecAbcFile *file;
   guint major, minor;
@@ -1167,18 +1068,26 @@ swfdec_abc_file_new_trusted (SwfdecAsContext *context, SwfdecBits *bits,
     return NULL;
   }
   
-//#define SWFDEC_PRINT_STUBS
+#define SWFDEC_PRINT_STUBS
 #ifdef SWFDEC_PRINT_STUBS
   {
     guint i;
 
     if (SWFDEC_ABC_GLOBAL (context->global)->file == NULL)
       SWFDEC_ABC_GLOBAL (context->global)->file = file;
+    
+    /* update machine types */
+    SWFDEC_ABC_BOOLEAN_TRAITS (context)->machine_type = SWFDEC_ABC_INT;
+    SWFDEC_ABC_INT_TRAITS (context)->machine_type = SWFDEC_ABC_INT;
+    SWFDEC_ABC_UINT_TRAITS (context)->machine_type = SWFDEC_ABC_UINT;
+    SWFDEC_ABC_NUMBER_TRAITS (context)->machine_type = SWFDEC_ABC_DOUBLE;
+    SWFDEC_ABC_STRING_TRAITS (context)->machine_type = SWFDEC_ABC_STRING;
+
     g_print ("missing implementations:\n");
     for (i = 0; i < file->n_functions; i++) {
       SwfdecAbcFunction *fun = file->functions[i];
       char *name;
-      if (fun->native == NULL)
+      if (fun->code != NULL)
 	continue;
       /* This is why we can't print this stuff by default: We need to resolve
        * the function, which could throw */
@@ -1186,8 +1095,8 @@ swfdec_abc_file_new_trusted (SwfdecAsContext *context, SwfdecBits *bits,
 	  (fun->bound_traits != NULL && !swfdec_abc_traits_resolve (fun->bound_traits))) {
 	g_assert_not_reached ();
       }
-      name = swfdec_abc_describe_function (fun);
-      g_print ("%s %s\n", fun->native == swfdec_abc_default_stub ? "XXX" : "   ", name);
+      name = swfdec_abc_function_describe (fun);
+      g_print ("%s %s\n", fun->native == NULL ? "XXX" : "   ", name);
       g_free (name);
       }
   }

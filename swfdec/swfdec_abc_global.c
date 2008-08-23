@@ -77,6 +77,7 @@ swfdec_abc_global_constructor (GType type, guint n_construct_properties,
   global->void_traits->pool = NULL;
   global->void_traits->ns = context->public_ns;
   global->void_traits->name = SWFDEC_AS_STR_void;
+  global->void_traits->machine_type = SWFDEC_ABC_VOID;
   global->void_traits->final = TRUE;
   global->void_traits->resolved = TRUE;
   global->null_traits = g_object_new (SWFDEC_TYPE_ABC_TRAITS, "context", context, NULL);
@@ -106,6 +107,13 @@ swfdec_abc_global_constructor (GType type, guint n_construct_properties,
   if (traits->n_slots)
     SWFDEC_ABC_OBJECT (global)->slots = swfdec_as_context_new (context,
        SwfdecAsValue, traits->n_slots);
+
+  /* update machine types */
+  SWFDEC_ABC_BOOLEAN_TRAITS (context)->machine_type = SWFDEC_ABC_INT;
+  SWFDEC_ABC_INT_TRAITS (context)->machine_type = SWFDEC_ABC_INT;
+  SWFDEC_ABC_UINT_TRAITS (context)->machine_type = SWFDEC_ABC_UINT;
+  SWFDEC_ABC_NUMBER_TRAITS (context)->machine_type = SWFDEC_ABC_DOUBLE;
+  SWFDEC_ABC_STRING_TRAITS (context)->machine_type = SWFDEC_ABC_STRING;
 
   /* run main script */
   global->file->main->global = SWFDEC_ABC_OBJECT (global);

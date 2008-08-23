@@ -30,7 +30,185 @@
 #include "swfdec_abc_traits.h"
 #include "swfdec_as_context.h"
 #include "swfdec_as_frame_internal.h"
+#include "swfdec_as_strings.h" /* swfdec_abc_function_describe */
 #include "swfdec_debug.h"
+
+/*** LIBFFI ***/
+
+static ffi_type *machine_types_ffi[] = {
+  [SWFDEC_ABC_POINTER] = &ffi_type_pointer,
+  [SWFDEC_ABC_INT] = &ffi_type_sint,
+  [SWFDEC_ABC_UINT] = &ffi_type_uint,
+  [SWFDEC_ABC_DOUBLE] = &ffi_type_double,
+  [SWFDEC_ABC_STRING] = &ffi_type_pointer,
+  [SWFDEC_ABC_VOID] = &ffi_type_void
+};
+
+static ffi_type *
+swfdec_abc_ffi_traits_to_type (SwfdecAbcTraits *traits)
+{
+  if (traits == NULL)
+    return &ffi_type_pointer;
+
+  return machine_types_ffi[traits->machine_type];
+}
+
+static guint
+swfdec_abc_function_native_n_arguments (SwfdecAbcFunction *fun)
+{
+  /* this pointer */
+  guint n_args = 1;
+  /* arguments */
+  n_args += fun->n_args;
+  /* add context as first arg if we're not passing an object */
+  if (fun->args[0].traits->machine_type != SWFDEC_ABC_POINTER)
+    n_args++;
+  /* append arguments: guint argc, SwfdecAsValue **argv */
+  if (fun->need_rest || fun->need_arguments)
+    n_args += 2;
+  /* append argument: SwfdecAsValue *retval */
+  if (fun->return_traits == NULL)
+    n_args++;
+  return n_args;
+}
+
+static gboolean
+swfdec_abc_function_ffi_verify (SwfdecAbcFunction *fun)
+{
+  guint i, n_args;
+  ffi_type **args;
+  ffi_type *ret;
+  ffi_status status;
+  
+  /* prepare variables */
+  n_args = swfdec_abc_function_native_n_arguments (fun);
+  args = g_new (ffi_type *, n_args);
+
+  /* set argument types */
+  if (fun->args[0].traits->machine_type != SWFDEC_ABC_POINTER)
+    args[0] = &ffi_type_pointer;
+  for (i = 0; i <= fun->n_args; i++) {
+    args[i] = swfdec_abc_ffi_traits_to_type (fun->args[i].traits);
+  }
+  if (fun->args[0].traits->machine_type != SWFDEC_ABC_POINTER) {
+    args--;
+    i++;
+  }
+  if (fun->need_rest || fun->need_arguments) {
+    args[i++] = &ffi_type_uint;
+    args[i++] = &ffi_type_pointer;
+  }
+  if (fun->return_traits == NULL) {
+    ret = &ffi_type_void;
+    args[i++] = &ffi_type_pointer;
+  } else {
+    ret = swfdec_abc_ffi_traits_to_type (fun->return_traits);
+  }
+  g_assert (i == n_args);
+
+  /* prepare the cif */
+  status = ffi_prep_cif (&fun->cif, FFI_DEFAULT_ABI, n_args, ret, args);
+  //g_free (args);
+  if (status != FFI_OK) {
+    /* We don't have typedefs and we use the default abi, so this must not happen */
+    g_assert_not_reached ();
+  }
+
+  return TRUE;
+}
+
+/* NB: @val must have been coerced to @traits */
+static gpointer
+swfdec_abc_ffi_get_address (SwfdecAbcTraits *traits, SwfdecAsValue *val)
+{
+  g_assert (traits != NULL);
+
+  /* make sure the value is NULL; */
+  if (SWFDEC_AS_VALUE_IS_NULL (val))
+    val->value.object = NULL;
+  /* FIXME: Is this correct, or do we need to do stuff like:
+   * if (SWFDEC_AS_VALUE_IS_BOOLEAN (val)) return &val.values.boolean
+   */
+  return &val->value;
+}
+
+static gboolean
+swfdec_abc_function_ffi_call (SwfdecAbcFunction *fun)
+{
+  SwfdecAsContext *context = swfdec_gc_object_get_context (fun);
+  SwfdecAsFrame *frame = context->frame;
+  SwfdecAsValue rval = { 0, };
+  const SwfdecAsValue *restp;
+  guint i, rest, n_args;
+  gpointer *args;
+  gpointer ret, rvalp;
+
+  /* compute number of arguments */
+  n_args = swfdec_abc_function_native_n_arguments (fun);
+  /* FIXME: I don't want a malloc here */
+  args = g_new (gpointer, n_args);
+
+  if (fun->args[0].traits->machine_type != SWFDEC_ABC_POINTER) {
+    args[0] = &context;
+    args++;
+  }
+  for (i = 0; i <= MIN (frame->argc, fun->n_args); i++) {
+    if (fun->args[i].traits == NULL) {
+      gconstpointer *tmp = g_newa (gconstpointer, 1);
+      *tmp = &frame->argv[i];
+      args[i] = &tmp;
+    } else {
+      args[i] = swfdec_abc_ffi_get_address (fun->args[i].traits, (gpointer) &frame->argv[i]);
+    }
+  }
+  for (; i <= fun->n_args; i++) {
+    if (fun->args[i].traits == NULL) {
+      gpointer *tmp = g_newa (gpointer, 1);
+      *tmp = &fun->args[i].default_value;
+      args[i] = &tmp;
+    } else {
+      args[i] = swfdec_abc_ffi_get_address (fun->args[i].traits, 
+	  &fun->args[i].default_value);
+    }
+  }
+  if (fun->args[0].traits->machine_type != SWFDEC_ABC_POINTER) {
+    args--;
+    i++;
+  }
+  if (fun->need_rest) {
+    if (frame->argc <= fun->n_args) {
+      rest = 0;
+      args[i++] = &rest;
+      args[i++] = &rval.value.object; /* should be a NULL value */
+    } else {
+      rest = frame->argc - fun->n_args;
+      restp = &frame->argv[fun->n_args];
+      args[i++] = &rest;
+      args[i++] = &restp;
+    }
+  } else if (fun->need_arguments) {
+    args[i++] = &frame->argc;
+    args[i++] = &frame->argv;
+  }
+  if (fun->return_traits == NULL) {
+    rvalp = &rval;
+    args[i++] = &rvalp;
+    ret = NULL;
+  } else {
+    ret = swfdec_abc_ffi_get_address (fun->return_traits, &rval);
+  }
+  g_assert (i == n_args);
+
+  ffi_call (&fun->cif, FFI_FN (fun->native), ret, args);
+  g_free (args);
+  if ((SWFDEC_AS_VALUE_IS_OBJECT (&rval) && rval.value.object == NULL) ||
+      (SWFDEC_AS_VALUE_IS_STRING (&rval) && rval.value.string == NULL) ||
+      (SWFDEC_AS_VALUE_IS_NAMESPACE (&rval) && rval.value.ns == NULL)) {
+    SWFDEC_AS_VALUE_SET_NULL (&rval);
+  }
+  swfdec_as_frame_return (frame, &rval);
+  return context->exception ? FALSE : TRUE;
+}
 
 G_DEFINE_TYPE (SwfdecAbcFunction, swfdec_abc_function, SWFDEC_TYPE_GC_OBJECT)
 
@@ -174,6 +352,9 @@ swfdec_abc_function_verify (SwfdecAbcFunction *fun)
   if (!swfdec_abc_function_resolve (fun))
     return FALSE;
 
+  if (fun->native)
+    return swfdec_abc_function_ffi_verify (fun);
+
   if (!shut_up) {
     SWFDEC_FIXME ("i can has verify?");
     shut_up = TRUE;
@@ -271,11 +452,155 @@ swfdec_abc_function_call (SwfdecAbcFunction *fun, SwfdecAbcScopeChain *scope,
   frame.original_target = frame.target;
   /* FIXME: coerce arguments */
   if (fun->native) {
-    SwfdecAsValue rval;
-    ((SwfdecAbcNative) fun->native) (context, argc, argv, &rval);
-    swfdec_as_frame_return (&frame, &rval);
-    return context->exception ? FALSE : TRUE;
-  } else {
+    return swfdec_abc_function_ffi_call (fun);
+  } else if (fun->code) {
     return swfdec_abc_interpret (fun, scope);
+  } else {
+    /* no code and no native function, probably a missing stub */
+    SwfdecAsValue rval = { 0, };
+    char *desc = swfdec_abc_function_describe (fun);
+    SWFDEC_STUB (desc);
+    g_free (desc);
+    if (fun->return_traits && !swfdec_abc_traits_coerce (fun->return_traits, &rval))
+      return FALSE;
+    swfdec_as_frame_return (&frame, &rval);
+    return TRUE;
   }
 }
+
+static void
+swfdec_abc_function_append_name_for_traits (GString *string, SwfdecAbcTraits *traits)
+{
+  if (traits == NULL) {
+    g_string_append (string, "const SwfdecAsValue *");
+    return;
+  }
+
+  switch (traits->machine_type) {
+    case SWFDEC_ABC_POINTER:
+      g_string_append (string, "SwfdecAbc");
+      g_string_append (string, traits->name);
+      g_string_append (string, "*");
+      break;
+    case SWFDEC_ABC_INT:
+      if (traits->name == SWFDEC_AS_STR_Boolean)
+	g_string_append (string, "gboolean");
+      else
+	g_string_append (string, "int");
+      break;
+    case SWFDEC_ABC_UINT:
+      g_string_append (string, "guint");
+      break;
+    case SWFDEC_ABC_DOUBLE:
+      g_string_append (string, "double");
+      break;
+    case SWFDEC_ABC_STRING:
+      g_string_append (string, "const char*");
+      break;
+    case SWFDEC_ABC_VOID:
+      g_string_append (string, "void");
+      break;
+    default:
+      g_assert_not_reached ();
+  }
+}
+
+char *
+swfdec_abc_function_describe (SwfdecAbcFunction *fun)
+{
+  SwfdecAbcTraits *traits;
+  GString *name, *retname;
+  guint i, id;
+
+  g_assert (fun->resolved);
+
+  /* find id of our function in pool */
+  for (id = 0; id < fun->pool->n_functions; id++) {
+    if (fun->pool->functions[id] == fun)
+      break;
+  }
+
+  traits = fun->bound_traits;
+  name = g_string_new ("");
+  if (fun->return_traits == NULL) {
+    retname = g_string_new ("void");
+  } else {
+    retname = g_string_new ("");
+    swfdec_abc_function_append_name_for_traits (retname, fun->return_traits);
+  }
+  if (traits == NULL) {
+    /* we're likely a lambda function */
+    g_string_append_printf (name, "function %u: %s [lambda]", id, retname->str);
+  } else if (traits->construct == fun) {
+    /* we're the constructor */
+    g_string_append_printf (name, "function %u: %s %s", id, 
+	retname->str, traits->name);
+  } else {
+    /* we're method, getter or setter, find out what */
+    do {
+      for (i = 0; i < traits->n_traits; i++) {
+	SwfdecAbcTrait *trait = &traits->traits[i];
+	guint slot = SWFDEC_ABC_BINDING_GET_ID (trait->type);
+	switch (SWFDEC_ABC_BINDING_GET_TYPE (trait->type)) {
+	  case SWFDEC_ABC_TRAIT_METHOD:
+	    if (traits->methods[slot] == fun) {
+	      g_string_append_printf (name, "method %u %s %s.%s", id,
+		  retname->str, traits->name, trait->name);
+	      goto out;
+	    }
+	    break;
+	  case SWFDEC_ABC_TRAIT_GET:
+	  case SWFDEC_ABC_TRAIT_SET:
+	  case SWFDEC_ABC_TRAIT_GETSET:
+	    if (traits->methods[slot] == fun) {
+	      g_string_append_printf (name, "getter %u %s %s.%s", id,
+		  retname->str, traits->name, trait->name);
+	      goto out;
+	    } else if (traits->methods[slot + 1] == fun) {
+	      g_string_append_printf (name, "setter %u %s %s.%s", id,
+		  retname->str, traits->name, trait->name);
+	      goto out;
+	    }
+	    break;
+	  case SWFDEC_ABC_TRAIT_NONE:
+	  case SWFDEC_ABC_TRAIT_SLOT:
+	  case SWFDEC_ABC_TRAIT_CONST:
+	  case SWFDEC_ABC_TRAIT_ITRAMP:
+	  default:
+	  break;
+	}
+      }
+      traits = traits->base;
+    } while (traits);
+    /* huh? */
+    g_string_append_printf (name, "function %u %s %s", id, retname->str,
+	fun->bound_traits->name);
+  }
+out:
+  /* append arguments */
+  g_string_append (name, " (");
+  if (fun->args[0].traits->machine_type != SWFDEC_ABC_POINTER)
+    g_string_append (name, "SwfdecAsContext *cx, ");
+  for (i = 0; i <= fun->n_args; i++) {
+    if (i > 0)
+      g_string_append (name, ", ");
+    swfdec_abc_function_append_name_for_traits (name, fun->args[i].traits);
+    if (i > 0)
+      g_string_append_printf (name, " arg%u", i);
+    else
+      g_string_append (name, " thisp");
+  }
+  if (fun->need_rest) {
+    g_string_append (name, ", guint argc, SwfdecAsValue *rest");
+  } else if (fun->need_arguments) {
+    g_string_append (name, ", guint argc, SwfdecAsValue *argv");
+  }
+  if (fun->return_type == NULL) {
+    g_string_append (name, ", SwfdecAsValue *ret");
+  }
+  g_string_append (name, ")");
+
+  g_string_free (retname, TRUE);
+  return g_string_free (name, FALSE);
+}
+
