@@ -959,11 +959,11 @@ swfdec_abc_file_parse_bodies (SwfdecAbcFile *file, SwfdecBits *bits)
     if (!swfdec_abc_file_parse_method (file, bits, NULL, &fun))
       return FALSE;
     if (swfdec_abc_function_is_native (fun))
-      THROW (file, "Native method %u has illegal method body.", fun - file->functions[0]);
+      THROW (file, "Native method %"G_GSIZE_FORMAT" has illegal method body.", fun - file->functions[0]);
     if (fun->bound_traits && fun->bound_traits->interface)
-      THROW (file, "Interface method %u has illegal method body.", fun - file->functions[0]);
+      THROW (file, "Interface method %"G_GSIZE_FORMAT" has illegal method body.", fun - file->functions[0]);
     if (fun->code != NULL)
-      THROW (file, "Method %u has a duplicate method body.", fun - file->functions[0]);
+      THROW (file, "Method %"G_GSIZE_FORMAT" has a duplicate method body.", fun - file->functions[0]);
 
     READ_U30 (fun->n_stack, bits);
     SWFDEC_LOG ("  stack: %u", fun->n_stack);
