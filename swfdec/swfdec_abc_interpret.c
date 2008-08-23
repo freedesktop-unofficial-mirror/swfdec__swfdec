@@ -658,6 +658,11 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun, SwfdecAbcScopeChain *outer_scope)
 	  }
 	}
 	continue;
+      case SWFDEC_ABC_OPCODE_ADD_I:
+	val = swfdec_as_stack_peek (context, 2);
+	SWFDEC_AS_VALUE_SET_INT (val, swfdec_as_value_to_integer (context, val) +
+	      swfdec_as_value_to_integer (context, swfdec_as_stack_pop (context)));
+	break;
       case SWFDEC_ABC_OPCODE_CALL_PROPERTY:
       case SWFDEC_ABC_OPCODE_CALL_PROP_LEX:
       case SWFDEC_ABC_OPCODE_CALL_PROP_VOID:
@@ -842,6 +847,30 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun, SwfdecAbcScopeChain *outer_scope)
 	i = swfdec_bits_get_vu32 (&bits);
 	SWFDEC_AS_VALUE_SET_UNDEFINED (&locals[i]);
 	continue;
+      case SWFDEC_ABC_OPCODE_MODULO:
+	val = swfdec_as_stack_peek (context, 2);
+	SWFDEC_AS_VALUE_SET_NUMBER (val, fmod (
+	      swfdec_as_value_to_number (context, val),
+	      swfdec_as_value_to_number (context, swfdec_as_stack_pop (context))));
+	break;
+      case SWFDEC_ABC_OPCODE_MULTIPLY:
+	val = swfdec_as_stack_peek (context, 2);
+	SWFDEC_AS_VALUE_SET_NUMBER (val, swfdec_as_value_to_number (context, val) *
+	      swfdec_as_value_to_number (context, swfdec_as_stack_pop (context)));
+	break;
+      case SWFDEC_ABC_OPCODE_MULTIPLY_I:
+	val = swfdec_as_stack_peek (context, 2);
+	SWFDEC_AS_VALUE_SET_INT (val, swfdec_as_value_to_integer (context, val) *
+	      swfdec_as_value_to_integer (context, swfdec_as_stack_pop (context)));
+	break;
+      case SWFDEC_ABC_OPCODE_NEGATE:
+	val = swfdec_as_stack_peek (context, 1);
+	SWFDEC_AS_VALUE_SET_NUMBER (val, swfdec_as_value_to_number (context, val));
+	break;
+      case SWFDEC_ABC_OPCODE_NEGATE_I:
+	val = swfdec_as_stack_peek (context, 1);
+	SWFDEC_AS_VALUE_SET_INT (val, swfdec_as_value_to_integer (context, val));
+	break;
       case SWFDEC_ABC_OPCODE_NEW_CLASS:
 	{
 	  SwfdecAbcClass *classp;
@@ -929,6 +958,16 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun, SwfdecAbcScopeChain *outer_scope)
 	i = swfdec_bits_get_vu32 (&bits);
 	SWFDEC_AS_VALUE_SET_STRING (swfdec_as_stack_push (context), pool->strings[i]);
 	continue;
+      case SWFDEC_ABC_OPCODE_SUBTRACT:
+	val = swfdec_as_stack_peek (context, 2);
+	SWFDEC_AS_VALUE_SET_NUMBER (val, swfdec_as_value_to_number (context, val) -
+	      swfdec_as_value_to_number (context, swfdec_as_stack_pop (context)));
+	break;
+      case SWFDEC_ABC_OPCODE_SUBTRACT_I:
+	val = swfdec_as_stack_peek (context, 2);
+	SWFDEC_AS_VALUE_SET_INT (val, swfdec_as_value_to_integer (context, val) -
+	      swfdec_as_value_to_integer (context, swfdec_as_stack_pop (context)));
+	break;
       case SWFDEC_ABC_OPCODE_PUSH_TRUE:
 	SWFDEC_AS_VALUE_SET_BOOLEAN (swfdec_as_stack_push (context), TRUE);
 	continue;
@@ -985,7 +1024,6 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun, SwfdecAbcScopeChain *outer_scope)
 	continue;
       case SWFDEC_ABC_OPCODE_ABS_JUMP:
       case SWFDEC_ABC_OPCODE_ADD_D:
-      case SWFDEC_ABC_OPCODE_ADD_I:
       case SWFDEC_ABC_OPCODE_ALLOC:
       case SWFDEC_ABC_OPCODE_AS_TYPE:
       case SWFDEC_ABC_OPCODE_AS_TYPE_LATE:
@@ -1065,11 +1103,6 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun, SwfdecAbcScopeChain *outer_scope)
       case SWFDEC_ABC_OPCODE_LOOKUP_SWITCH:
       case SWFDEC_ABC_OPCODE_LSHIFT:
       case SWFDEC_ABC_OPCODE_MARK:
-      case SWFDEC_ABC_OPCODE_MODULO:
-      case SWFDEC_ABC_OPCODE_MULTIPLY:
-      case SWFDEC_ABC_OPCODE_MULTIPLY_I:
-      case SWFDEC_ABC_OPCODE_NEGATE:
-      case SWFDEC_ABC_OPCODE_NEGATE_I:
       case SWFDEC_ABC_OPCODE_NEXT_NAME:
       case SWFDEC_ABC_OPCODE_NEXT_VALUE:
       case SWFDEC_ABC_OPCODE_NEW_ARRAY:
@@ -1086,8 +1119,6 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun, SwfdecAbcScopeChain *outer_scope)
       case SWFDEC_ABC_OPCODE_SET_SLOT:
       case SWFDEC_ABC_OPCODE_SET_SUPER:
       case SWFDEC_ABC_OPCODE_STRICT_EQUALS:
-      case SWFDEC_ABC_OPCODE_SUBTRACT:
-      case SWFDEC_ABC_OPCODE_SUBTRACT_I:
       case SWFDEC_ABC_OPCODE_SWEEP:
       case SWFDEC_ABC_OPCODE_THROW:
       case SWFDEC_ABC_OPCODE_TIMESTAMP:
