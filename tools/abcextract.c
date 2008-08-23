@@ -24,7 +24,7 @@
 #include <stdlib.h>
 
 #include <swfdec/swfdec.h>
-#include <swfdec/swfdec_abc_file.h>
+#include <swfdec/swfdec_abc_pool.h>
 #include <swfdec/swfdec_abc_global.h>
 #include <swfdec/swfdec_bits.h>
 
@@ -57,14 +57,14 @@ write_data (guint8 *data, guint len)
 static void
 extract (SwfdecAsContext *cx, SwfdecBuffer *buffer, gsize offset, gboolean dump)
 {
-  SwfdecAbcFile *file;
+  SwfdecAbcPool *pool;
   SwfdecBits bits;
 
   g_print ("extracting data at offset %"G_GSIZE_FORMAT"...\n", offset);
   swfdec_bits_init (&bits, buffer);
   swfdec_bits_skip_bytes (&bits, offset);
-  file = swfdec_abc_file_new (cx, &bits);
-  if (file) {
+  pool = swfdec_abc_pool_new (cx, &bits);
+  if (pool) {
     g_print ("  SUCCESS (%"G_GSIZE_FORMAT" bytes)\n", bits.ptr - buffer->data - offset);
   } else {
     g_print ("  failed\n");
