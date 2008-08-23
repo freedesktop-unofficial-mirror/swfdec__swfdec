@@ -108,7 +108,7 @@ typedef struct _SwfdecAbcGlobalClass SwfdecAbcGlobalClass;
 struct _SwfdecAbcGlobal {
   SwfdecAbcObject	object;
 
-  SwfdecAbcFile	*	file;		/* file that read the default objects */
+  SwfdecAbcPool	*	pool;		/* file that read the default objects */
   SwfdecAbcTraits *	void_traits;	/* the void traits */
   SwfdecAbcTraits *	null_traits;	/* the null traits */
   SwfdecAbcClass *	classes[SWFDEC_ABC_N_TYPES];	/* NULL or resolved Class objects */

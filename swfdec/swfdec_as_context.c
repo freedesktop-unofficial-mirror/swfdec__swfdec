@@ -27,7 +27,7 @@
 #include <string.h>
 #include <stdlib.h>
 
-#include "swfdec_abc_file.h"
+#include "swfdec_abc_pool.h"
 #include "swfdec_abc_global.h"
 #include "swfdec_abc_internal.h"
 #include "swfdec_as_array.h"

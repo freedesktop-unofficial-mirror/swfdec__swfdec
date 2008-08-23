@@ -25,7 +25,7 @@
 
 #include <string.h>
 
-#include "swfdec_abc_file.h"
+#include "swfdec_abc_pool.h"
 #include "swfdec_abc_function.h"
 #include "swfdec_abc_global.h"
 #include "swfdec_abc_internal.h"
@@ -124,7 +124,7 @@ swfdec_abc_traits_resolve (SwfdecAbcTraits *traits)
 {
   SwfdecAsContext *context;
   SwfdecAbcTraits *base;
-  SwfdecAbcFile *pool;
+  SwfdecAbcPool *pool;
   guint i;
 
   g_return_val_if_fail (SWFDEC_IS_ABC_TRAITS (traits), FALSE);
@@ -188,7 +188,7 @@ swfdec_abc_traits_resolve (SwfdecAbcTraits *traits)
 	} else if (trait->default_index == 0) {
 	  SWFDEC_AS_VALUE_SET_UNDEFINED (&traits->slots[slot]);
 	} else {
-	  if (!swfdec_abc_file_get_constant (pool, &traits->slots[slot],
+	  if (!swfdec_abc_pool_get_constant (pool, &traits->slots[slot],
 		trait->default_type, trait->default_index))
 	    goto fail;
 	}

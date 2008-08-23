@@ -25,7 +25,7 @@
 
 #include "swfdec_sprite_movie.h"
 #include "swfdec_abc_class.h"
-#include "swfdec_abc_file.h"
+#include "swfdec_abc_pool.h"
 #include "swfdec_abc_global.h"
 #include "swfdec_abc_internal.h"
 #include "swfdec_abc_multiname.h"
@@ -501,7 +501,7 @@ swfdec_sprite_movie_perform_one_action (SwfdecSpriteMovie *movie, guint tag, Swf
     case SWFDEC_TAG_DOABC:
       {
 	SwfdecSandbox *sandbox;
-	SwfdecAbcFile *file;
+	SwfdecAbcPool *file;
 	guint flags;
 	char *name;
 	sandbox = mov->resource->sandbox;
@@ -521,7 +521,7 @@ swfdec_sprite_movie_perform_one_action (SwfdecSpriteMovie *movie, guint tag, Swf
 	SWFDEC_LOG ("  name: %s", name);
 	g_free (name);
 	swfdec_sandbox_use (sandbox);
-	file = swfdec_abc_file_new (SWFDEC_AS_CONTEXT (player), &bits);
+	file = swfdec_abc_pool_new (SWFDEC_AS_CONTEXT (player), &bits);
 	swfdec_sandbox_unuse (sandbox);
       }
       return TRUE;

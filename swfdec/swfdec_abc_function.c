@@ -23,7 +23,7 @@
 
 #include "swfdec_abc_function.h"
 
-#include "swfdec_abc_file.h"
+#include "swfdec_abc_pool.h"
 #include "swfdec_abc_global.h"
 #include "swfdec_abc_internal.h"
 #include "swfdec_abc_interpret.h"
@@ -327,7 +327,7 @@ swfdec_abc_function_resolve (SwfdecAbcFunction *fun)
     if (fun->args[i].default_index == 0) {
       SWFDEC_AS_VALUE_SET_UNDEFINED (&fun->args[i].default_value);
     } else {
-      if (!swfdec_abc_file_get_constant (fun->pool, &fun->args[i].default_value,
+      if (!swfdec_abc_pool_get_constant (fun->pool, &fun->args[i].default_value,
 	    fun->args[i].default_type, fun->args[i].default_index))
 	return FALSE;
     }

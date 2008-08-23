@@ -17,8 +17,8 @@
  * Boston, MA  02110-1301  USA
  */
 
-#ifndef _SWFDEC_ABC_FILE_H_
-#define _SWFDEC_ABC_FILE_H_
+#ifndef _SWFDEC_ABC_POOL_H_
+#define _SWFDEC_ABC_POOL_H_
 
 #include <swfdec/swfdec_abc_global.h>
 #include <swfdec/swfdec_abc_multiname.h>
@@ -48,28 +48,28 @@ typedef enum {
   SWFDEC_ABC_CONST_STATIC_PROTECTED_NAMESPACE = 26
 } SwfdecAbcConstant;
 
-//typedef struct _SwfdecAbcFile SwfdecAbcFile;
-typedef struct _SwfdecAbcFileClass SwfdecAbcFileClass;
+//typedef struct _SwfdecAbcPool SwfdecAbcPool;
+typedef struct _SwfdecAbcPoolClass SwfdecAbcPoolClass;
 
-#define SWFDEC_TYPE_ABC_FILE                    (swfdec_abc_file_get_type())
-#define SWFDEC_IS_ABC_FILE(obj)                 (G_TYPE_CHECK_INSTANCE_TYPE ((obj), SWFDEC_TYPE_ABC_FILE))
-#define SWFDEC_IS_ABC_FILE_CLASS(klass)         (G_TYPE_CHECK_CLASS_TYPE ((klass), SWFDEC_TYPE_ABC_FILE))
-#define SWFDEC_ABC_FILE(obj)                    (G_TYPE_CHECK_INSTANCE_CAST ((obj), SWFDEC_TYPE_ABC_FILE, SwfdecAbcFile))
-#define SWFDEC_ABC_FILE_CLASS(klass)            (G_TYPE_CHECK_CLASS_CAST ((klass), SWFDEC_TYPE_ABC_FILE, SwfdecAbcFileClass))
-#define SWFDEC_ABC_FILE_GET_CLASS(obj)          (G_TYPE_INSTANCE_GET_CLASS ((obj), SWFDEC_TYPE_ABC_FILE, SwfdecAbcFileClass))
+#define SWFDEC_TYPE_ABC_POOL                    (swfdec_abc_pool_get_type())
+#define SWFDEC_IS_ABC_POOL(obj)                 (G_TYPE_CHECK_INSTANCE_TYPE ((obj), SWFDEC_TYPE_ABC_POOL))
+#define SWFDEC_IS_ABC_POOL_CLASS(klass)         (G_TYPE_CHECK_CLASS_TYPE ((klass), SWFDEC_TYPE_ABC_POOL))
+#define SWFDEC_ABC_POOL(obj)                    (G_TYPE_CHECK_INSTANCE_CAST ((obj), SWFDEC_TYPE_ABC_POOL, SwfdecAbcPool))
+#define SWFDEC_ABC_POOL_CLASS(klass)            (G_TYPE_CHECK_CLASS_CAST ((klass), SWFDEC_TYPE_ABC_POOL, SwfdecAbcPoolClass))
+#define SWFDEC_ABC_POOL_GET_CLASS(obj)          (G_TYPE_INSTANCE_GET_CLASS ((obj), SWFDEC_TYPE_ABC_POOL, SwfdecAbcPoolClass))
 
-struct _SwfdecAbcFile {
+struct _SwfdecAbcPool {
   SwfdecGcObject	object;
 
   SwfdecAbcGlobal *	global;		/* the global object we belong to */
 
-  int *			ints;		/* all integer values in the file */
+  int *			ints;		/* all integer values in the pool */
   guint			n_ints;		/* number of integers */
-  guint *		uints;		/* all unsigned integer values in the file */
+  guint *		uints;		/* all unsigned integer values in the pool */
   guint			n_uints;	/* number of unsigned integers */
-  double *		doubles;	/* all double values in the file */
+  double *		doubles;	/* all double values in the pool */
   guint			n_doubles;	/* number of doubles */
-  const char **		strings;	/* all string values in the file */
+  const char **		strings;	/* all string values in the pool */
   guint			n_strings;	/* number of strings */
   SwfdecAbcNamespace **	namespaces;	/* all the namespaces in use */
   guint			n_namespaces;	/* number of namespaces */
@@ -85,20 +85,20 @@ struct _SwfdecAbcFile {
   SwfdecAbcScript *	main;		/* main script */
 };
 
-struct _SwfdecAbcFileClass {
+struct _SwfdecAbcPoolClass {
   SwfdecGcObjectClass	object_class;
 };
 
-GType		swfdec_abc_file_get_type	(void);
+GType		swfdec_abc_pool_get_type	(void);
 
-SwfdecAbcFile *	swfdec_abc_file_new		(SwfdecAsContext *	context,
+SwfdecAbcPool *	swfdec_abc_pool_new		(SwfdecAsContext *	context,
 						 SwfdecBits *		bits);
-SwfdecAbcFile *	swfdec_abc_file_new_trusted	(SwfdecAsContext *	context,
+SwfdecAbcPool *	swfdec_abc_pool_new_trusted	(SwfdecAsContext *	context,
 						 SwfdecBits *		bits,
 						 const GCallback *	natives,
 						 guint			n_natives);
 
-gboolean	swfdec_abc_file_get_constant	(SwfdecAbcFile *	pool,
+gboolean	swfdec_abc_pool_get_constant	(SwfdecAbcPool *	pool,
 						 SwfdecAsValue *	value,
 						 guint			type,
 						 guint			id);

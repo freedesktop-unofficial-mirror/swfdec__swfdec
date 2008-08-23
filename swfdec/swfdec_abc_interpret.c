@@ -26,7 +26,7 @@
 #include <math.h>
 
 #include "swfdec_abc_class.h"
-#include "swfdec_abc_file.h"
+#include "swfdec_abc_pool.h"
 #include "swfdec_abc_function.h"
 #include "swfdec_abc_internal.h"
 #include "swfdec_abc_scope_chain.h"
@@ -562,7 +562,7 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun, SwfdecAbcScopeChain *outer_scope)
   guint i, opcode;
   /* used in interpretation switch */
   SwfdecAbcMultiname mn;
-  SwfdecAbcFile *pool;
+  SwfdecAbcPool *pool;
   SwfdecAsValue *val;
 
   g_return_val_if_fail (SWFDEC_IS_ABC_FUNCTION (fun), FALSE);

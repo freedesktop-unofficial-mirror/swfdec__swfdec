@@ -28,7 +28,7 @@
 #include <math.h>
 
 #include "swfdec_abc_class.h"
-#include "swfdec_abc_file.h"
+#include "swfdec_abc_pool.h"
 #include "swfdec_abc_function.h"
 #include "swfdec_abc_initialize.h"
 #include "swfdec_abc_internal.h"
@@ -91,13 +91,13 @@ swfdec_abc_global_constructor (GType type, guint n_construct_properties,
 
   /* init default pool */
   swfdec_bits_init_data (&bits, swfdec_abc_initialize, sizeof (swfdec_abc_initialize));
-  global->file = swfdec_abc_file_new_trusted (context, &bits, 
+  global->pool = swfdec_abc_pool_new_trusted (context, &bits, 
       swfdec_abc_natives, G_N_ELEMENTS (swfdec_abc_natives));
   /* must work and not throw exceptions */
-  g_assert (global->file);
+  g_assert (global->pool);
 
   /* set proper traits here */
-  traits = global->file->main->traits;
+  traits = global->pool->main->traits;
   if (!swfdec_abc_traits_resolve (traits)) {
     g_assert_not_reached ();
   }
@@ -116,7 +116,7 @@ swfdec_abc_global_constructor (GType type, guint n_construct_properties,
   SWFDEC_ABC_STRING_TRAITS (context)->machine_type = SWFDEC_ABC_STRING;
 
   /* run main script */
-  global->file->main->global = SWFDEC_ABC_OBJECT (global);
+  global->pool->main->global = SWFDEC_ABC_OBJECT (global);
   SWFDEC_AS_VALUE_SET_OBJECT (&val, SWFDEC_AS_OBJECT (global));
   swfdec_abc_function_call (traits->construct, NULL, 0, &val, &val);
   return object;
@@ -296,10 +296,10 @@ SwfdecAbcTraits *
 swfdec_abc_global_get_builtin_traits (SwfdecAbcGlobal *global, guint id)
 {
   g_return_val_if_fail (SWFDEC_IS_ABC_GLOBAL (global), NULL);
-  g_return_val_if_fail (global->file, NULL);
+  g_return_val_if_fail (global->pool, NULL);
   g_return_val_if_fail (id < SWFDEC_ABC_N_TYPES, NULL);
 
-  return global->file->instances[id];
+  return global->pool->instances[id];
 }
 
 SwfdecAbcClass *
@@ -310,10 +310,10 @@ swfdec_abc_global_get_builtin_class (SwfdecAbcGlobal *global, guint id)
   SwfdecAsValue val;
 
   g_return_val_if_fail (SWFDEC_IS_ABC_GLOBAL (global), NULL);
-  g_return_val_if_fail (global->file, NULL);
+  g_return_val_if_fail (global->pool, NULL);
   g_return_val_if_fail (id < SWFDEC_ABC_N_TYPES, NULL);
 
-  traits = global->file->instances[id];
+  traits = global->pool->instances[id];
 
   swfdec_abc_multiname_init (&mn, traits->name, traits->ns, NULL);
   SWFDEC_AS_VALUE_SET_OBJECT (&val, SWFDEC_AS_OBJECT (global));

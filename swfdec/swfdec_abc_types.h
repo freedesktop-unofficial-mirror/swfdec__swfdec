@@ -58,7 +58,7 @@ enum {
 #define SWFDEC_ABC_N_TYPES 29
 
 typedef struct _SwfdecAbcClass SwfdecAbcClass;
-typedef struct _SwfdecAbcFile SwfdecAbcFile;
+typedef struct _SwfdecAbcPool SwfdecAbcPool;
 typedef struct _SwfdecAbcFunction SwfdecAbcFunction;
 typedef struct _SwfdecAbcMultiname SwfdecAbcMultiname;
 typedef struct _SwfdecAbcObject SwfdecAbcObject;

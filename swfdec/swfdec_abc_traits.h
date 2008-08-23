@@ -93,7 +93,7 @@ extern const SwfdecAbcTrait swfdec_abc_trait_ambiguous;
 struct _SwfdecAbcTraits {
   SwfdecGcObject		object;
 
-  SwfdecAbcFile *		pool;		/* pool that defined this traits */
+  SwfdecAbcPool *		pool;		/* pool that defined this traits */
   SwfdecAbcNamespace *		ns;		/* namespace of type we represent */
   const char *			name;		/* name of type we represent */
   SwfdecAbcTraits *		base;		/* parent type traits */

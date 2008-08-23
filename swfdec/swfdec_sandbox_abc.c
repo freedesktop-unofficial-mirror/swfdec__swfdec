@@ -23,7 +23,7 @@
 
 #include "swfdec_sandbox_abc.h"
 
-#include "swfdec_abc_file.h"
+#include "swfdec_abc_pool.h"
 #include "swfdec_abc_native.h"
 #include "swfdec_bits.h"
 #include "swfdec_debug.h"
@@ -62,7 +62,7 @@ swfdec_sandbox_abc_constructor (GType type, guint n_construct_properties,
   player = SWFDEC_PLAYER (context);
 
   swfdec_bits_init_data (&bits, swfdec_initialize_abc, sizeof (swfdec_initialize_abc));
-  swfdec_abc_file_new_trusted (context, &bits, swfdec_abc_natives_flash,
+  swfdec_abc_pool_new_trusted (context, &bits, swfdec_abc_natives_flash,
       G_N_ELEMENTS (swfdec_abc_natives_flash));
 
   return object;

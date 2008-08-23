@@ -22,7 +22,7 @@
 #endif
 
 #include "swfdec_sandbox_as.h"
-#include "swfdec_abc_file.h"
+#include "swfdec_abc_pool.h"
 #include "swfdec_abc_native.h"
 #include "swfdec_as_internal.h"
 #include "swfdec_debug.h"
