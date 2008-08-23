@@ -717,7 +717,7 @@ swfdec_abc_file_parse_methods (SwfdecAbcFile *file, SwfdecBits *bits,
 	  fun->native = natives[i];
 	}
 	if (fun->native == NULL) {
-	  SWFDEC_INFO ("no native for index %u, using default stub", i);
+	  SWFDEC_INFO ("no native for index %u", i);
 	}
       }
       if (optional) {
@@ -1068,7 +1068,7 @@ swfdec_abc_file_new_trusted (SwfdecAsContext *context, SwfdecBits *bits,
     return NULL;
   }
   
-#define SWFDEC_PRINT_STUBS
+//#define SWFDEC_PRINT_STUBS
 #ifdef SWFDEC_PRINT_STUBS
   {
     guint i;
