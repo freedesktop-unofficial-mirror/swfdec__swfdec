@@ -722,6 +722,16 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun, SwfdecAbcScopeChain *outer_scope)
 	    outer_scope ? outer_scope->base : NULL, i, val, val);
 	swfdec_as_stack_pop_n (context, i + 1);
 	continue;
+      case SWFDEC_ABC_OPCODE_DEBUG:
+	/* type = */ swfdec_bits_get_u8 (&bits);
+	/* name = */ swfdec_bits_get_vu32 (&bits);
+	/* register = */ swfdec_bits_get_u8 (&bits);
+	/* extra = */ swfdec_bits_get_vu32 (&bits);
+	break;
+      case SWFDEC_ABC_OPCODE_DEBUG_FILE:
+      case SWFDEC_ABC_OPCODE_DEBUG_LINE:
+	i = swfdec_bits_get_vu32 (&bits);
+	continue;
       case SWFDEC_ABC_OPCODE_DIVIDE:
 	val = swfdec_as_stack_peek (context, 1);
 	SWFDEC_AS_VALUE_SET_NUMBER (val, swfdec_as_value_to_number (context, val) 
@@ -1007,9 +1017,6 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun, SwfdecAbcScopeChain *outer_scope)
       case SWFDEC_ABC_OPCODE_CONVERT_O:
       case SWFDEC_ABC_OPCODE_CONVERT_S:
       case SWFDEC_ABC_OPCODE_CONVERT_U:
-      case SWFDEC_ABC_OPCODE_DEBUG:
-      case SWFDEC_ABC_OPCODE_DEBUG_FILE:
-      case SWFDEC_ABC_OPCODE_DEBUG_LINE:
       case SWFDEC_ABC_OPCODE_DEC_LOCAL:
       case SWFDEC_ABC_OPCODE_DECLOCAL_I:
       case SWFDEC_ABC_OPCODE_DECODE:
