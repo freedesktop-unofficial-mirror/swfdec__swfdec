@@ -69,7 +69,8 @@ struct _SwfdecAsValue {
   } value;
 };
 
-#define SWFDEC_IS_AS_VALUE(val) ((val) != NULL && (val)->type <= SWFDEC_TYPE_ABC_NAMESPACE)
+#define SWFDEC_AS_VALUE_GET_TYPE(val) ((val)->type)
+#define SWFDEC_IS_AS_VALUE(val) ((val) != NULL && SWFDEC_AS_VALUE_GET_TYPE (val) <= SWFDEC_AS_TYPE_NAMESPACE)
 
 #define SWFDEC_AS_VALUE_IS_UNDEFINED(val) ((val)->type == SWFDEC_AS_TYPE_UNDEFINED)
 #define SWFDEC_AS_VALUE_SET_UNDEFINED(val) (val)->type = SWFDEC_AS_TYPE_UNDEFINED
@@ -139,7 +140,6 @@ SwfdecAsObject *swfdec_as_value_to_object	(SwfdecAsContext *	context,
 void		swfdec_as_value_to_primitive	(SwfdecAsValue *	value);
 const char *	swfdec_as_value_to_string	(SwfdecAsContext *	context,
 						 const SwfdecAsValue *	value);
-const char *	swfdec_as_value_get_type_name	(const SwfdecAsValue *	value);
 char *		swfdec_as_value_to_debug	(const SwfdecAsValue *	value);
 
 /* special conversion functions */
@@ -148,6 +148,8 @@ const char *	swfdec_as_integer_to_string	(SwfdecAsContext *      context,
 int		swfdec_as_double_to_integer	(double			d);
 const char *	swfdec_as_double_to_string	(SwfdecAsContext *	context,
 						 double			d);
+double		swfdec_as_string_to_number	(SwfdecAsContext *	context,
+						 const char *		s);
 const char *	swfdec_as_str_concat		(SwfdecAsContext *	cx,
 						 const char *		s1,
 						 const char *		s2);

@@ -216,7 +216,7 @@ swfdec_abc_object_get_variable (SwfdecAsContext *context, const SwfdecAsValue *o
   g_return_val_if_fail (mn != NULL, FALSE);
   g_return_val_if_fail (value != NULL, FALSE);
 
-  traits = swfdec_as_value_to_traits (context, object);
+  traits = swfdec_abc_value_to_traits (context, object);
   trait = swfdec_abc_traits_find_trait_multi (traits, mn);
   if (!trait) {
     if (!SWFDEC_AS_VALUE_IS_OBJECT (object) || traits->sealed ||
@@ -285,7 +285,7 @@ swfdec_abc_object_set_variable_full (SwfdecAsContext *context, const SwfdecAsVal
   SwfdecAbcTraits *traits;
   const SwfdecAbcTrait *trait;
 
-  traits = swfdec_as_value_to_traits (context, object);
+  traits = swfdec_abc_value_to_traits (context, object);
   trait = swfdec_abc_traits_find_trait_multi (traits, mn);
   if (trait == NULL) {
     if (!SWFDEC_AS_VALUE_IS_OBJECT (object) || traits->sealed ||
@@ -389,7 +389,7 @@ swfdec_abc_object_call_variable	(SwfdecAsContext *context, const SwfdecAsValue *
 	"%s is not a function.", mn->name);
     return FALSE;
   }
-  traits = swfdec_as_value_to_traits (context, object);
+  traits = swfdec_abc_value_to_traits (context, object);
   trait = swfdec_abc_traits_find_trait_multi (traits, mn);
   if (trait == SWFDEC_ABC_TRAIT_AMBIGUOUS) {
     swfdec_as_context_throw_abc (context, SWFDEC_ABC_TYPE_REFERENCE_ERROR,

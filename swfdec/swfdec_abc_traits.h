@@ -140,9 +140,9 @@ gboolean		swfdec_abc_traits_is_traits		(SwfdecAbcTraits *	traits,
 gboolean		swfdec_abc_traits_coerce		(SwfdecAbcTraits *	traits,
 								 SwfdecAsValue *	val);
 /* FIXME: kinda wrong header */
-SwfdecAbcTraits *	swfdec_as_value_to_traits		(SwfdecAsContext *	context,
+SwfdecAbcTraits *	swfdec_abc_value_to_traits		(SwfdecAsContext *	context,
 								 const SwfdecAsValue *	value);
-gboolean		swfdec_as_value_is_traits		(const SwfdecAsValue *	value,
+gboolean		swfdec_abc_value_is_traits		(const SwfdecAsValue *	value,
 								 SwfdecAbcTraits *	traits);
 
 

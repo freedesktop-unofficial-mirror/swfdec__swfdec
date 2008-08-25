@@ -32,6 +32,7 @@
 #include "swfdec_abc_multiname.h"
 #include "swfdec_abc_namespace.h"
 #include "swfdec_abc_object.h"
+#include "swfdec_abc_value.h"
 #include "swfdec_as_context.h"
 #include "swfdec_as_strings.h"
 #include "swfdec_debug.h"
@@ -335,7 +336,7 @@ swfdec_abc_traits_is_traits (SwfdecAbcTraits *traits, SwfdecAbcTraits *parent)
 }
 
 SwfdecAbcTraits *
-swfdec_as_value_to_traits (SwfdecAsContext *context, const SwfdecAsValue *value)
+swfdec_abc_value_to_traits (SwfdecAsContext *context, const SwfdecAsValue *value)
 {
   g_return_val_if_fail (SWFDEC_IS_AS_CONTEXT (context), NULL);
   g_return_val_if_fail (value != NULL, NULL);
@@ -371,7 +372,7 @@ swfdec_as_value_to_traits (SwfdecAsContext *context, const SwfdecAsValue *value)
 }
 
 gboolean
-swfdec_as_value_is_traits (const SwfdecAsValue *value, SwfdecAbcTraits *traits)
+swfdec_abc_value_is_traits (const SwfdecAsValue *value, SwfdecAbcTraits *traits)
 {
   SwfdecAsContext *context;
   SwfdecAbcTraits *vtraits;
@@ -380,7 +381,7 @@ swfdec_as_value_is_traits (const SwfdecAsValue *value, SwfdecAbcTraits *traits)
   g_return_val_if_fail (SWFDEC_IS_ABC_TRAITS (traits), FALSE);
 
   context = swfdec_gc_object_get_context (traits);
-  vtraits = swfdec_as_value_to_traits (context, value);
+  vtraits = swfdec_abc_value_to_traits (context, value);
   return swfdec_abc_traits_is_traits (vtraits, traits);
 }
 
@@ -396,30 +397,30 @@ swfdec_abc_traits_coerce (SwfdecAbcTraits *traits, SwfdecAsValue *val)
 
   if (traits == SWFDEC_ABC_BOOLEAN_TRAITS (context)) {
     SWFDEC_AS_VALUE_SET_BOOLEAN (val,
-	swfdec_as_value_to_boolean (context, val));
+	swfdec_abc_value_to_boolean (context, val));
     return TRUE;
   } else if (traits == SWFDEC_ABC_NUMBER_TRAITS (context)) {
     SWFDEC_AS_VALUE_SET_NUMBER (val,
-	swfdec_as_value_to_number (context, val));
+	swfdec_abc_value_to_number (context, val));
     return TRUE;
   } else if (traits == SWFDEC_ABC_INT_TRAITS (context)) {
     SWFDEC_AS_VALUE_SET_INT (val,
-	swfdec_as_value_to_integer (context, val));
+	swfdec_abc_value_to_integer (context, val));
     return TRUE;
   } else if (traits == SWFDEC_ABC_UINT_TRAITS (context)) {
     SWFDEC_AS_VALUE_SET_NUMBER (val,
-	(guint) swfdec_as_value_to_integer (context, val));
+	(guint) swfdec_abc_value_to_integer (context, val));
     return TRUE;
   } else if (traits == SWFDEC_ABC_NUMBER_TRAITS (context)) {
     SWFDEC_AS_VALUE_SET_NUMBER (val,
-	(guint) swfdec_as_value_to_integer (context, val));
+	(guint) swfdec_abc_value_to_integer (context, val));
     return TRUE;
   } else if (traits == SWFDEC_ABC_STRING_TRAITS (context)) {
     if (SWFDEC_AS_VALUE_IS_UNDEFINED (val) || SWFDEC_AS_VALUE_IS_NULL (val)) {
       SWFDEC_AS_VALUE_SET_NULL (val);
     } else {
       SWFDEC_AS_VALUE_SET_STRING (val, 
-	  swfdec_as_value_to_string (context, val));
+	  swfdec_abc_value_to_string (context, val));
     }
     return TRUE;
   } else if (traits == SWFDEC_ABC_OBJECT_TRAITS (context)) {
@@ -438,6 +439,6 @@ swfdec_abc_traits_coerce (SwfdecAbcTraits *traits, SwfdecAsValue *val)
     return TRUE;
   }
 
-  return swfdec_as_value_is_traits (val, traits);
+  return swfdec_abc_value_is_traits (val, traits);
 }
 

@@ -549,7 +549,7 @@ swfdec_sprite_movie_perform_one_action (SwfdecSpriteMovie *movie, guint tag, Swf
 	  swfdec_sandbox_use (sandbox);
 	  swfdec_abc_multiname_init_from_string (&mn, context, s);
 	  swfdec_as_context_get_abc_variable (context, &mn, &val);
-	  if (swfdec_as_value_is_traits (&val, SWFDEC_ABC_CLASS_TRAITS (context))) {
+	  if (swfdec_abc_value_is_traits (&val, SWFDEC_ABC_CLASS_TRAITS (context))) {
 	    swfdec_resource_add_abc_class (mov->resource, id, 
 		SWFDEC_ABC_CLASS (SWFDEC_AS_VALUE_GET_OBJECT (&val)));
 	  } else {

@@ -28,6 +28,7 @@
 #include "swfdec_abc_internal.h"
 #include "swfdec_abc_interpret.h"
 #include "swfdec_abc_traits.h"
+#include "swfdec_abc_value.h"
 #include "swfdec_as_context.h"
 #include "swfdec_as_frame_internal.h"
 #include "swfdec_as_strings.h" /* swfdec_abc_function_describe */
@@ -431,7 +432,7 @@ swfdec_abc_function_call (SwfdecAbcFunction *fun, SwfdecAbcScopeChain *scope,
     if (!swfdec_abc_traits_coerce (fun->args[i].traits, &argv[i])) {
       swfdec_as_context_throw_abc (context, SWFDEC_ABC_TYPE_TYPE_ERROR, 
 	"Type Coercion failed: cannot convert %s to %s.",
-	swfdec_as_value_get_type_name (&argv[i]), fun->args[i].traits->name);
+	swfdec_abc_value_get_type_name (&argv[i]), fun->args[i].traits->name);
       return FALSE;
     }
   }

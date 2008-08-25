@@ -32,6 +32,7 @@
 #include "swfdec_abc_scope_chain.h"
 #include "swfdec_abc_script.h"
 #include "swfdec_abc_traits.h"
+#include "swfdec_abc_value.h"
 #include "swfdec_as_context.h"
 #include "swfdec_as_frame_internal.h"
 #include "swfdec_as_internal.h"
@@ -246,7 +247,7 @@ swfdec_abc_interpret_resolve_multiname (SwfdecAsContext *context,
 	SWFDEC_ABC_OBJECT (SWFDEC_AS_VALUE_GET_OBJECT (val))->traits == SWFDEC_ABC_QNAME_TRAITS (context)) {
       SWFDEC_FIXME ("implement Qname multiname resolution");
     }
-    target->name = swfdec_as_value_to_string (context, val);
+    target->name = swfdec_abc_value_to_string (context, val);
   } else {
     target->name = source->name;
   }
@@ -324,7 +325,7 @@ swfdec_as_value_has_property (SwfdecAsContext *context, const SwfdecAsValue *val
   if (SWFDEC_AS_VALUE_IS_OBJECT (value)) {
     o = SWFDEC_AS_VALUE_GET_OBJECT (value);
   } else {
-    traits = swfdec_as_value_to_traits (context, value);
+    traits = swfdec_abc_value_to_traits (context, value);
     if (swfdec_abc_traits_find_trait_multi (traits, mn))
       return TRUE;
     o = swfdec_as_value_to_prototype (context, value);
@@ -626,8 +627,8 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun, SwfdecAbcScopeChain *outer_scope)
 	  SwfdecAbcTraits *ltraits, *rtraits;
 	  rhs = swfdec_as_stack_pop (context);
 	  lhs = swfdec_as_stack_peek (context, 1);
-	  ltraits = swfdec_as_value_to_traits (context, lhs);
-	  rtraits = swfdec_as_value_to_traits (context, rhs);
+	  ltraits = swfdec_abc_value_to_traits (context, lhs);
+	  rtraits = swfdec_abc_value_to_traits (context, rhs);
 	  if (SWFDEC_AS_VALUE_IS_NUMBER (lhs) && SWFDEC_AS_VALUE_IS_NUMBER (rhs)) {
 	    SWFDEC_AS_VALUE_SET_NUMBER (lhs,
 		SWFDEC_AS_VALUE_GET_NUMBER (lhs) + SWFDEC_AS_VALUE_GET_NUMBER (rhs));
@@ -636,8 +637,8 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun, SwfdecAbcScopeChain *outer_scope)
 	      (ltraits == SWFDEC_ABC_DATE_TRAITS (context)) ||
 	      (rtraits == SWFDEC_ABC_DATE_TRAITS (context))) {
 	    SWFDEC_AS_VALUE_SET_STRING (lhs, swfdec_as_str_concat (context, 
-		swfdec_as_value_to_string (context, lhs), 
-		swfdec_as_value_to_string (context, rhs)));
+		swfdec_abc_value_to_string (context, lhs), 
+		swfdec_abc_value_to_string (context, rhs)));
 	    continue;
 	  }
 	  if ((ltraits == SWFDEC_ABC_XML_TRAITS (context) || ltraits == SWFDEC_ABC_XML_LIST_TRAITS (context)) &&
@@ -650,18 +651,18 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun, SwfdecAbcScopeChain *outer_scope)
 	  swfdec_as_value_to_primitive (&rtmp);
 	  if (SWFDEC_AS_VALUE_IS_STRING (&ltmp) || SWFDEC_AS_VALUE_IS_STRING (&rtmp)) {
 	    SWFDEC_AS_VALUE_SET_STRING (lhs, swfdec_as_str_concat (context, 
-		swfdec_as_value_to_string (context, &ltmp), 
-		swfdec_as_value_to_string (context, &rtmp)));
+		swfdec_abc_value_to_string (context, &ltmp), 
+		swfdec_abc_value_to_string (context, &rtmp)));
 	  } else {
 	    SWFDEC_AS_VALUE_SET_NUMBER (lhs,
-		swfdec_as_value_to_number (context, lhs) + swfdec_as_value_to_number (context, rhs));
+		swfdec_abc_value_to_number (context, lhs) + swfdec_abc_value_to_number (context, rhs));
 	  }
 	}
 	continue;
       case SWFDEC_ABC_OPCODE_ADD_I:
 	val = swfdec_as_stack_peek (context, 2);
-	SWFDEC_AS_VALUE_SET_INT (val, swfdec_as_value_to_integer (context, val) +
-	      swfdec_as_value_to_integer (context, swfdec_as_stack_pop (context)));
+	SWFDEC_AS_VALUE_SET_INT (val, swfdec_abc_value_to_integer (context, val) +
+	      swfdec_abc_value_to_integer (context, swfdec_as_stack_pop (context)));
 	break;
       case SWFDEC_ABC_OPCODE_CALL_PROPERTY:
       case SWFDEC_ABC_OPCODE_CALL_PROP_LEX:
@@ -696,7 +697,7 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun, SwfdecAbcScopeChain *outer_scope)
 	  if (!swfdec_abc_traits_coerce (traits, val)) {
 	    swfdec_as_context_throw_abc (context, SWFDEC_ABC_TYPE_REFERENCE_ERROR,
 		"Type Coercion failed: cannot convert %s to %s.", 
-		swfdec_as_value_get_type_name (val), traits->name);
+		swfdec_abc_value_get_type_name (val), traits->name);
 	    break;
 	  }
 	}
@@ -714,7 +715,7 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun, SwfdecAbcScopeChain *outer_scope)
 	  SWFDEC_AS_VALUE_SET_NULL (val);
 	} else if (!SWFDEC_AS_VALUE_IS_NULL (val)) {
 	  SWFDEC_AS_VALUE_SET_STRING (val,
-	      swfdec_as_value_to_string (context, val));
+	      swfdec_abc_value_to_string (context, val));
 	}
 	/* else NULL stays the same */
 	continue;
@@ -739,8 +740,8 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun, SwfdecAbcScopeChain *outer_scope)
 	continue;
       case SWFDEC_ABC_OPCODE_DIVIDE:
 	val = swfdec_as_stack_peek (context, 1);
-	SWFDEC_AS_VALUE_SET_NUMBER (val, swfdec_as_value_to_number (context, val) 
-	    / swfdec_as_value_to_number (context, swfdec_as_stack_pop (context)));
+	SWFDEC_AS_VALUE_SET_NUMBER (val, swfdec_abc_value_to_number (context, val) 
+	    / swfdec_abc_value_to_number (context, swfdec_as_stack_pop (context)));
 	continue;
       case SWFDEC_ABC_OPCODE_DUP:
 	val = swfdec_as_stack_peek (context, 1);
@@ -827,7 +828,7 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun, SwfdecAbcScopeChain *outer_scope)
 	  if (!swfdec_abc_interpret_resolve_multiname (context, &mn, &pool->multinames[i]))
 	    break;
 	  object = swfdec_as_stack_pop (context);
-	  traits = swfdec_as_value_to_traits (context, object);
+	  traits = swfdec_abc_value_to_traits (context, object);
 	  /* FIXME: do we capture init vs set right? */
 	  if (fun == traits->construct) {
 	    if (!swfdec_abc_object_init_variable (context, object, &mn, val))
@@ -850,26 +851,26 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun, SwfdecAbcScopeChain *outer_scope)
       case SWFDEC_ABC_OPCODE_MODULO:
 	val = swfdec_as_stack_peek (context, 2);
 	SWFDEC_AS_VALUE_SET_NUMBER (val, fmod (
-	      swfdec_as_value_to_number (context, val),
-	      swfdec_as_value_to_number (context, swfdec_as_stack_pop (context))));
+	      swfdec_abc_value_to_number (context, val),
+	      swfdec_abc_value_to_number (context, swfdec_as_stack_pop (context))));
 	break;
       case SWFDEC_ABC_OPCODE_MULTIPLY:
 	val = swfdec_as_stack_peek (context, 2);
-	SWFDEC_AS_VALUE_SET_NUMBER (val, swfdec_as_value_to_number (context, val) *
-	      swfdec_as_value_to_number (context, swfdec_as_stack_pop (context)));
+	SWFDEC_AS_VALUE_SET_NUMBER (val, swfdec_abc_value_to_number (context, val) *
+	      swfdec_abc_value_to_number (context, swfdec_as_stack_pop (context)));
 	break;
       case SWFDEC_ABC_OPCODE_MULTIPLY_I:
 	val = swfdec_as_stack_peek (context, 2);
-	SWFDEC_AS_VALUE_SET_INT (val, swfdec_as_value_to_integer (context, val) *
-	      swfdec_as_value_to_integer (context, swfdec_as_stack_pop (context)));
+	SWFDEC_AS_VALUE_SET_INT (val, swfdec_abc_value_to_integer (context, val) *
+	      swfdec_abc_value_to_integer (context, swfdec_as_stack_pop (context)));
 	break;
       case SWFDEC_ABC_OPCODE_NEGATE:
 	val = swfdec_as_stack_peek (context, 1);
-	SWFDEC_AS_VALUE_SET_NUMBER (val, swfdec_as_value_to_number (context, val));
+	SWFDEC_AS_VALUE_SET_NUMBER (val, swfdec_abc_value_to_number (context, val));
 	break;
       case SWFDEC_ABC_OPCODE_NEGATE_I:
 	val = swfdec_as_stack_peek (context, 1);
-	SWFDEC_AS_VALUE_SET_INT (val, swfdec_as_value_to_integer (context, val));
+	SWFDEC_AS_VALUE_SET_INT (val, swfdec_abc_value_to_integer (context, val));
 	break;
       case SWFDEC_ABC_OPCODE_NEW_CLASS:
 	{
@@ -880,7 +881,7 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun, SwfdecAbcScopeChain *outer_scope)
 	  if (!swfdec_abc_traits_coerce (SWFDEC_ABC_CLASS_TRAITS (context), val)) {
 	    swfdec_as_context_throw_abc (context, SWFDEC_ABC_TYPE_REFERENCE_ERROR,
 		"Type Coercion failed: cannot convert %s to %s.", 
-		swfdec_as_value_get_type_name (val), "Class");
+		swfdec_abc_value_get_type_name (val), "Class");
 	    break;
 	  }
 	  chain = swfdec_abc_scope_chain_new (context, outer_scope, 
@@ -960,13 +961,13 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun, SwfdecAbcScopeChain *outer_scope)
 	continue;
       case SWFDEC_ABC_OPCODE_SUBTRACT:
 	val = swfdec_as_stack_peek (context, 2);
-	SWFDEC_AS_VALUE_SET_NUMBER (val, swfdec_as_value_to_number (context, val) -
-	      swfdec_as_value_to_number (context, swfdec_as_stack_pop (context)));
+	SWFDEC_AS_VALUE_SET_NUMBER (val, swfdec_abc_value_to_number (context, val) -
+	      swfdec_abc_value_to_number (context, swfdec_as_stack_pop (context)));
 	break;
       case SWFDEC_ABC_OPCODE_SUBTRACT_I:
 	val = swfdec_as_stack_peek (context, 2);
-	SWFDEC_AS_VALUE_SET_INT (val, swfdec_as_value_to_integer (context, val) -
-	      swfdec_as_value_to_integer (context, swfdec_as_stack_pop (context)));
+	SWFDEC_AS_VALUE_SET_INT (val, swfdec_abc_value_to_integer (context, val) -
+	      swfdec_abc_value_to_integer (context, swfdec_as_stack_pop (context)));
 	break;
       case SWFDEC_ABC_OPCODE_PUSH_TRUE:
 	SWFDEC_AS_VALUE_SET_BOOLEAN (swfdec_as_stack_push (context), TRUE);

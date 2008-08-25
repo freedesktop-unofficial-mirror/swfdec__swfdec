@@ -458,39 +458,7 @@ swfdec_as_value_to_debug (const SwfdecAsValue *value)
   }
 }
 
-const char *
-swfdec_as_value_get_type_name (const SwfdecAsValue *value)
-{
-  g_return_val_if_fail (SWFDEC_IS_AS_VALUE (value), NULL);
-
-  switch (value->type) {
-    case SWFDEC_AS_TYPE_STRING:
-      return SWFDEC_AS_STR_String;
-    case SWFDEC_AS_TYPE_UNDEFINED:
-      return SWFDEC_AS_STR_void;
-    case SWFDEC_AS_TYPE_BOOLEAN:
-      return SWFDEC_AS_STR_Boolean;
-    case SWFDEC_AS_TYPE_NULL:
-      return SWFDEC_AS_STR_null;
-    case SWFDEC_AS_TYPE_NUMBER:
-      return SWFDEC_AS_STR_Number;
-    case SWFDEC_AS_TYPE_OBJECT:
-      {
-	SwfdecAsObject *object = SWFDEC_AS_VALUE_GET_OBJECT (value);
-	if (SWFDEC_IS_ABC_OBJECT (object))
-	  return SWFDEC_ABC_OBJECT (object)->traits->name;
-	return SWFDEC_AS_STR_Object;
-      }
-    case SWFDEC_AS_TYPE_NAMESPACE:
-      return SWFDEC_AS_STR_Namespace;
-    case SWFDEC_AS_TYPE_INT:
-    default:
-      g_assert_not_reached ();
-      return NULL;
-  }
-}
-
-static double
+double
 swfdec_as_string_to_number (SwfdecAsContext *context, const char *s)
 {
   char *end;
