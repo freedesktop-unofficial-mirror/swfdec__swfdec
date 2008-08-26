@@ -429,7 +429,7 @@ swfdec_abc_function_call (SwfdecAbcFunction *fun, SwfdecAbcScopeChain *scope,
     return FALSE;
 
   for (i = 0; i <= MIN (argc, fun->n_args); i++) {
-    if (!swfdec_abc_traits_coerce (fun->args[i].traits, &argv[i])) {
+    if (fun->args[i].traits && !swfdec_abc_traits_coerce (fun->args[i].traits, &argv[i])) {
       swfdec_as_context_throw_abc (context, SWFDEC_ABC_TYPE_TYPE_ERROR, 
 	"Type Coercion failed: cannot convert %s to %s.",
 	swfdec_abc_value_get_type_name (&argv[i]), fun->args[i].traits->name);
