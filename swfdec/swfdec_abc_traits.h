@@ -134,6 +134,8 @@ const SwfdecAbcTrait *	swfdec_abc_traits_find_trait		(SwfdecAbcTraits *	traits,
 								 const char *		name);
 const SwfdecAbcTrait *	swfdec_abc_traits_find_trait_multi	(SwfdecAbcTraits *	traits,
 								 const SwfdecAbcMultiname *multi);
+SwfdecAbcTraits *	swfdec_abc_traits_get_slot_traits	(SwfdecAbcTraits *	traits,
+								 guint			slot);
 
 gboolean		swfdec_abc_traits_is_traits		(SwfdecAbcTraits *	traits,
 								 SwfdecAbcTraits *	parent);

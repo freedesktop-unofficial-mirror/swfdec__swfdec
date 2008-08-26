@@ -1027,6 +1027,21 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun, SwfdecAbcScopeChain *outer_scope)
 	val = swfdec_as_stack_peek (context, 1);
 	SWFDEC_AS_VALUE_SET_INT (val, swfdec_abc_value_to_integer (context, val));
 	break;
+      case SWFDEC_ABC_OPCODE_NEW_ACTIVATION:
+	{
+	  SwfdecAbcObject *object;
+	  object = swfdec_abc_object_new (fun->activation, outer_scope);
+	  if (fun->activation->construct) {
+	    SwfdecAsValue tmp;
+	    SWFDEC_AS_VALUE_SET_OBJECT (&tmp, SWFDEC_AS_OBJECT (object));
+	    if (!swfdec_abc_function_call (fun->activation->construct,
+		  outer_scope, 0, &tmp, &tmp))
+	      break;
+	  }
+	  SWFDEC_AS_VALUE_SET_OBJECT (swfdec_as_stack_push (context),
+	      SWFDEC_AS_OBJECT (object));
+	}
+	continue;
       case SWFDEC_ABC_OPCODE_NEW_CLASS:
 	{
 	  SwfdecAbcClass *classp;
@@ -1171,6 +1186,18 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun, SwfdecAbcScopeChain *outer_scope)
 	    !swfdec_abc_object_set_variable (context, swfdec_as_stack_pop (context), &mn, val))
 	  break;
 	continue;
+      case SWFDEC_ABC_OPCODE_SET_SLOT:
+	{
+	  SwfdecAbcObject *object;
+	  i = swfdec_bits_get_vu32 (&bits) - 1;
+	  val = swfdec_as_stack_pop (context);
+	  if (swfdec_abc_interpreter_throw_null (context, swfdec_as_stack_peek (context, 1)))
+	    break;
+	  object = SWFDEC_ABC_OBJECT (SWFDEC_AS_VALUE_GET_OBJECT (swfdec_as_stack_pop (context)));
+	  swfdec_abc_traits_coerce (swfdec_abc_traits_get_slot_traits (object->traits, i), val);
+	  object->slots[i] = *val;
+	}
+	continue;
       case SWFDEC_ABC_OPCODE_STRICT_EQUALS:
 	{
 	  SwfdecAbcComparison comp;
@@ -1256,7 +1283,6 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun, SwfdecAbcScopeChain *outer_scope)
       case SWFDEC_ABC_OPCODE_NEXT_NAME:
       case SWFDEC_ABC_OPCODE_NEXT_VALUE:
       case SWFDEC_ABC_OPCODE_NEW_ARRAY:
-      case SWFDEC_ABC_OPCODE_NEW_ACTIVATION:
       case SWFDEC_ABC_OPCODE_NEW_CATCH:
       case SWFDEC_ABC_OPCODE_NEW_OBJECT:
       case SWFDEC_ABC_OPCODE_NOP:
@@ -1266,7 +1292,6 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun, SwfdecAbcScopeChain *outer_scope)
       case SWFDEC_ABC_OPCODE_RSHIFT:
       case SWFDEC_ABC_OPCODE_SEND_ENTER:
       case SWFDEC_ABC_OPCODE_SET_GLOBAL_SLOT:
-      case SWFDEC_ABC_OPCODE_SET_SLOT:
       case SWFDEC_ABC_OPCODE_SET_SUPER:
       case SWFDEC_ABC_OPCODE_SWEEP:
       case SWFDEC_ABC_OPCODE_THROW:

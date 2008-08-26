@@ -442,3 +442,28 @@ swfdec_abc_traits_coerce (SwfdecAbcTraits *traits, SwfdecAsValue *val)
   return swfdec_abc_value_is_traits (val, traits);
 }
 
+SwfdecAbcTraits *
+swfdec_abc_traits_get_slot_traits (SwfdecAbcTraits *traits, guint slot)
+{
+  SwfdecAbcTrait *trait;
+  guint i, slot_id, const_id;
+
+  g_return_val_if_fail (SWFDEC_IS_ABC_TRAITS (traits), NULL);
+  g_return_val_if_fail (traits->resolved, NULL);
+  g_return_val_if_fail (slot < traits->n_slots, NULL);
+
+  while (traits->base && traits->base->n_slots > slot)
+    traits = traits->base;
+
+  const_id = SWFDEC_ABC_BINDING_NEW (SWFDEC_ABC_TRAIT_CONST, slot);
+  slot_id = SWFDEC_ABC_BINDING_NEW (SWFDEC_ABC_TRAIT_SLOT, slot);
+  for (i = 0; i < traits->n_traits; i++) {
+    trait = &traits->traits[i];
+    if (trait->type == slot_id || trait->type == const_id)
+      return trait->traits;
+  }
+
+  g_assert_not_reached ();
+  return NULL;
+}
+
