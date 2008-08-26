@@ -92,6 +92,13 @@ gboolean		swfdec_abc_object_call_variable	(SwfdecAsContext *		context,
 							 guint				argc,
 							 SwfdecAsValue *		argv,
 							 SwfdecAsValue *		ret);
+gboolean		swfdec_abc_object_construct_variable
+							(SwfdecAsContext *		context,
+							 const SwfdecAsValue *		object,
+							 const SwfdecAbcMultiname *	mn,
+							 guint				argc,
+							 SwfdecAsValue *		argv,
+							 SwfdecAsValue *		ret);
 
 
 G_END_DECLS

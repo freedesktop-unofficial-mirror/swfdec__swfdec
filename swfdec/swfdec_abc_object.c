@@ -377,7 +377,7 @@ swfdec_abc_object_init_variable (SwfdecAsContext *context, const SwfdecAsValue *
 }
 
 gboolean
-swfdec_abc_object_call_variable	(SwfdecAsContext *context, const SwfdecAsValue *object,
+swfdec_abc_object_call_variable (SwfdecAsContext *context, const SwfdecAsValue *object,
     const SwfdecAbcMultiname *mn, guint argc, SwfdecAsValue *argv, SwfdecAsValue *ret)
 {
   SwfdecAbcTraits *traits;
@@ -421,6 +421,23 @@ swfdec_abc_object_call_variable	(SwfdecAsContext *context, const SwfdecAsValue *
       return FALSE;
     }
   }
+}
+
+gboolean
+swfdec_abc_object_construct_variable (SwfdecAsContext *context, const SwfdecAsValue *object,
+    const SwfdecAbcMultiname *mn, guint argc, SwfdecAsValue *argv, SwfdecAsValue *ret)
+{
+  SwfdecAsValue tmp;
+
+  if (!swfdec_abc_object_get_variable (context, object, mn, &tmp))
+    return FALSE;
+  if (!SWFDEC_AS_VALUE_IS_OBJECT (&tmp)) {
+    swfdec_as_context_throw_abc (context, SWFDEC_ABC_TYPE_TYPE_ERROR,
+	"Instantiation attempted on a non-constructor.");
+    return FALSE;
+  }
+  return swfdec_abc_object_construct (SWFDEC_ABC_OBJECT (SWFDEC_AS_VALUE_GET_OBJECT (&tmp)),
+      argc, argv, ret);
 }
 
 gboolean

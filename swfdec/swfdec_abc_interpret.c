@@ -680,7 +680,7 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun, SwfdecAbcScopeChain *outer_scope)
 	  swfdec_as_stack_push_n (context, argc);
 	  if (opcode == SWFDEC_ABC_OPCODE_CALL_PROP_LEX)
 	    SWFDEC_AS_VALUE_SET_NULL (val);
-	  if (!swfdec_abc_object_call_variable (context, &tmp, &mn, argc, val, &tmp))
+	  if (!swfdec_abc_object_call_variable (context, &tmp, &mn, argc, val, val))
 	    break;
 	  swfdec_as_stack_pop_n (context, argc);
 	  if (opcode == SWFDEC_ABC_OPCODE_CALL_PROP_VOID)
@@ -717,7 +717,37 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun, SwfdecAbcScopeChain *outer_scope)
 	  SWFDEC_AS_VALUE_SET_STRING (val,
 	      swfdec_abc_value_to_string (context, val));
 	}
-	/* else NULL stays the same */
+	/* else NULL: it stays the same */
+	continue;
+      case SWFDEC_ABC_OPCODE_CONSTRUCT:
+	i = swfdec_bits_get_vu32 (&bits);
+	val = swfdec_as_stack_peek (context, i + 1);
+	if (!SWFDEC_AS_VALUE_IS_OBJECT (val)) {
+	  swfdec_as_context_throw_abc (context, SWFDEC_ABC_TYPE_TYPE_ERROR,
+	      "Instantiation attempted on a non-constructor.");
+	  break;
+	}
+	if (!swfdec_abc_object_construct (SWFDEC_ABC_OBJECT (SWFDEC_AS_VALUE_GET_OBJECT (val)),
+	      i, val, val))
+	  break;
+	swfdec_as_stack_pop_n (context, i);
+	continue;
+      case SWFDEC_ABC_OPCODE_CONSTRUCT_PROP:
+	{
+	  SwfdecAsValue tmp;
+	  guint argc;
+	  i = swfdec_bits_get_vu32 (&bits);
+	  argc = swfdec_bits_get_vu32 (&bits);
+	  swfdec_as_stack_pop_n (context, argc);
+	  if (!swfdec_abc_interpret_resolve_multiname (context, &mn, &pool->multinames[i]))
+	    break;
+	  val = swfdec_as_stack_peek (context, 1);
+	  tmp = *val;
+	  swfdec_as_stack_push_n (context, argc);
+	  if (!swfdec_abc_object_construct_variable (context, &tmp, &mn, argc, val, val))
+	    break;
+	  swfdec_as_stack_pop_n (context, argc);
+	}
 	continue;
       case SWFDEC_ABC_OPCODE_CONSTRUCT_SUPER:
 	i = swfdec_bits_get_vu32 (&bits);
@@ -1239,8 +1269,6 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun, SwfdecAbcScopeChain *outer_scope)
       case SWFDEC_ABC_OPCODE_COERCE_I:
       case SWFDEC_ABC_OPCODE_COERCE_U:
       case SWFDEC_ABC_OPCODE_CONCAT:
-      case SWFDEC_ABC_OPCODE_CONSTRUCT:
-      case SWFDEC_ABC_OPCODE_CONSTRUCT_PROP:
       case SWFDEC_ABC_OPCODE_CONVERT_B:
       case SWFDEC_ABC_OPCODE_CONVERT_D:
       case SWFDEC_ABC_OPCODE_CONVERT_I:
