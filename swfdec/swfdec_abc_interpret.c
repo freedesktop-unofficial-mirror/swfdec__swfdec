@@ -747,6 +747,17 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun, SwfdecAbcScopeChain *outer_scope)
 	val = swfdec_as_stack_peek (context, 1);
 	*swfdec_as_stack_push (context) = *val;
 	continue;
+      case SWFDEC_ABC_OPCODE_EQUALS:
+	{
+	  SwfdecAbcComparison comp;
+	  val = swfdec_as_stack_peek (context, 2);
+	  comp = swfdec_abc_value_equals (context, val, swfdec_as_stack_pop (context));
+	  if (comp == SWFDEC_ABC_COMPARE_THROWN)
+	    break;
+	  g_assert (comp == SWFDEC_ABC_COMPARE_EQUAL || comp == SWFDEC_ABC_COMPARE_NOT_EQUAL);
+	  SWFDEC_AS_VALUE_SET_BOOLEAN (val, comp == SWFDEC_ABC_COMPARE_EQUAL);
+	}
+	continue;
       case SWFDEC_ABC_OPCODE_FIND_PROP_STRICT:
       case SWFDEC_ABC_OPCODE_FIND_PROPERTY:
 	i = swfdec_bits_get_vu32 (&bits);
@@ -818,6 +829,150 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun, SwfdecAbcScopeChain *outer_scope)
 	if (swfdec_abc_interpreter_throw_null (context, val))
 	  break;
 	*val = SWFDEC_ABC_OBJECT (SWFDEC_AS_VALUE_GET_OBJECT (val))->slots[i - 1];
+	continue;
+      case SWFDEC_ABC_OPCODE_IFEQ:
+	{
+	  SwfdecAbcComparison comp;
+	  i = swfdec_bits_get_s24 (&bits);
+	  val = swfdec_as_stack_pop (context);
+	  comp = swfdec_abc_value_equals (context, swfdec_as_stack_pop (context), val);
+	  if (comp == SWFDEC_ABC_COMPARE_THROWN ||
+	      (comp == SWFDEC_ABC_COMPARE_EQUAL && !swfdec_abc_interpret_jump (context, &bits, i)))
+	    break;
+	}
+	continue;
+      case SWFDEC_ABC_OPCODE_IFFALSE:
+	i = swfdec_bits_get_s24 (&bits);
+	if (!swfdec_as_value_to_boolean (context, swfdec_as_stack_pop (context)) &&
+	    !swfdec_abc_interpret_jump (context, &bits, i))
+	  break;
+	continue;
+      case SWFDEC_ABC_OPCODE_IFGE:
+	{
+	  SwfdecAbcComparison comp;
+	  i = swfdec_bits_get_s24 (&bits);
+	  val = swfdec_as_stack_pop (context);
+	  comp = swfdec_abc_value_compare (context, swfdec_as_stack_pop (context), val);
+	  if (comp == SWFDEC_ABC_COMPARE_THROWN ||
+	      (comp != SWFDEC_ABC_COMPARE_GREATER && !swfdec_abc_interpret_jump (context, &bits, i)))
+	    break;
+	}
+	continue;
+      case SWFDEC_ABC_OPCODE_IFGT:
+	{
+	  SwfdecAbcComparison comp;
+	  i = swfdec_bits_get_s24 (&bits);
+	  val = swfdec_as_stack_pop (context);
+	  comp = swfdec_abc_value_compare (context, val, swfdec_as_stack_pop (context));
+	  if (comp == SWFDEC_ABC_COMPARE_THROWN ||
+	      (comp == SWFDEC_ABC_COMPARE_LOWER && !swfdec_abc_interpret_jump (context, &bits, i)))
+	    break;
+	}
+	continue;
+      case SWFDEC_ABC_OPCODE_IFLE:
+	{
+	  SwfdecAbcComparison comp;
+	  i = swfdec_bits_get_s24 (&bits);
+	  val = swfdec_as_stack_pop (context);
+	  comp = swfdec_abc_value_compare (context, val, swfdec_as_stack_pop (context));
+	  if (comp == SWFDEC_ABC_COMPARE_THROWN ||
+	      (comp == SWFDEC_ABC_COMPARE_GREATER && !swfdec_abc_interpret_jump (context, &bits, i)))
+	    break;
+	}
+	continue;
+      case SWFDEC_ABC_OPCODE_IFLT:
+	{
+	  SwfdecAbcComparison comp;
+	  i = swfdec_bits_get_s24 (&bits);
+	  val = swfdec_as_stack_pop (context);
+	  comp = swfdec_abc_value_compare (context, swfdec_as_stack_pop (context), val);
+	  if (comp == SWFDEC_ABC_COMPARE_THROWN ||
+	      (comp == SWFDEC_ABC_COMPARE_LOWER && !swfdec_abc_interpret_jump (context, &bits, i)))
+	    break;
+	}
+	continue;
+      case SWFDEC_ABC_OPCODE_IFNE:
+	{
+	  SwfdecAbcComparison comp;
+	  i = swfdec_bits_get_s24 (&bits);
+	  val = swfdec_as_stack_pop (context);
+	  comp = swfdec_abc_value_equals (context, swfdec_as_stack_pop (context), val);
+	  if (comp == SWFDEC_ABC_COMPARE_THROWN ||
+	      (comp == SWFDEC_ABC_COMPARE_NOT_EQUAL && !swfdec_abc_interpret_jump (context, &bits, i)))
+	    break;
+	}
+	continue;
+      case SWFDEC_ABC_OPCODE_IFNLE:
+	{
+	  SwfdecAbcComparison comp;
+	  i = swfdec_bits_get_s24 (&bits);
+	  val = swfdec_as_stack_pop (context);
+	  comp = swfdec_abc_value_compare (context, val, swfdec_as_stack_pop (context));
+	  if (comp == SWFDEC_ABC_COMPARE_THROWN ||
+	      (comp != SWFDEC_ABC_COMPARE_GREATER && !swfdec_abc_interpret_jump (context, &bits, i)))
+	    break;
+	}
+	continue;
+      case SWFDEC_ABC_OPCODE_IFNLT:
+	{
+	  SwfdecAbcComparison comp;
+	  i = swfdec_bits_get_s24 (&bits);
+	  val = swfdec_as_stack_pop (context);
+	  comp = swfdec_abc_value_compare (context, swfdec_as_stack_pop (context), val);
+	  if (comp == SWFDEC_ABC_COMPARE_THROWN ||
+	      (comp != SWFDEC_ABC_COMPARE_LOWER && !swfdec_abc_interpret_jump (context, &bits, i)))
+	    break;
+	}
+	continue;
+      case SWFDEC_ABC_OPCODE_IFNGE:
+	{
+	  SwfdecAbcComparison comp;
+	  i = swfdec_bits_get_s24 (&bits);
+	  val = swfdec_as_stack_pop (context);
+	  comp = swfdec_abc_value_compare (context, swfdec_as_stack_pop (context), val);
+	  if (comp == SWFDEC_ABC_COMPARE_THROWN ||
+	      (comp != SWFDEC_ABC_COMPARE_GREATER && !swfdec_abc_interpret_jump (context, &bits, i)))
+	    break;
+	}
+	continue;
+      case SWFDEC_ABC_OPCODE_IFNGT:
+	{
+	  SwfdecAbcComparison comp;
+	  i = swfdec_bits_get_s24 (&bits);
+	  val = swfdec_as_stack_pop (context);
+	  comp = swfdec_abc_value_compare (context, val, swfdec_as_stack_pop (context));
+	  if (comp == SWFDEC_ABC_COMPARE_THROWN ||
+	      (comp != SWFDEC_ABC_COMPARE_LOWER && !swfdec_abc_interpret_jump (context, &bits, i)))
+	    break;
+	}
+	continue;
+      case SWFDEC_ABC_OPCODE_IFSTRICTEQ:
+	{
+	  SwfdecAbcComparison comp;
+	  i = swfdec_bits_get_s24 (&bits);
+	  val = swfdec_as_stack_pop (context);
+	  comp = swfdec_abc_value_strict_equals (context, swfdec_as_stack_pop (context), val);
+	  if (comp == SWFDEC_ABC_COMPARE_THROWN ||
+	      (comp == SWFDEC_ABC_COMPARE_EQUAL && !swfdec_abc_interpret_jump (context, &bits, i)))
+	    break;
+	}
+	continue;
+      case SWFDEC_ABC_OPCODE_IFSTRICTNE:
+	{
+	  SwfdecAbcComparison comp;
+	  i = swfdec_bits_get_s24 (&bits);
+	  val = swfdec_as_stack_pop (context);
+	  comp = swfdec_abc_value_strict_equals (context, swfdec_as_stack_pop (context), val);
+	  if (comp == SWFDEC_ABC_COMPARE_THROWN ||
+	      (comp == SWFDEC_ABC_COMPARE_NOT_EQUAL && !swfdec_abc_interpret_jump (context, &bits, i)))
+	    break;
+	}
+	continue;
+      case SWFDEC_ABC_OPCODE_IFTRUE:
+	i = swfdec_bits_get_s24 (&bits);
+	if (swfdec_as_value_to_boolean (context, swfdec_as_stack_pop (context)) &&
+	    !swfdec_abc_interpret_jump (context, &bits, i))
+	  break;
 	continue;
       case SWFDEC_ABC_OPCODE_INIT_PROPERTY:
 	{
@@ -1016,6 +1171,15 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun, SwfdecAbcScopeChain *outer_scope)
 	    !swfdec_abc_object_set_variable (context, swfdec_as_stack_pop (context), &mn, val))
 	  break;
 	continue;
+      case SWFDEC_ABC_OPCODE_STRICT_EQUALS:
+	{
+	  SwfdecAbcComparison comp;
+	  val = swfdec_as_stack_peek (context, 2);
+	  comp = swfdec_abc_value_strict_equals (context, val, swfdec_as_stack_pop (context));
+	  g_assert (comp == SWFDEC_ABC_COMPARE_EQUAL || comp == SWFDEC_ABC_COMPARE_NOT_EQUAL);
+	  SWFDEC_AS_VALUE_SET_BOOLEAN (val, comp == SWFDEC_ABC_COMPARE_EQUAL);
+	}
+	continue;
       case SWFDEC_ABC_OPCODE_SWAP:
 	{
 	  SwfdecAsValue tmp = *swfdec_as_stack_peek (context, 1);
@@ -1065,7 +1229,6 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun, SwfdecAbcScopeChain *outer_scope)
       case SWFDEC_ABC_OPCODE_DOUBLE_TO_ATOM:
       case SWFDEC_ABC_OPCODE_DXNS:
       case SWFDEC_ABC_OPCODE_DXNS_LATE:
-      case SWFDEC_ABC_OPCODE_EQUALS:
       case SWFDEC_ABC_OPCODE_ESC_XATTR:
       case SWFDEC_ABC_OPCODE_ESC_XELEM:
       case SWFDEC_ABC_OPCODE_FIND_DEF:
@@ -1076,20 +1239,6 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun, SwfdecAbcScopeChain *outer_scope)
       case SWFDEC_ABC_OPCODE_GREATER_THAN:
       case SWFDEC_ABC_OPCODE_HAS_NEXT:
       case SWFDEC_ABC_OPCODE_HAS_NEXT2:
-      case SWFDEC_ABC_OPCODE_IFEQ:
-      case SWFDEC_ABC_OPCODE_IFFALSE:
-      case SWFDEC_ABC_OPCODE_IFGE:
-      case SWFDEC_ABC_OPCODE_IFGT:
-      case SWFDEC_ABC_OPCODE_IFLE:
-      case SWFDEC_ABC_OPCODE_IFLT:
-      case SWFDEC_ABC_OPCODE_IFNE:
-      case SWFDEC_ABC_OPCODE_IFNLE:
-      case SWFDEC_ABC_OPCODE_IFNLT:
-      case SWFDEC_ABC_OPCODE_IFNGE:
-      case SWFDEC_ABC_OPCODE_IFNGT:
-      case SWFDEC_ABC_OPCODE_IFSTRICTEQ:
-      case SWFDEC_ABC_OPCODE_IFSTRICTNE:
-      case SWFDEC_ABC_OPCODE_IFTRUE:
       case SWFDEC_ABC_OPCODE_IN:
       case SWFDEC_ABC_OPCODE_INC_LOCAL:
       case SWFDEC_ABC_OPCODE_INCLOCAL_I:
@@ -1119,7 +1268,6 @@ swfdec_abc_interpret (SwfdecAbcFunction *fun, SwfdecAbcScopeChain *outer_scope)
       case SWFDEC_ABC_OPCODE_SET_GLOBAL_SLOT:
       case SWFDEC_ABC_OPCODE_SET_SLOT:
       case SWFDEC_ABC_OPCODE_SET_SUPER:
-      case SWFDEC_ABC_OPCODE_STRICT_EQUALS:
       case SWFDEC_ABC_OPCODE_SWEEP:
       case SWFDEC_ABC_OPCODE_THROW:
       case SWFDEC_ABC_OPCODE_TIMESTAMP:

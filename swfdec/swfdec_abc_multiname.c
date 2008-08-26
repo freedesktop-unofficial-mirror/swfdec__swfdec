@@ -30,15 +30,26 @@
 #include "swfdec_debug.h"
 
 void
-swfdec_abc_multiname_init (SwfdecAbcMultiname *multi, const char *name,
-    SwfdecAbcNamespace *ns, SwfdecAbcNsSet *set)
+swfdec_abc_multiname_init (SwfdecAbcMultiname *multi, SwfdecAbcNamespace *ns,
+    const char *name)
 {
   g_return_if_fail (multi != NULL);
-  g_return_if_fail (ns == NULL || set == NULL);
   g_return_if_fail (ns == NULL || ns == SWFDEC_ABC_MULTINAME_ANY || SWFDEC_IS_ABC_NAMESPACE (ns));
 
   multi->name = name;
   multi->ns = ns;
+  multi->nsset = NULL;
+}
+
+void
+swfdec_abc_multiname_init_set (SwfdecAbcMultiname *multi, SwfdecAbcNsSet *set, 
+    const char *name)
+{
+  g_return_if_fail (multi != NULL);
+  g_return_if_fail (set != NULL);
+
+  multi->name = name;
+  multi->ns = NULL;
   multi->nsset = set;
 }
 

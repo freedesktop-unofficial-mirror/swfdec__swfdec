@@ -64,8 +64,7 @@ SwfdecAbcObject *	swfdec_abc_object_new_from_class(SwfdecAbcClass *		classp);
 
 gboolean		swfdec_abc_object_default_value	(SwfdecAbcObject *		object,
 							 SwfdecAsValue *		default_value);
-gboolean		swfdec_abc_object_to_string	(SwfdecAbcObject *		object,
-							 SwfdecAsValue *		string);
+const char *		swfdec_abc_object_to_string	(SwfdecAbcObject *		object);
 gboolean		swfdec_abc_object_call		(SwfdecAbcObject *		object,
 							 guint				argc,
 							 SwfdecAsValue *		argv,

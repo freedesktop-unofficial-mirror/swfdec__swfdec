@@ -28,10 +28,11 @@ G_BEGIN_DECLS
 
 typedef enum {
   SWFDEC_ABC_COMPARE_UNDEFINED,
+  SWFDEC_ABC_COMPARE_NOT_EQUAL = SWFDEC_ABC_COMPARE_UNDEFINED,
   SWFDEC_ABC_COMPARE_THROWN,
   SWFDEC_ABC_COMPARE_LOWER,
   SWFDEC_ABC_COMPARE_EQUAL,
-  SWFDEC_ABC_COMPARE_GREATER
+  SWFDEC_ABC_COMPARE_GREATER,
 } SwfdecAbcComparison;
 
 gboolean		swfdec_abc_value_to_boolean	(SwfdecAsContext *	context,
@@ -49,6 +50,12 @@ const char *		swfdec_abc_value_to_string	(SwfdecAsContext *	context,
 const char *		swfdec_abc_value_get_type_name	(const SwfdecAsValue *	value);
 
 SwfdecAbcComparison	swfdec_abc_value_compare	(SwfdecAsContext *	context,
+							 const SwfdecAsValue *	lval,
+							 const SwfdecAsValue *	rval);
+SwfdecAbcComparison	swfdec_abc_value_equals		(SwfdecAsContext *	context,
+							 const SwfdecAsValue *	lval,
+							 const SwfdecAsValue *	rval);
+SwfdecAbcComparison	swfdec_abc_value_strict_equals	(SwfdecAsContext *	context,
 							 const SwfdecAsValue *	lval,
 							 const SwfdecAsValue *	rval);
 

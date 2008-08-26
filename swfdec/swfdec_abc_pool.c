@@ -335,9 +335,8 @@ swfdec_abc_pool_parse_constants (SwfdecAbcPool *pool, SwfdecBits *bits)
 	  if (nameid >= pool->n_strings)
 	    THROW (pool, "Cpool index %u is out of range %u.", nameid, pool->n_strings);
 	  swfdec_abc_multiname_init (&pool->multinames[i],
-	      nameid == 0 ? SWFDEC_ABC_MULTINAME_ANY : pool->strings[nameid],
 	      nsid == 0 ? SWFDEC_ABC_MULTINAME_ANY : pool->namespaces[nsid],
-	      NULL);
+	      nameid == 0 ? SWFDEC_ABC_MULTINAME_ANY : pool->strings[nameid]);
 	  break;
 	case 0x10:
 	  SWFDEC_FIXME ("implement attributes");
@@ -346,14 +345,14 @@ swfdec_abc_pool_parse_constants (SwfdecAbcPool *pool, SwfdecBits *bits)
 	  if (nameid >= pool->n_strings)
 	    THROW (pool, "Cpool index %u is out of range %u.", nameid, pool->n_strings);
 	  swfdec_abc_multiname_init (&pool->multinames[i],
-	      nameid == 0 ? SWFDEC_ABC_MULTINAME_ANY : pool->strings[nameid],
-	      NULL, NULL);
+	      NULL,
+	      nameid == 0 ? SWFDEC_ABC_MULTINAME_ANY : pool->strings[nameid]);
 	  break;
 	case 0x12:
 	  SWFDEC_FIXME ("implement attributes");
 	case 0x11:
 	  swfdec_abc_multiname_init (&pool->multinames[i],
-	      NULL, NULL, NULL);
+	      NULL, NULL);
 	  break;
 	case 0x0E:
 	  SWFDEC_FIXME ("implement attributes");
@@ -364,9 +363,8 @@ swfdec_abc_pool_parse_constants (SwfdecAbcPool *pool, SwfdecBits *bits)
 	  READ_U30 (nsid, bits);
 	  if (nsid >= pool->n_nssets)
 	    THROW (pool, "Cpool index %u is out of range %u.", nsid, pool->n_nssets);
-	  swfdec_abc_multiname_init (&pool->multinames[i],
-	      nameid == 0 ? SWFDEC_ABC_MULTINAME_ANY : pool->strings[nameid],
-	      NULL, pool->nssets[nsid]);
+	  swfdec_abc_multiname_init_set (&pool->multinames[i], pool->nssets[nsid],
+	      nameid == 0 ? SWFDEC_ABC_MULTINAME_ANY : pool->strings[nameid]);
 	  break;
 	case 0x1C:
 	  SWFDEC_FIXME ("implement attributes");
@@ -374,8 +372,7 @@ swfdec_abc_pool_parse_constants (SwfdecAbcPool *pool, SwfdecBits *bits)
 	  READ_U30 (nsid, bits);
 	  if (nsid >= pool->n_nssets)
 	    THROW (pool, "Cpool index %u is out of range %u.", nsid, pool->n_nssets);
-	  swfdec_abc_multiname_init (&pool->multinames[i],
-	      NULL, NULL, pool->nssets[nsid]);
+	  swfdec_abc_multiname_init_set (&pool->multinames[i], pool->nssets[nsid], NULL);
 	  break;
 	default:
 	  THROW (pool, "Cpool entry %u is wrong type.", i);

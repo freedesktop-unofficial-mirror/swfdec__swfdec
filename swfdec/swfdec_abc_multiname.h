@@ -35,9 +35,11 @@ struct _SwfdecAbcMultiname {
 };
 
 void			swfdec_abc_multiname_init		(SwfdecAbcMultiname *		multi,
-								 const char *			name,
 								 SwfdecAbcNamespace *		ns,
-								 SwfdecAbcNsSet *		set);
+								 const char *			name);
+void			swfdec_abc_multiname_init_set		(SwfdecAbcMultiname *		multi,
+								 SwfdecAbcNsSet *		set,
+								 const char *			name);
 void			swfdec_abc_multiname_init_from_string	(SwfdecAbcMultiname *		multi,
 								 SwfdecAsContext *		context,
 								 const char *			string);

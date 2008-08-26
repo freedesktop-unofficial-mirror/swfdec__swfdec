@@ -29,7 +29,9 @@
 #include "swfdec_abc_multiname.h"
 #include "swfdec_abc_scope_chain.h"
 #include "swfdec_abc_traits.h"
+#include "swfdec_abc_value.h"
 #include "swfdec_as_context.h"
+#include "swfdec_as_strings.h"
 #include "swfdec_debug.h"
 
 enum {
@@ -419,4 +421,72 @@ swfdec_abc_object_call_variable	(SwfdecAsContext *context, const SwfdecAsValue *
       return FALSE;
     }
   }
+}
+
+gboolean
+swfdec_abc_object_default_value	(SwfdecAbcObject *object, SwfdecAsValue *default_value)
+{
+  SwfdecAsContext *context;
+  SwfdecAbcMultiname mn;
+  SwfdecAsValue val;
+
+  g_return_val_if_fail (SWFDEC_IS_ABC_OBJECT (object), FALSE);
+  g_return_val_if_fail (default_value != NULL, FALSE);
+
+  context = swfdec_gc_object_get_context (object);
+
+  /* first, call toString - if it returns a primitive, return it */
+  swfdec_abc_multiname_init (&mn, context->public_ns, SWFDEC_AS_STR_valueOf);
+  SWFDEC_AS_VALUE_SET_OBJECT (&val, SWFDEC_AS_OBJECT (object));
+  if (!swfdec_abc_object_call_variable (context, &val, &mn, 0, &val, default_value))
+    return FALSE;
+  if (!SWFDEC_AS_VALUE_IS_OBJECT (default_value))
+    return TRUE;
+
+  /* second, call valueOf - if it returns a primitive, return it */
+  swfdec_abc_multiname_init (&mn, context->public_ns, SWFDEC_AS_STR_toString);
+  SWFDEC_AS_VALUE_SET_OBJECT (&val, SWFDEC_AS_OBJECT (object));
+  if (!swfdec_abc_object_call_variable (context, &val, &mn, 0, &val, default_value))
+    return FALSE;
+  if (!SWFDEC_AS_VALUE_IS_OBJECT (default_value))
+    return TRUE;
+
+  /* Object doesn't want to be a string, complain */
+  swfdec_as_context_throw_abc (context, SWFDEC_ABC_TYPE_TYPE_ERROR, 
+      "Cannot convert %s to primitive.", object->traits->name);
+  SWFDEC_AS_VALUE_SET_UNDEFINED (default_value);
+  return FALSE;
+}
+
+const char *
+swfdec_abc_object_to_string (SwfdecAbcObject *object)
+{
+  SwfdecAsContext *context;
+  SwfdecAbcMultiname mn;
+  SwfdecAsValue val, ret;
+
+  g_return_val_if_fail (SWFDEC_IS_ABC_OBJECT (object), FALSE);
+
+  context = swfdec_gc_object_get_context (object);
+
+  /* first, call toString - if it returns a primitive, return it */
+  swfdec_abc_multiname_init (&mn, context->public_ns, SWFDEC_AS_STR_toString);
+  SWFDEC_AS_VALUE_SET_OBJECT (&val, SWFDEC_AS_OBJECT (object));
+  if (!swfdec_abc_object_call_variable (context, &val, &mn, 0, &val, &ret))
+    return NULL;
+  if (!SWFDEC_AS_VALUE_IS_OBJECT (&ret))
+    return swfdec_abc_value_to_string (context, &ret);
+
+  /* second, call valueOf - if it returns a primitive, return it */
+  swfdec_abc_multiname_init (&mn, context->public_ns, SWFDEC_AS_STR_valueOf);
+  SWFDEC_AS_VALUE_SET_OBJECT (&val, SWFDEC_AS_OBJECT (object));
+  if (!swfdec_abc_object_call_variable (context, &val, &mn, 0, &val, &ret))
+    return NULL;
+  if (!SWFDEC_AS_VALUE_IS_OBJECT (&ret))
+    return swfdec_abc_value_to_string (context, &ret);
+
+  /* Object doesn't want to be a string, complain */
+  swfdec_as_context_throw_abc (context, SWFDEC_ABC_TYPE_TYPE_ERROR, 
+      "Cannot convert %s to primitive.", object->traits->name);
+  return NULL;
 }

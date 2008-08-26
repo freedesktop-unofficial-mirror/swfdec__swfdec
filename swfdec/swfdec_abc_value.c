@@ -119,7 +119,7 @@ swfdec_abc_value_to_number (SwfdecAsContext *context, const SwfdecAsValue *value
 gboolean
 swfdec_abc_value_to_primitive (SwfdecAsValue *dest, const SwfdecAsValue *src)
 {
-  g_return_val_if_fail (SWFDEC_IS_AS_VALUE (dest), FALSE);
+  g_return_val_if_fail (dest != NULL, FALSE);
   g_return_val_if_fail (SWFDEC_IS_AS_VALUE (src), FALSE);
 
   if (SWFDEC_AS_VALUE_IS_OBJECT (src)) {
@@ -149,13 +149,7 @@ swfdec_abc_value_to_string (SwfdecAsContext *context, const SwfdecAsValue *value
     case SWFDEC_AS_TYPE_STRING:
       return SWFDEC_AS_VALUE_GET_STRING (value);
     case SWFDEC_AS_TYPE_OBJECT:
-      {
-	SwfdecAsValue tmp;
-	if (!swfdec_abc_object_to_string (
-	      SWFDEC_ABC_OBJECT (SWFDEC_AS_VALUE_GET_OBJECT (value)), &tmp))
-	  return SWFDEC_AS_STR_EMPTY;
-	return swfdec_abc_value_to_string (context, &tmp);
-      }
+      return swfdec_abc_object_to_string (SWFDEC_ABC_OBJECT (SWFDEC_AS_VALUE_GET_OBJECT (value)));
     case SWFDEC_AS_TYPE_NAMESPACE:
       return SWFDEC_AS_VALUE_GET_NAMESPACE (value)->uri;
     case SWFDEC_AS_TYPE_INT:
@@ -222,6 +216,8 @@ swfdec_abc_value_compare (SwfdecAsContext *context, const SwfdecAsValue *lval,
       !swfdec_abc_value_to_primitive (&rtmp, rval))
     return SWFDEC_ABC_COMPARE_THROWN;
 
+  /* FIXME: need special code for XMLList here */
+
   if (SWFDEC_AS_VALUE_IS_STRING (&ltmp) && SWFDEC_AS_VALUE_IS_STRING (&rtmp)) {
     int comp = strcmp (SWFDEC_AS_VALUE_GET_STRING (&ltmp), 
 	SWFDEC_AS_VALUE_GET_STRING (&rtmp));
@@ -236,5 +232,137 @@ swfdec_abc_value_compare (SwfdecAsContext *context, const SwfdecAsValue *lval,
     return (l < r) ? SWFDEC_ABC_COMPARE_LOWER : 
       (l > r ? SWFDEC_ABC_COMPARE_GREATER : SWFDEC_ABC_COMPARE_EQUAL);
   }
+}
+
+SwfdecAbcComparison
+swfdec_abc_value_equals (SwfdecAsContext *context, const SwfdecAsValue *lval,
+    const SwfdecAsValue *rval)
+{
+  SwfdecAsValue tmp;
+  SwfdecAsValueType ltype, rtype;
+
+  g_return_val_if_fail (SWFDEC_IS_AS_CONTEXT (context), SWFDEC_ABC_COMPARE_UNDEFINED);
+  g_return_val_if_fail (lval != NULL, SWFDEC_ABC_COMPARE_UNDEFINED);
+  g_return_val_if_fail (rval != NULL, SWFDEC_ABC_COMPARE_UNDEFINED);
+
+  ltype = SWFDEC_AS_VALUE_GET_TYPE (lval);
+  rtype = SWFDEC_AS_VALUE_GET_TYPE (rval);
+
+  /* FIXME: need special code for XMLList here */
+
+  if (ltype == rtype) {
+    switch (ltype) {
+      case SWFDEC_AS_TYPE_UNDEFINED:
+      case SWFDEC_AS_TYPE_NULL:
+	return SWFDEC_ABC_COMPARE_EQUAL;
+      case SWFDEC_AS_TYPE_BOOLEAN:
+	return SWFDEC_AS_VALUE_GET_BOOLEAN (lval) == SWFDEC_AS_VALUE_GET_BOOLEAN (rval) ?
+	    SWFDEC_ABC_COMPARE_EQUAL : SWFDEC_ABC_COMPARE_NOT_EQUAL;
+      case SWFDEC_AS_TYPE_NUMBER:
+	return SWFDEC_AS_VALUE_GET_NUMBER (lval) == SWFDEC_AS_VALUE_GET_NUMBER (rval) ? 
+	    SWFDEC_ABC_COMPARE_EQUAL : SWFDEC_ABC_COMPARE_NOT_EQUAL;
+      case SWFDEC_AS_TYPE_STRING:
+	return SWFDEC_AS_VALUE_GET_STRING (lval) == SWFDEC_AS_VALUE_GET_STRING (rval) ? 
+	    SWFDEC_ABC_COMPARE_EQUAL : SWFDEC_ABC_COMPARE_NOT_EQUAL;
+      case SWFDEC_AS_TYPE_OBJECT:
+	/* FIXME: Need special code for QName and XMLList here */
+	return SWFDEC_AS_VALUE_GET_OBJECT (lval) == SWFDEC_AS_VALUE_GET_OBJECT (rval) ? 
+	    SWFDEC_ABC_COMPARE_EQUAL : SWFDEC_ABC_COMPARE_NOT_EQUAL;
+      case SWFDEC_AS_TYPE_NAMESPACE:
+	return swfdec_abc_namespace_equal (SWFDEC_AS_VALUE_GET_NAMESPACE (lval),
+	    SWFDEC_AS_VALUE_GET_NAMESPACE (rval)) ? 
+	    SWFDEC_ABC_COMPARE_EQUAL : SWFDEC_ABC_COMPARE_NOT_EQUAL;
+      case SWFDEC_AS_TYPE_INT:
+      default:
+	g_assert_not_reached ();
+	return SWFDEC_ABC_COMPARE_UNDEFINED;
+    }
+  }
+
+  if ((ltype == SWFDEC_AS_TYPE_UNDEFINED && rtype == SWFDEC_AS_TYPE_NULL) ||
+      (ltype == SWFDEC_AS_TYPE_NULL && rtype == SWFDEC_AS_TYPE_UNDEFINED))
+    return SWFDEC_ABC_COMPARE_EQUAL;
+
+  if (ltype == SWFDEC_AS_TYPE_NUMBER && rtype == SWFDEC_AS_TYPE_STRING) {
+    SWFDEC_AS_VALUE_SET_NUMBER (&tmp, swfdec_abc_value_to_number (context, rval));
+    return swfdec_abc_value_equals (context, lval, &tmp);
+  }
+  if (ltype == SWFDEC_AS_TYPE_STRING && rtype == SWFDEC_AS_TYPE_NUMBER) {
+    SWFDEC_AS_VALUE_SET_NUMBER (&tmp, swfdec_abc_value_to_number (context, lval));
+    return swfdec_abc_value_equals (context, &tmp, rval);
+  }
+
+  /* FIXME: need special code for XMLList here */
+
+  if (ltype == SWFDEC_AS_TYPE_BOOLEAN) {
+    SWFDEC_AS_VALUE_SET_NUMBER (&tmp, swfdec_abc_value_to_number (context, lval));
+    return swfdec_abc_value_equals (context, &tmp, rval);
+  }
+  if (rtype == SWFDEC_AS_TYPE_BOOLEAN) {
+    SWFDEC_AS_VALUE_SET_NUMBER (&tmp, swfdec_abc_value_to_number (context, rval));
+    return swfdec_abc_value_equals (context, lval, &tmp);
+  }
+
+  if (rtype == SWFDEC_AS_TYPE_OBJECT && 
+      (ltype == SWFDEC_AS_TYPE_NUMBER || ltype == SWFDEC_AS_TYPE_STRING)) {
+    if (!swfdec_abc_object_default_value (SWFDEC_ABC_OBJECT (SWFDEC_AS_VALUE_GET_OBJECT (rval)), &tmp))
+      return SWFDEC_ABC_COMPARE_THROWN;
+    SWFDEC_AS_VALUE_SET_NUMBER (&tmp, swfdec_abc_value_to_number (context, rval));
+    return swfdec_abc_value_equals (context, lval, &tmp);
+  }
+  if (ltype == SWFDEC_AS_TYPE_OBJECT && 
+      (rtype == SWFDEC_AS_TYPE_NUMBER || rtype == SWFDEC_AS_TYPE_STRING)) {
+    if (!swfdec_abc_object_default_value (SWFDEC_ABC_OBJECT (SWFDEC_AS_VALUE_GET_OBJECT (lval)), &tmp))
+      return SWFDEC_ABC_COMPARE_THROWN;
+    SWFDEC_AS_VALUE_SET_NUMBER (&tmp, swfdec_abc_value_to_number (context, lval));
+    return swfdec_abc_value_equals (context, &tmp, rval);
+  }
+  
+  return SWFDEC_ABC_COMPARE_NOT_EQUAL;
+}
+
+SwfdecAbcComparison
+swfdec_abc_value_strict_equals (SwfdecAsContext *context, const SwfdecAsValue *lval,
+    const SwfdecAsValue *rval)
+{
+  SwfdecAsValueType ltype, rtype;
+
+  g_return_val_if_fail (SWFDEC_IS_AS_CONTEXT (context), SWFDEC_ABC_COMPARE_UNDEFINED);
+  g_return_val_if_fail (lval != NULL, SWFDEC_ABC_COMPARE_UNDEFINED);
+  g_return_val_if_fail (rval != NULL, SWFDEC_ABC_COMPARE_UNDEFINED);
+
+  ltype = SWFDEC_AS_VALUE_GET_TYPE (lval);
+  rtype = SWFDEC_AS_VALUE_GET_TYPE (rval);
+
+  /* FIXME: need special code for XMLList here */
+
+  if (ltype == rtype) {
+    switch (ltype) {
+      case SWFDEC_AS_TYPE_UNDEFINED:
+      case SWFDEC_AS_TYPE_NULL:
+	return SWFDEC_ABC_COMPARE_EQUAL;
+      case SWFDEC_AS_TYPE_BOOLEAN:
+	return SWFDEC_AS_VALUE_GET_BOOLEAN (lval) == SWFDEC_AS_VALUE_GET_BOOLEAN (rval) ?
+	    SWFDEC_ABC_COMPARE_EQUAL : SWFDEC_ABC_COMPARE_NOT_EQUAL;
+      case SWFDEC_AS_TYPE_NUMBER:
+	return SWFDEC_AS_VALUE_GET_NUMBER (lval) == SWFDEC_AS_VALUE_GET_NUMBER (rval) ? 
+	    SWFDEC_ABC_COMPARE_EQUAL : SWFDEC_ABC_COMPARE_NOT_EQUAL;
+      case SWFDEC_AS_TYPE_STRING:
+	return SWFDEC_AS_VALUE_GET_STRING (lval) == SWFDEC_AS_VALUE_GET_STRING (rval) ? 
+	    SWFDEC_ABC_COMPARE_EQUAL : SWFDEC_ABC_COMPARE_NOT_EQUAL;
+      case SWFDEC_AS_TYPE_OBJECT:
+	/* FIXME: Need special code for XMLList here */
+	return SWFDEC_AS_VALUE_GET_OBJECT (lval) == SWFDEC_AS_VALUE_GET_OBJECT (rval) ? 
+	    SWFDEC_ABC_COMPARE_EQUAL : SWFDEC_ABC_COMPARE_NOT_EQUAL;
+      case SWFDEC_AS_TYPE_NAMESPACE:
+	return SWFDEC_AS_VALUE_GET_NAMESPACE (lval) == SWFDEC_AS_VALUE_GET_NAMESPACE (rval) ? 
+	    SWFDEC_ABC_COMPARE_EQUAL : SWFDEC_ABC_COMPARE_NOT_EQUAL;
+      case SWFDEC_AS_TYPE_INT:
+      default:
+	g_assert_not_reached ();
+	return SWFDEC_ABC_COMPARE_UNDEFINED;
+    }
+  }
+  return SWFDEC_ABC_COMPARE_NOT_EQUAL;
 }
 
