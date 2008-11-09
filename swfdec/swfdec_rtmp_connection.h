@@ -21,7 +21,7 @@
 #define _SWFDEC_RTMP_CONNECTION_H_
 
 #include <swfdec/swfdec.h>
-#include <swfdec/swfdec_gc_object.h>
+#include <swfdec/swfdec_as_relay.h>
 
 G_BEGIN_DECLS
 
@@ -40,7 +40,7 @@ typedef struct _SwfdecRtmpConnectionClass SwfdecRtmpConnectionClass;
 #define SWFDEC_RTMP_CONNECTION_GET_CLASS(obj)          (G_TYPE_INSTANCE_GET_CLASS ((obj), SWFDEC_TYPE_RTMP_CONNECTION, SwfdecRtmpConnectionClass))
 
 struct _SwfdecRtmpConnection {
-  SwfdecGcObject      	object;
+  SwfdecAsRelay		relay;
 
   SwfdecRtmpSocket *	socket;		/* socket we're using for read/write */
   /* FIXME: make this a GArray for size savings? Are 256 or 512 bytes really worth it? */
@@ -48,7 +48,7 @@ struct _SwfdecRtmpConnection {
 };
 
 struct _SwfdecRtmpConnectionClass {
-  SwfdecGcObjectClass	object_class;
+  SwfdecAsRelayClass	relay_class;
 };
 
 GType			swfdec_rtmp_connection_get_type	(void);

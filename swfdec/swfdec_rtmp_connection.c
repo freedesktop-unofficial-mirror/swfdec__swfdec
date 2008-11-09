@@ -26,7 +26,7 @@
 
 /*** SwfdecRtmpConnection ***/
 
-G_DEFINE_TYPE (SwfdecRtmpConnection, swfdec_rtmp_connection, SWFDEC_TYPE_GC_OBJECT)
+G_DEFINE_TYPE (SwfdecRtmpConnection, swfdec_rtmp_connection, SWFDEC_TYPE_AS_RELAY)
 
 static void
 swfdec_rtmp_connection_dispose (GObject *object)
