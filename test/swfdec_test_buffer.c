@@ -21,6 +21,7 @@
 #include "config.h"
 #endif
 
+#include <ctype.h>
 #include <string.h>
 #include <unistd.h>
 
@@ -241,22 +242,54 @@ swfdec_test_buffer_toString (SwfdecAsContext *cx, SwfdecAsObject *object, guint 
 {
   SwfdecBuffer *b;
   SwfdecTestBuffer *buffer;
-  const char *end;
-  char *s;
-  
+  GString *string;
+  gsize i;
+
   SWFDEC_AS_CHECK (SWFDEC_TYPE_TEST_BUFFER, &buffer, "");
 
   b = buffer->buffer;
-  if (g_utf8_validate ((const char *) b->data, b->length, &end)) {
-    s = g_strndup ((const char *) b->data, b->length);
-  } else if ((size_t) (end - (char *) b->data) == b->length - 1) {
-    s = g_strdup ((const char *) b->data);
-  } else {
-    s = NULL;
+  for (i = 0; i < b->length; i++) {
+    char c = b->data[i];
+    switch (c) {
+      case '\"': 
+      case '\'': 
+      case '\\':
+	g_string_append_c (string, '\\');
+	g_string_append_c (string, c);
+	break;
+      case '\f':
+	g_string_append_c (string, '\\');
+	g_string_append_c (string, 'f');
+	break;
+      case '\n':
+	g_string_append_c (string, '\\');
+	g_string_append_c (string, 'n');
+	break;
+      case '\r':
+	g_string_append_c (string, '\\');
+	g_string_append_c (string, 'r');
+	break;
+      case '\t':
+	g_string_append_c (string, '\\');
+	g_string_append_c (string, 't');
+	break;
+      case '\v':
+	g_string_append_c (string, '\\');
+	g_string_append_c (string, 'v');
+	break;
+      default:
+	if (isprint(c)) {
+	  g_string_append_c (string, c);
+	} else if (i < b->length - 1 && isdigit(b->data[i + 1])) {
+	  g_string_append_printf (string, "\\%03o", c);
+	} else {
+	  g_string_append_printf (string, "\\%o", c);
+	}
+	break;
+    }
   }
-  if (s == NULL)
-    s = g_strdup ("[binary Buffer]");
-  SWFDEC_AS_VALUE_SET_STRING (retval, swfdec_as_context_give_string (cx, s));
+
+  SWFDEC_AS_VALUE_SET_STRING (retval, swfdec_as_context_give_string (cx, g_string_free (string, FALSE)));
 }
 
 SwfdecBuffer *
