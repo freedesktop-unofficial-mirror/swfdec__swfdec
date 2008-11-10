@@ -37,6 +37,9 @@ typedef struct _SwfdecRtmpSocketRtmpClass SwfdecRtmpSocketRtmpClass;
 
 struct _SwfdecRtmpSocketRtmp {
   SwfdecRtmpSocket	parent_socket;
+
+  SwfdecSocket *	socket;		/* the socket we use */
+  SwfdecBuffer *	ping;		/* ping buffer on startup or NULL if startup is done */
 };
 
 struct _SwfdecRtmpSocketRtmpClass {
