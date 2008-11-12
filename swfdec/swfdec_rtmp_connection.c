@@ -21,8 +21,11 @@
 #include "config.h"
 #endif
 
-#include <string.h>
 #include "swfdec_rtmp_connection.h"
+
+#include <string.h>
+
+#include "swfdec_rtmp_socket.h"
 
 /*** SwfdecRtmpConnection ***/
 
@@ -33,10 +36,8 @@ swfdec_rtmp_connection_dispose (GObject *object)
 {
   SwfdecRtmpConnection *conn = SWFDEC_RTMP_CONNECTION (object);
 
-  if (conn->socket) {
-    g_object_unref (conn->socket);
-    conn->socket = NULL;
-  }
+  swfdec_rtmp_connection_close (conn);
+  g_assert (conn->socket == NULL);
 
   G_OBJECT_CLASS (swfdec_rtmp_connection_parent_class)->dispose (object);
 }
@@ -52,5 +53,26 @@ swfdec_rtmp_connection_class_init (SwfdecRtmpConnectionClass *klass)
 static void
 swfdec_rtmp_connection_init (SwfdecRtmpConnection *rtmp_connection)
 {
+}
+
+void
+swfdec_rtmp_connection_connect (SwfdecRtmpConnection *conn, const char *url)
+{
+  g_return_if_fail (SWFDEC_IS_RTMP_CONNECTION (conn));
+
+  swfdec_rtmp_connection_close (conn);
+
+  conn->socket = swfdec_rtmp_socket_new (conn, url);
+}
+
+void
+swfdec_rtmp_connection_close (SwfdecRtmpConnection *conn)
+{
+  g_return_if_fail (SWFDEC_IS_RTMP_CONNECTION (conn));
+
+  if (conn->socket) {
+    g_object_unref (conn->socket);
+    conn->socket = NULL;
+  }
 }
 

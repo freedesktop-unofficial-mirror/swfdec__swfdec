@@ -53,8 +53,9 @@ struct _SwfdecRtmpConnectionClass {
 
 GType			swfdec_rtmp_connection_get_type	(void);
 
-void			swfdec_rtmp_connection_new	(SwfdecPlayer *		player,
+void			swfdec_rtmp_connection_connect	(SwfdecRtmpConnection *	conn,
 							 const char *		url);
+void			swfdec_rtmp_connection_close	(SwfdecRtmpConnection *	conn);
 
 
 G_END_DECLS

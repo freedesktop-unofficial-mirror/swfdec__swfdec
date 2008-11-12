@@ -113,10 +113,13 @@ ASSetNativeAccessor (Stage, 666, "9fullScreenSourceRect,9fullScreenHeight,9fullS
 
 /*** NetConnection ***/
 
-// FIXME: this should actually be a non-native function that calls the ASnative
-// function
-NetConnection = ASconstructor (2100, 200);
-
+NetConnection = function () {
+  this.isConnected = false;
+  ASSetPropFlags(this, null, 7);
+  var init = ASnative (2100, 200);
+  init (this);
+  this.contentType = "application/x-fcs";
+};
 ASSetNative (NetConnection.prototype, 2100, "6connect,6close,6call,6addHeader");
 NetConnection.prototype.addProperty ("connectedProxyType", ASnative (2100, 4), null);
 NetConnection.prototype.proxyType = "none";

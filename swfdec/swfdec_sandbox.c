@@ -74,7 +74,6 @@ static void
 swfdec_sandbox_initialize (SwfdecSandbox *sandbox, guint version)
 {
   SwfdecAsContext *context = swfdec_gc_object_get_context (sandbox);
-  SwfdecPlayer *player = SWFDEC_PLAYER (context);
 
   swfdec_sandbox_use (sandbox);
   if (context->state == SWFDEC_AS_CONTEXT_RUNNING)
@@ -83,7 +82,6 @@ swfdec_sandbox_initialize (SwfdecSandbox *sandbox, guint version)
   /* reset state for initialization */
   /* FIXME: have a better way to do this */
   context->state = SWFDEC_AS_CONTEXT_NEW;
-  swfdec_net_stream_init_context (player);
 
   swfdec_as_context_run_init_script (context, swfdec_initialize, 
       sizeof (swfdec_initialize), version);

@@ -91,7 +91,7 @@ swfdec_rtmp_socket_rtmp_stream_target_init (SwfdecStreamTargetInterface *iface)
 
 /*** SwfdecRtmpSocketRtmp ***/
 
-G_DEFINE_TYPE_WITH_CODE (SwfdecRtmpSocketRtmp, swfdec_rtmp_socket_rtmp, G_TYPE_OBJECT,
+G_DEFINE_TYPE_WITH_CODE (SwfdecRtmpSocketRtmp, swfdec_rtmp_socket_rtmp, SWFDEC_TYPE_RTMP_SOCKET,
     G_IMPLEMENT_INTERFACE (SWFDEC_TYPE_STREAM_TARGET, swfdec_rtmp_socket_rtmp_stream_target_init))
 
 static void
