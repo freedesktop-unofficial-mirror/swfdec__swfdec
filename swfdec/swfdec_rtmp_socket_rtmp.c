@@ -25,6 +25,7 @@
 
 #include "swfdec_debug.h"
 #include "swfdec_loader_internal.h"
+#include "swfdec_player_internal.h"
 #include "swfdec_stream_target.h"
 
 /*** SwfdecStreamTarget ***/
@@ -97,17 +98,51 @@ G_DEFINE_TYPE_WITH_CODE (SwfdecRtmpSocketRtmp, swfdec_rtmp_socket_rtmp, SWFDEC_T
 static void
 swfdec_rtmp_socket_rtmp_dispose (GObject *object)
 {
-  //SwfdecRtmpSocketRtmp *sock = SWFDEC_RTMP_SOCKET_RTMP (object);
+  SwfdecRtmpSocketRtmp *sock = SWFDEC_RTMP_SOCKET_RTMP (object);
+
+  if (sock->url) {
+    swfdec_url_free (sock->url);
+    sock->url = NULL;
+  }
 
   G_OBJECT_CLASS (swfdec_rtmp_socket_rtmp_parent_class)->dispose (object);
+}
+
+static void
+swfdec_rtmp_socket_rtmp_open (SwfdecRtmpSocket *sock, const char *url_string)
+{
+  SwfdecPlayer *player = SWFDEC_PLAYER (swfdec_gc_object_get_context (sock->conn));
+  SwfdecRtmpSocketRtmp *rtmp = SWFDEC_RTMP_SOCKET_RTMP (sock);
+
+  rtmp->url = swfdec_player_create_url (player, url_string);
+  rtmp->socket = swfdec_player_create_socket (player, 
+      swfdec_url_get_host (rtmp->url) ? swfdec_url_get_host (rtmp->url) : "localhost",
+      swfdec_url_get_port (rtmp->url) ? swfdec_url_get_port (rtmp->url) : 1935);
+}
+
+static void
+swfdec_rtmp_socket_rtmp_close (SwfdecRtmpSocket *sock)
+{
+  SWFDEC_FIXME ("do something useful");
+}
+
+static void
+swfdec_rtmp_socket_rtmp_send (SwfdecRtmpSocket *sock, SwfdecBuffer *data)
+{
+  SWFDEC_FIXME ("do something useful");
 }
 
 static void
 swfdec_rtmp_socket_rtmp_class_init (SwfdecRtmpSocketRtmpClass *klass)
 {
   GObjectClass *object_class = G_OBJECT_CLASS (klass);
+  SwfdecRtmpSocketClass *socket_class = SWFDEC_RTMP_SOCKET_CLASS (klass);
 
   object_class->dispose = swfdec_rtmp_socket_rtmp_dispose;
+
+  socket_class->open = swfdec_rtmp_socket_rtmp_open;
+  socket_class->close = swfdec_rtmp_socket_rtmp_close;
+  socket_class->send = swfdec_rtmp_socket_rtmp_send;
 }
 
 static void

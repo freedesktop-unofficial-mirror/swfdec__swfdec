@@ -39,6 +39,7 @@ struct _SwfdecRtmpSocketRtmp {
   SwfdecRtmpSocket	parent_socket;
 
   SwfdecSocket *	socket;		/* the socket we use */
+  SwfdecURL *		url;		/* the URL we're opening */
   SwfdecBuffer *	ping;		/* ping buffer on startup or NULL if startup is done */
 };
 
