@@ -118,6 +118,7 @@ swfdec_rtmp_socket_rtmp_open (SwfdecRtmpSocket *sock, const char *url_string)
   rtmp->socket = swfdec_player_create_socket (player, 
       swfdec_url_get_host (rtmp->url) ? swfdec_url_get_host (rtmp->url) : "localhost",
       swfdec_url_get_port (rtmp->url) ? swfdec_url_get_port (rtmp->url) : 1935);
+  swfdec_stream_set_target (SWFDEC_STREAM (rtmp->socket), SWFDEC_STREAM_TARGET (rtmp));
 }
 
 static void
