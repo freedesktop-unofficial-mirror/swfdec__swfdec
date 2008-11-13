@@ -23,6 +23,8 @@
 
 #include "swfdec_rtmp_socket_rtmp.h"
 
+#include <string.h>
+
 #include "swfdec_debug.h"
 #include "swfdec_loader_internal.h"
 #include "swfdec_player_internal.h"
@@ -46,7 +48,8 @@ swfdec_rtmp_socket_rtmp_stream_target_open (SwfdecStreamTarget *target, SwfdecSt
 
   send = swfdec_buffer_new (1 + 1536);
   send->data[0] = 3;
-  rtmp->ping = swfdec_buffer_ref (send);
+  rtmp->ping = swfdec_buffer_queue_new ();
+  swfdec_buffer_queue_push (rtmp->ping, swfdec_buffer_new_subbuffer (send, 1, 1536));
   swfdec_socket_send (SWFDEC_SOCKET (stream), send);
 }
 
@@ -57,9 +60,29 @@ swfdec_rtmp_socket_rtmp_stream_target_parse (SwfdecStreamTarget *target, SwfdecS
   SwfdecBufferQueue *queue = swfdec_stream_get_queue (stream);
 
   if (rtmp->ping) {
-    if (swfdec_buffer_queue_get_depth (queue) < 1536 * 2)
+    SwfdecBuffer *send_back, *test, *compare;
+    guint first_byte;
+    if (swfdec_buffer_queue_get_depth (queue) < 1536 * 2 + 1)
       return FALSE;
-    g_assert_not_reached ();
+    compare = swfdec_buffer_queue_pull (queue, 1);
+    first_byte = compare->data[0];
+    swfdec_buffer_unref (compare);
+    send_back = swfdec_buffer_queue_pull (queue, 1536);
+    compare = swfdec_buffer_queue_pull (queue, 1536);
+    test = swfdec_buffer_queue_pull (rtmp->ping, 1536);
+    if (first_byte != 3 || memcmp (test->data, compare->data, 1536) != 0) {
+      swfdec_rtmp_socket_error (SWFDEC_RTMP_SOCKET (rtmp),
+	  "handshake data is wrong, closing connection");
+      return TRUE;
+    }
+    swfdec_buffer_unref (test);
+    swfdec_buffer_unref (compare);
+    swfdec_socket_send (rtmp->socket, send_back);
+    send_back = swfdec_buffer_queue_pull (rtmp->ping, 
+	swfdec_buffer_queue_get_depth (rtmp->ping));
+    swfdec_socket_send (rtmp->socket, send_back);
+    swfdec_buffer_queue_unref (rtmp->ping);
+    rtmp->ping = NULL;
   }
   return TRUE;
 }
@@ -98,11 +121,15 @@ G_DEFINE_TYPE_WITH_CODE (SwfdecRtmpSocketRtmp, swfdec_rtmp_socket_rtmp, SWFDEC_T
 static void
 swfdec_rtmp_socket_rtmp_dispose (GObject *object)
 {
-  SwfdecRtmpSocketRtmp *sock = SWFDEC_RTMP_SOCKET_RTMP (object);
+  SwfdecRtmpSocketRtmp *rtmp = SWFDEC_RTMP_SOCKET_RTMP (object);
 
-  if (sock->url) {
-    swfdec_url_free (sock->url);
-    sock->url = NULL;
+  if (rtmp->url) {
+    swfdec_url_free (rtmp->url);
+    rtmp->url = NULL;
+  }
+  if (rtmp->ping) {
+    swfdec_buffer_queue_unref (rtmp->ping);
+    rtmp->ping = NULL;
   }
 
   G_OBJECT_CLASS (swfdec_rtmp_socket_rtmp_parent_class)->dispose (object);
