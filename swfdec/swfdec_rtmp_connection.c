@@ -25,6 +25,7 @@
 
 #include <string.h>
 
+#include "swfdec_debug.h"
 #include "swfdec_rtmp_socket.h"
 
 /*** SwfdecRtmpConnection ***/
@@ -62,7 +63,11 @@ swfdec_rtmp_connection_connect (SwfdecRtmpConnection *conn, const char *url)
 
   swfdec_rtmp_connection_close (conn);
 
-  conn->socket = swfdec_rtmp_socket_new (conn, url);
+  if (url) {
+    conn->socket = swfdec_rtmp_socket_new (conn, url);
+  } else {
+    SWFDEC_FIXME ("handle NULL urls in connect()");
+  }
 }
 
 void
