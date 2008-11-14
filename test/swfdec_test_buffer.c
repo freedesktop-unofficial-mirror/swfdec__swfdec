@@ -244,10 +244,22 @@ swfdec_test_buffer_toString (SwfdecAsContext *cx, SwfdecAsObject *object, guint 
   SwfdecTestBuffer *buffer;
   GString *string;
   gsize i;
+  gboolean convert = TRUE;
 
-  SWFDEC_AS_CHECK (SWFDEC_TYPE_TEST_BUFFER, &buffer, "");
+  SWFDEC_AS_CHECK (SWFDEC_TYPE_TEST_BUFFER, &buffer, "|b", &convert);
 
   b = buffer->buffer;
+  if (!convert) {
+    if (g_utf8_validate ((const char *) b->data, b->length, NULL)) {
+      char *s = g_memdup (b->data, b->length);
+      SWFDEC_AS_VALUE_SET_STRING (retval, swfdec_as_context_give_string (cx, s ? s : g_strdup ("")));
+    } else {
+      swfdec_test_throw (cx, "Buffer contents are not valid utf-8");
+    }
+    return;
+  }
+
+  string = g_string_new ("");
   for (i = 0; i < b->length; i++) {
     char c = b->data[i];
     switch (c) {
@@ -292,6 +304,74 @@ swfdec_test_buffer_toString (SwfdecAsContext *cx, SwfdecAsObject *object, guint 
   SWFDEC_AS_VALUE_SET_STRING (retval, swfdec_as_context_give_string (cx, g_string_free (string, FALSE)));
 }
 
+static GString *
+swfdec_test_buffer_fromString (SwfdecAsContext *cx, const char *s)
+{
+  GString *string = g_string_new ("");
+
+  while (*s) {
+    if (*s == '\\') {
+      s++;
+      switch (*s) {
+	case '"': 
+	  g_string_append_c (string, '"');
+	  break;
+	case '\'': 
+	  g_string_append_c (string, '\'');
+	  break;
+	case '\\':
+	  g_string_append_c (string, '\\');
+	  break;
+	case 'f':
+	  g_string_append_c (string, '\f');
+	  break;
+	case 'n':
+	  g_string_append_c (string, '\n');
+	  break;
+	case 'r':
+	  g_string_append_c (string, '\r');
+	  break;
+	case 't':
+	  g_string_append_c (string, '\t');
+	  break;
+	case 'v':
+	  g_string_append_c (string, '\v');
+	  break;
+	case '0':
+	case '1':
+	case '2':
+	case '3':
+	case '4':
+	case '5':
+	case '6':
+	case '7':
+	  {
+	    guint val = s[0] - '0';
+	    if (s[1] >= '0' && s[1] <= '7') {
+	      s++;
+	      val = 8 * val + s[0] - '0';
+	      if (s[1] >= '0' && s[1] <= '7' && val * 8 < 256) {
+		s++;
+		val = 8 * val + s[0] - '0';
+	      } else {
+		swfdec_test_throw (cx, "Invalid octal escape sequence");
+	      }
+	    }
+	    g_string_append_c (string, val);
+	  }
+	  break;
+	default:
+	  swfdec_test_throw (cx, "Stray \\ in string");
+	  break;
+      }
+    } else {
+      g_string_append_c (string, *s);
+    }
+    s++;
+  }
+  return string;
+}
+
 SwfdecBuffer *
 swfdec_test_buffer_from_args (SwfdecAsContext *cx, guint argc, SwfdecAsValue *argv)
 {
@@ -311,11 +391,9 @@ swfdec_test_buffer_from_args (SwfdecAsContext *cx, guint argc, SwfdecAsValue *ar
       b->data[0] = swfdec_as_value_to_integer (cx, argv[i]);
     }
     if (b == NULL) {
-      const char *s = swfdec_as_value_to_string (cx, argv[i]);
-      gsize len = strlen (s);
-      /* no terminating 0 byte on purpose here - use new Buffer (string, 0); to get that */
-      b = swfdec_buffer_new (len);
-      memcpy (b->data, s, len);
+      GString *s = swfdec_test_buffer_fromString (cx, swfdec_as_value_to_string (cx, argv[i]));
+      b = swfdec_buffer_new_for_data ((guchar *) s->str, s->len);
+      g_string_free (s, FALSE);
     }
     swfdec_buffer_queue_push (queue, b);
   }
