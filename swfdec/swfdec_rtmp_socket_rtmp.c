@@ -42,7 +42,7 @@ swfdec_rtmp_socket_rtmp_stream_target_get_player (SwfdecStreamTarget *target)
 }
 
 static SwfdecBuffer *
-swfdec_rtmp_encode_uptime (SwfdecAsContext *context, guchar *data)
+swfdec_rtmp_create_initial_buffer (SwfdecAsContext *context)
 {
   SwfdecBots *bots;
   GTimeVal tv;
@@ -55,14 +55,15 @@ swfdec_rtmp_encode_uptime (SwfdecAsContext *context, guchar *data)
   x += (tv.tv_usec - context->start_time.tv_usec) / 1000;
 
   bots = swfdec_bots_new ();
-  swfdec_bots_prepare_bytes (bots, 1536);
+  swfdec_bots_prepare_bytes (bots, 1 + 1536);
+  swfdec_bots_put_u8 (bots, 3);
   swfdec_bots_put_bu32 (bots, x);
   swfdec_bots_put_bu32 (bots, 0);
   for (i = 0; i < 1528 / 2; i++) {
     x = (x * 0xB8CD75 + 1) & 0xFF;
     swfdec_bots_put_bu16 (bots, x);
   }
-  g_assert (swfdec_bots_get_bytes (bots) == 1536);
+  g_assert (swfdec_bots_get_bytes (bots) == 1537);
   return swfdec_bots_close (bots);
 }
 
@@ -72,12 +73,10 @@ swfdec_rtmp_socket_rtmp_stream_target_open (SwfdecStreamTarget *target, SwfdecSt
   SwfdecRtmpSocketRtmp *rtmp = SWFDEC_RTMP_SOCKET_RTMP (target);
   SwfdecBuffer *send;
 
-  send = swfdec_buffer_new_static ("\3", 1);
-  swfdec_socket_send (SWFDEC_SOCKET (stream), send);
-  send = swfdec_rtmp_encode_uptime (swfdec_gc_object_get_context (SWFDEC_RTMP_SOCKET (rtmp)->conn),
-      send->data + 1);
+  send = swfdec_rtmp_create_initial_buffer (
+      swfdec_gc_object_get_context (SWFDEC_RTMP_SOCKET (rtmp)->conn));
   rtmp->ping = swfdec_buffer_queue_new ();
-  swfdec_buffer_queue_push (rtmp->ping, swfdec_buffer_ref (send));
+  swfdec_buffer_queue_push (rtmp->ping, swfdec_buffer_new_subbuffer (send, 1, 1536));
   swfdec_socket_send (SWFDEC_SOCKET (stream), send);
 }
 
