@@ -350,11 +350,12 @@ swfdec_test_buffer_fromString (SwfdecAsContext *cx, const char *s)
 	    if (s[1] >= '0' && s[1] <= '7') {
 	      s++;
 	      val = 8 * val + s[0] - '0';
-	      if (s[1] >= '0' && s[1] <= '7' && val * 8 < 256) {
+	      if (s[1] >= '0' && s[1] <= '7') {
 		s++;
 		val = 8 * val + s[0] - '0';
-	      } else {
-		swfdec_test_throw (cx, "Invalid octal escape sequence");
+		if (val >= 256) {
+		  swfdec_test_throw (cx, "Invalid octal escape sequence");
+		}
 	      }
 	    }
 	    g_string_append_c (string, val);
@@ -389,11 +390,15 @@ swfdec_test_buffer_from_args (SwfdecAsContext *cx, guint argc, SwfdecAsValue *ar
     } else if (SWFDEC_AS_VALUE_IS_NUMBER (argv[i])) {
       b = swfdec_buffer_new (1);
       b->data[0] = swfdec_as_value_to_integer (cx, argv[i]);
-    }
-    if (b == NULL) {
-      GString *s = swfdec_test_buffer_fromString (cx, swfdec_as_value_to_string (cx, argv[i]));
+    } else if (SWFDEC_AS_VALUE_IS_STRING (argv[i])) {
+      GString *s = swfdec_test_buffer_fromString (cx, SWFDEC_AS_VALUE_GET_STRING (argv[i]));
       b = swfdec_buffer_new_for_data ((guchar *) s->str, s->len);
       g_string_free (s, FALSE);
+    }
+    if (b == NULL) {
+      const char *s = swfdec_as_value_to_string (cx, argv[i]);
+      gsize len = strlen (s);
+      b = swfdec_buffer_new_for_data (g_memdup (s, len), len);
     }
     swfdec_buffer_queue_push (queue, b);
   }
