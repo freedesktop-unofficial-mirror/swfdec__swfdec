@@ -68,7 +68,7 @@ vivi_code_asm_function_emit (ViviCodeAsm *code, ViviCodeEmitter *emitter, GError
   SwfdecBots *bots;
   guint i, len;
 
-  bots = swfdec_bots_open ();
+  bots = swfdec_bots_new ();
   swfdec_bots_put_string (bots, fun->name ? fun->name : "");
   len = fun->args ? g_strv_length (fun->args) : 0;
   g_assert (len <= G_MAXUINT16);

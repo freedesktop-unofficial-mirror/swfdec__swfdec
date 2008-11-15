@@ -360,7 +360,7 @@ process_buffer (SwfdecBuffer *original, guint flags)
   guint version, tag, len;
   gboolean long_header, needs_init = TRUE;
 
-  bots = swfdec_bots_open ();
+  bots = swfdec_bots_new ();
   swfdec_bits_init (&bits, original);
 
   /* copy header */
@@ -393,7 +393,7 @@ process_buffer (SwfdecBuffer *original, guint flags)
       case SWFDEC_TAG_DOINITACTION:
 	{
 	  SwfdecBuffer *sub = swfdec_buffer_new_subbuffer (buffer, 2, buffer->length - 2);
-	  SwfdecBots *bots2 = swfdec_bots_open ();
+	  SwfdecBots *bots2 = swfdec_bots_new ();
 	  guint sprite = buffer->data[0] | buffer->data[1] << 8;
 	  char *name = g_strdup_printf ("DoInitAction %u", sprite);
 	  swfdec_bots_put_u16 (bots2, sprite);
@@ -433,7 +433,7 @@ process_buffer (SwfdecBuffer *original, guint flags)
   }
 
   swfdec_buffer_unref (original);
-  full = swfdec_bots_open ();
+  full = swfdec_bots_new ();
   swfdec_bots_put_u8 (full, 'F');
   swfdec_bots_put_u8 (full, 'W');
   swfdec_bots_put_u8 (full, 'S');
@@ -464,7 +464,7 @@ buffer_decode (SwfdecBuffer *buffer)
   if (u == 'F')
     return buffer;
 
-  bots = swfdec_bots_open ();
+  bots = swfdec_bots_new ();
   swfdec_bots_put_u8 (bots, 'F');
   swfdec_bots_put_u8 (bots, 'W');
   swfdec_bots_put_u8 (bots, 'S');

@@ -35,17 +35,7 @@ G_BEGIN_DECLS
  */
 typedef struct _SwfdecBots SwfdecBots;
 
-struct _SwfdecBots {
-  unsigned char *	data;
-  unsigned char *	ptr;
-  unsigned int		idx;
-  unsigned char *	end;
-};
-
-#define SWFDEC_OUT_INITIAL (32)
-#define SWFDEC_OUT_STEP (32)
-
-SwfdecBots *	swfdec_bots_open		(void);
+SwfdecBots *	swfdec_bots_new			(void);
 SwfdecBuffer *	swfdec_bots_close		(SwfdecBots *		bots);
 void		swfdec_bots_free		(SwfdecBots *		bots);
 
@@ -76,9 +66,13 @@ void		swfdec_bots_put_u8		(SwfdecBots *		bots,
 						 guint	  		i);
 void		swfdec_bots_put_u16		(SwfdecBots *		bots,
 						 guint			i);
+void		swfdec_bots_put_bu16		(SwfdecBots *		bots,
+						 guint			i);
 void		swfdec_bots_put_s16		(SwfdecBots *		bots,
 						 gint			i);
 void		swfdec_bots_put_u32		(SwfdecBots *		bots,
+						 guint			i);
+void		swfdec_bots_put_bu32		(SwfdecBots *		bots,
 						 guint			i);
 void		swfdec_bots_put_string		(SwfdecBots *		bots,
 						 const char *		s);

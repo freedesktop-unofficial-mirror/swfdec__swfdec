@@ -25,8 +25,18 @@
 
 #include "swfdec_bots.h"
 
+struct _SwfdecBots {
+  unsigned char *	data;
+  unsigned char *	ptr;
+  unsigned int		idx;
+  unsigned char *	end;
+};
+
+#define SWFDEC_OUT_INITIAL (32)
+#define SWFDEC_OUT_STEP (32)
+
 SwfdecBots *
-swfdec_bots_open (void)
+swfdec_bots_new (void)
 {
   SwfdecBots *bots = g_new0 (SwfdecBots, 1);
 
@@ -184,6 +194,17 @@ swfdec_bots_put_u16 (SwfdecBots *bots, guint i)
 }
 
 void
+swfdec_bots_put_bu16 (SwfdecBots *bots, guint i)
+{
+  g_return_if_fail (i <= G_MAXUINT16);
+
+  swfdec_bots_prepare_bytes (bots, 2);
+  bots->ptr[0] = i >> 8;
+  bots->ptr[1] = i;
+  bots->ptr += 2;
+}
+
+void
 swfdec_bots_put_s16 (SwfdecBots *bots, int i)
 {
   g_return_if_fail (i >= G_MININT16 && i <= G_MAXINT16);
@@ -204,6 +225,19 @@ swfdec_bots_put_u32 (SwfdecBots *bots, guint i)
   bots->ptr[1] = i >> 8;
   bots->ptr[2] = i >> 16;
   bots->ptr[3] = i >> 24;
+  bots->ptr += 4;
+}
+
+void
+swfdec_bots_put_bu32 (SwfdecBots *bots, guint i)
+{
+  g_return_if_fail (i <= G_MAXUINT32);
+
+  swfdec_bots_prepare_bytes (bots, 4);
+  bots->ptr[0] = i >> 24;
+  bots->ptr[1] = i >> 16;
+  bots->ptr[2] = i >> 8;
+  bots->ptr[3] = i;
   bots->ptr += 4;
 }
 

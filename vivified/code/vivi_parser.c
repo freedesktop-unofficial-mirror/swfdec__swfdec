@@ -1161,7 +1161,7 @@ parse_asm_pool (ParseData *data)
   SwfdecBuffer *buffer;
   guint num;
 
-  bots = swfdec_bots_open ();
+  bots = swfdec_bots_new ();
   swfdec_bots_put_u16 (bots, 0);
 
   num = 0;
@@ -1174,10 +1174,11 @@ parse_asm_pool (ParseData *data)
     parse_automatic_semicolon (data);
   }
 
-  *(guint16 *)bots->data = GUINT16_TO_LE (num);
-
   // FIXME: version
-  buffer =  swfdec_bots_close (bots);
+  buffer = swfdec_bots_close (bots);
+  /* FIXME: can we avoid this assignment with better APIs? */
+  *(guint16 *)buffer->data = GUINT16_TO_LE (num);
+
   pool = swfdec_constant_pool_new (NULL, buffer, 8);
   swfdec_buffer_unref (buffer);
   code = vivi_code_asm_pool_new (pool);

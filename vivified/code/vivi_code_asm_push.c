@@ -48,7 +48,7 @@ vivi_code_asm_push_emit (ViviCodeAsm *code, ViviCodeEmitter *emitter, GError **e
 {
   ViviCodeAsmPush *push = VIVI_CODE_ASM_PUSH (code);
   SwfdecBots *emit = vivi_code_emitter_get_bots (emitter);
-  SwfdecBots *bots = swfdec_bots_open ();
+  SwfdecBots *bots = swfdec_bots_new ();
   guint i;
   gsize len;
 

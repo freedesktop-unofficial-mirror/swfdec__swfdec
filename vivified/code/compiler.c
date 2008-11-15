@@ -41,7 +41,7 @@ create_file (SwfdecBuffer *actions, guint version, guint rate, SwfdecRect rect)
   g_return_val_if_fail (version <= 255, NULL);
   g_return_val_if_fail (rate <= 255, NULL);
 
-  bots = swfdec_bots_open ();
+  bots = swfdec_bots_new ();
 
   // Frame size
   swfdec_bots_put_rect (bots, &rect);
@@ -63,7 +63,7 @@ create_file (SwfdecBuffer *actions, guint version, guint rate, SwfdecRect rect)
   swfdec_bots_put_u16 (bots, 0);
 
   // Header
-  full = swfdec_bots_open ();
+  full = swfdec_bots_new ();
   swfdec_bots_put_u8 (full, 'F');
   swfdec_bots_put_u8 (full, 'W');
   swfdec_bots_put_u8 (full, 'S');

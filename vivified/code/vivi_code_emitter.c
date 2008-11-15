@@ -55,7 +55,7 @@ vivi_code_emitter_class_init (ViviCodeEmitterClass *klass)
 static void
 vivi_code_emitter_init (ViviCodeEmitter *emit)
 {
-  emit->bots = swfdec_bots_open ();
+  emit->bots = swfdec_bots_new ();
   emit->labels = g_hash_table_new_full (g_direct_hash, g_direct_equal,
       g_object_unref, NULL);
 }
@@ -138,7 +138,7 @@ vivi_code_emitter_finish (ViviCodeEmitter *emitter, GError **error)
   g_slist_free (emitter->later);
   emitter->later = NULL;
   g_hash_table_remove_all (emitter->labels);
-  emitter->bots = swfdec_bots_open ();
+  emitter->bots = swfdec_bots_new ();
 
   return buffer;
 }

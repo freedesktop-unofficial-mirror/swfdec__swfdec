@@ -282,7 +282,7 @@ vivi_code_assembler_pool (ViviCodeAssembler *assembler)
   list = g_slist_reverse (list);
 
   // create the pool action
-  bots = swfdec_bots_open ();
+  bots = swfdec_bots_new ();
   swfdec_bots_put_u16 (bots, num);
   for (iter = list; iter != NULL; iter = iter->next) {
     swfdec_bots_put_string (bots, iter->data);
