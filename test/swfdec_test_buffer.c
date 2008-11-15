@@ -261,13 +261,13 @@ swfdec_test_buffer_toString (SwfdecAsContext *cx, SwfdecAsObject *object, guint 
 
   string = g_string_new ("");
   for (i = 0; i < b->length; i++) {
-    char c = b->data[i];
+    guchar c = (guchar) b->data[i];
     switch (c) {
       case '\"': 
       case '\'': 
       case '\\':
 	g_string_append_c (string, '\\');
-	g_string_append_c (string, c);
+	g_string_append_c (string, (char) c);
 	break;
       case '\f':
 	g_string_append_c (string, '\\');
@@ -291,11 +291,11 @@ swfdec_test_buffer_toString (SwfdecAsContext *cx, SwfdecAsObject *object, guint 
 	break;
       default:
 	if (isprint(c)) {
-	  g_string_append_c (string, c);
+	  g_string_append_c (string, (char) c);
 	} else if (i < b->length - 1 && isdigit(b->data[i + 1])) {
-	  g_string_append_printf (string, "\\%03o", c);
+	  g_string_append_printf (string, "\\%03o", (guint) c);
 	} else {
-	  g_string_append_printf (string, "\\%o", c);
+	  g_string_append_printf (string, "\\%o",(guint) c);
 	}
 	break;
     }
