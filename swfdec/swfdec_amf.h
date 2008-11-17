@@ -22,6 +22,7 @@
 
 #include <swfdec/swfdec_as_context.h>
 #include <swfdec/swfdec_bits.h>
+#include <swfdec/swfdec_bots.h>
 
 G_BEGIN_DECLS
 
@@ -48,14 +49,12 @@ typedef enum {
   SWFDEC_AMF_N_TYPES
 } SwfdecAmfType;
 
-gboolean	swfdec_amf_parse_one		(SwfdecAsContext *	context, 
+gboolean	swfdec_amf_decode		(SwfdecAsContext *	context, 
 						 SwfdecBits *		bits,
-						 SwfdecAmfType		expected_type,
 						 SwfdecAsValue *	rval);
-guint		swfdec_amf_parse		(SwfdecAsContext *	context, 
-						 SwfdecBits *		bits,
-						 guint			n_items,
-						 ...);
+gboolean	swfdec_amf_encode		(SwfdecAsContext *	context, 
+						 SwfdecBots *		bots,
+						 SwfdecAsValue		val);
 
 
 G_END_DECLS

@@ -27,25 +27,24 @@
 #include "swfdec_as_strings.h"
 #include "swfdec_debug.h"
 
-typedef gboolean (* SwfdecAmfParseFunc) (SwfdecAsContext *cx, SwfdecBits *bits, SwfdecAsValue *val);
-extern const SwfdecAmfParseFunc parse_funcs[SWFDEC_AMF_N_TYPES];
+/*** decoding ***/
 
 static gboolean
-swfdec_amf_parse_boolean (SwfdecAsContext *context, SwfdecBits *bits, SwfdecAsValue *val)
+swfdec_amf_decode_boolean (SwfdecAsContext *context, SwfdecBits *bits, SwfdecAsValue *val)
 {
   SWFDEC_AS_VALUE_SET_BOOLEAN (val, swfdec_bits_get_u8 (bits) ? TRUE : FALSE);
   return TRUE;
 }
 
 static gboolean
-swfdec_amf_parse_number (SwfdecAsContext *context, SwfdecBits *bits, SwfdecAsValue *val)
+swfdec_amf_decode_number (SwfdecAsContext *context, SwfdecBits *bits, SwfdecAsValue *val)
 {
   *val = swfdec_as_value_from_number (context, swfdec_bits_get_bdouble (bits));
   return TRUE;
 }
 
 static gboolean
-swfdec_amf_parse_string (SwfdecAsContext *context, SwfdecBits *bits, SwfdecAsValue *val)
+swfdec_amf_decode_string (SwfdecAsContext *context, SwfdecBits *bits, SwfdecAsValue *val)
 {
   guint len = swfdec_bits_get_bu16 (bits);
   char *s;
@@ -59,30 +58,20 @@ swfdec_amf_parse_string (SwfdecAsContext *context, SwfdecBits *bits, SwfdecAsVal
 }
 
 static gboolean
-swfdec_amf_parse_properties (SwfdecAsContext *context, SwfdecBits *bits, SwfdecAsObject *object)
+swfdec_amf_decode_properties (SwfdecAsContext *context, SwfdecBits *bits, SwfdecAsObject *object)
 {
-  guint type;
-  SwfdecAmfParseFunc func;
-
   while (swfdec_bits_left (bits)) {
     SwfdecAsValue val;
     const char *name;
 
-    if (!swfdec_amf_parse_string (context, bits, &val))
+    if (!swfdec_amf_decode_string (context, bits, &val))
       return FALSE;
     name = SWFDEC_AS_VALUE_GET_STRING (val);
-    type = swfdec_bits_get_u8 (bits);
-    if (type == SWFDEC_AMF_END_OBJECT)
+    /* FIXME: can we integrate this into swfdec_amf_decode() somehow? */
+    if (swfdec_bits_peek_u8 (bits) == SWFDEC_AMF_END_OBJECT)
       break;
-    if (type >= SWFDEC_AMF_N_TYPES ||
-	(func = parse_funcs[type]) == NULL) {
-      SWFDEC_ERROR ("no parse func for AMF type %u", type);
+    if (!swfdec_amf_decode (context, bits, &val))
       goto error;
-    }
-    swfdec_as_object_set_variable (object, name, &val); /* GC... */
-    if (!func (context, bits, &val)) {
-      goto error;
-    }
     swfdec_as_object_set_variable (object, name, &val);
   }
   /* no more bytes seems to end automatically */
@@ -93,50 +82,42 @@ error:
 }
 
 static gboolean
-swfdec_amf_parse_object (SwfdecAsContext *context, SwfdecBits *bits, SwfdecAsValue *val)
+swfdec_amf_decode_object (SwfdecAsContext *context, SwfdecBits *bits, SwfdecAsValue *val)
 {
   SwfdecAsObject *object;
   
   object = swfdec_as_object_new (context, SWFDEC_AS_STR_Object, NULL);
-  if (!swfdec_amf_parse_properties (context, bits, object))
+  if (!swfdec_amf_decode_properties (context, bits, object))
     return FALSE;
   SWFDEC_AS_VALUE_SET_OBJECT (val, object);
   return TRUE;
 }
 
 static gboolean
-swfdec_amf_parse_mixed_array (SwfdecAsContext *context, SwfdecBits *bits, SwfdecAsValue *val)
+swfdec_amf_decode_mixed_array (SwfdecAsContext *context, SwfdecBits *bits, SwfdecAsValue *val)
 {
   guint len;
   SwfdecAsObject *array;
   
   len = swfdec_bits_get_bu32 (bits);
   array = swfdec_as_array_new (context);
-  if (!swfdec_amf_parse_properties (context, bits, array))
+  if (!swfdec_amf_decode_properties (context, bits, array))
     return FALSE;
   SWFDEC_AS_VALUE_SET_OBJECT (val, array);
   return TRUE;
 }
 
 static gboolean
-swfdec_amf_parse_array (SwfdecAsContext *context, SwfdecBits *bits, SwfdecAsValue *val)
+swfdec_amf_decode_array (SwfdecAsContext *context, SwfdecBits *bits, SwfdecAsValue *val)
 {
   guint i, len;
   SwfdecAsObject *array;
-  guint type;
-  SwfdecAmfParseFunc func;
   
   len = swfdec_bits_get_bu32 (bits);
   array = swfdec_as_array_new (context);
   for (i = 0; i < len; i++) {
     SwfdecAsValue tmp;
-    type = swfdec_bits_get_u8 (bits);
-    if (type >= SWFDEC_AMF_N_TYPES ||
-	(func = parse_funcs[type]) == NULL) {
-      SWFDEC_ERROR ("no parse func for AMF type %u", type);
-      goto fail;
-    }
-    if (!func (context, bits, &tmp))
+    if (!swfdec_amf_decode (context, bits, &tmp))
       goto fail;
     swfdec_as_array_push (array, &tmp);
   }
@@ -150,7 +131,7 @@ fail:
 
 // FIXME: untested
 static gboolean
-swfdec_amf_parse_date (SwfdecAsContext *context, SwfdecBits *bits, SwfdecAsValue *val)
+swfdec_amf_decode_date (SwfdecAsContext *context, SwfdecBits *bits, SwfdecAsValue *val)
 {
   SwfdecAsDate *date;
   SwfdecAsObject *object;
@@ -166,14 +147,16 @@ swfdec_amf_parse_date (SwfdecAsContext *context, SwfdecBits *bits, SwfdecAsValue
   return TRUE;
 }
 
-const SwfdecAmfParseFunc parse_funcs[SWFDEC_AMF_N_TYPES] = {
-  [SWFDEC_AMF_NUMBER] = swfdec_amf_parse_number,
-  [SWFDEC_AMF_BOOLEAN] = swfdec_amf_parse_boolean,
-  [SWFDEC_AMF_STRING] = swfdec_amf_parse_string,
-  [SWFDEC_AMF_OBJECT] = swfdec_amf_parse_object,
-  [SWFDEC_AMF_MIXED_ARRAY] = swfdec_amf_parse_mixed_array,
-  [SWFDEC_AMF_ARRAY] = swfdec_amf_parse_array,
-  [SWFDEC_AMF_DATE] = swfdec_amf_parse_date,
+typedef gboolean (* SwfdecAmfParseFunc) (SwfdecAsContext *cx, SwfdecBits *bits, SwfdecAsValue *val);
+
+static const SwfdecAmfParseFunc parse_funcs[SWFDEC_AMF_N_TYPES] = {
+  [SWFDEC_AMF_NUMBER] = swfdec_amf_decode_number,
+  [SWFDEC_AMF_BOOLEAN] = swfdec_amf_decode_boolean,
+  [SWFDEC_AMF_STRING] = swfdec_amf_decode_string,
+  [SWFDEC_AMF_OBJECT] = swfdec_amf_decode_object,
+  [SWFDEC_AMF_MIXED_ARRAY] = swfdec_amf_decode_mixed_array,
+  [SWFDEC_AMF_ARRAY] = swfdec_amf_decode_array,
+  [SWFDEC_AMF_DATE] = swfdec_amf_decode_date,
 #if 0
   SWFDEC_AMF_MOVIECLIP = 4,
   SWFDEC_AMF_NULL = 5,
@@ -189,23 +172,17 @@ const SwfdecAmfParseFunc parse_funcs[SWFDEC_AMF_N_TYPES] = {
 };
 
 gboolean
-swfdec_amf_parse_one (SwfdecAsContext *context, SwfdecBits *bits, 
-    SwfdecAmfType expected_type, SwfdecAsValue *rval)
+swfdec_amf_decode (SwfdecAsContext *context, SwfdecBits *bits, 
+    SwfdecAsValue *rval)
 {
   SwfdecAmfParseFunc func;
   guint type;
 
-  g_return_val_if_fail (SWFDEC_IS_AS_CONTEXT (context), 0);
+  g_return_val_if_fail (SWFDEC_IS_AS_CONTEXT (context), FALSE);
   g_return_val_if_fail (bits != NULL, FALSE);
   g_return_val_if_fail (rval != NULL, FALSE);
-  g_return_val_if_fail (expected_type < SWFDEC_AMF_N_TYPES, FALSE);
 
   type = swfdec_bits_get_u8 (bits);
-  if (type != expected_type) {
-    SWFDEC_ERROR ("parse object should be type %u, but is %u", 
-	expected_type, type);
-    return FALSE;
-  }
   if (type >= SWFDEC_AMF_N_TYPES ||
       (func = parse_funcs[type]) == NULL) {
     SWFDEC_ERROR ("no parse func for AMF type %u", type);
@@ -214,23 +191,58 @@ swfdec_amf_parse_one (SwfdecAsContext *context, SwfdecBits *bits,
   return func (context, bits, rval);
 }
 
-guint
-swfdec_amf_parse (SwfdecAsContext *context, SwfdecBits *bits, guint n_items, ...)
+/*** encoding ***/
+
+gboolean
+swfdec_amf_encode (SwfdecAsContext *context,  SwfdecBots *bots,
+    SwfdecAsValue val)
 {
-  va_list args;
-  guint i;
+  g_return_val_if_fail (SWFDEC_IS_AS_CONTEXT (context), FALSE);
+  g_return_val_if_fail (bots != NULL, FALSE);
 
-  g_return_val_if_fail (SWFDEC_IS_AS_CONTEXT (context), 0);
-  g_return_val_if_fail (bits != NULL, 0);
-
-  va_start (args, n_items);
-  for (i = 0; i < n_items; i++) {
-    SwfdecAmfType type = va_arg (args, SwfdecAmfType);
-    SwfdecAsValue *val = va_arg (args, SwfdecAsValue *);
-    if (!swfdec_amf_parse_one (context, bits, type, val))
+  switch (SWFDEC_AS_VALUE_GET_TYPE (val)) {
+    case SWFDEC_AS_TYPE_UNDEFINED:
+      swfdec_bots_put_u8 (bots, SWFDEC_AMF_UNDEFINED);
       break;
+    case SWFDEC_AS_TYPE_NULL:
+      swfdec_bots_put_u8 (bots, SWFDEC_AMF_NULL);
+      break;
+    case SWFDEC_AS_TYPE_BOOLEAN:
+      swfdec_bots_put_u8 (bots, SWFDEC_AMF_BOOLEAN);
+      swfdec_bots_put_u8 (bots, SWFDEC_AS_VALUE_GET_BOOLEAN (val) ? 1 : 0);
+      break;
+    case SWFDEC_AS_TYPE_NUMBER:
+      swfdec_bots_put_u8 (bots, SWFDEC_AMF_NUMBER);
+      swfdec_bots_put_bdouble (bots, SWFDEC_AS_VALUE_GET_NUMBER (val));
+      break;
+    case SWFDEC_AS_TYPE_STRING:
+    {
+      const char *s = SWFDEC_AS_VALUE_GET_STRING (val);
+      gsize len = SWFDEC_AS_VALUE_STRLEN (val);
+      if (len > G_MAXUINT32) {
+	SWFDEC_ERROR ("string is more than 2^32 bytes, clamping");
+	len = G_MAXUINT32;
+      }
+      if (len > G_MAXUINT16) {
+	swfdec_bots_put_u8 (bots, SWFDEC_AMF_BIG_STRING);
+	swfdec_bots_put_u32 (bots, len);
+      } else {
+	swfdec_bots_put_u8 (bots, SWFDEC_AMF_STRING);
+	swfdec_bots_put_u16 (bots, len);
+      }
+      swfdec_bots_put_data (bots, (guchar *) s, len);
+    }
+    case SWFDEC_AS_TYPE_OBJECT:
+      SWFDEC_ERROR ("implement encoding of objects?");
+      return FALSE;
+    case SWFDEC_AS_TYPE_MOVIE:
+      SWFDEC_ERROR ("no clue how to encode movieclips, what now?");
+      return FALSE;
+    case SWFDEC_AS_TYPE_INT:
+    default:
+      g_assert_not_reached ();
+      return FALSE;
   }
-  va_end (args);
-  return i;
+  return TRUE;
 }
 

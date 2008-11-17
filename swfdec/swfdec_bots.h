@@ -68,6 +68,8 @@ void		swfdec_bots_put_u16		(SwfdecBots *		bots,
 						 guint			i);
 void		swfdec_bots_put_bu16		(SwfdecBots *		bots,
 						 guint			i);
+void		swfdec_bots_put_bu24		(SwfdecBots *		bots,
+						 guint			i);
 void		swfdec_bots_put_s16		(SwfdecBots *		bots,
 						 gint			i);
 void		swfdec_bots_put_u32		(SwfdecBots *		bots,
@@ -77,6 +79,8 @@ void		swfdec_bots_put_bu32		(SwfdecBots *		bots,
 void		swfdec_bots_put_string		(SwfdecBots *		bots,
 						 const char *		s);
 void		swfdec_bots_put_double		(SwfdecBots *		bots,
+						 double			value);
+void		swfdec_bots_put_bdouble		(SwfdecBots *		bots,
 						 double			value);
 void		swfdec_bots_put_float		(SwfdecBots *		bots,
 						 float			f);

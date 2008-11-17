@@ -216,6 +216,18 @@ swfdec_bots_put_s16 (SwfdecBots *bots, int i)
 }
 
 void
+swfdec_bots_put_bu24 (SwfdecBots *bots, guint i)
+{
+  g_return_if_fail (i <= G_MAXUINT32);
+
+  swfdec_bots_prepare_bytes (bots, 3);
+  bots->ptr[0] = i;
+  bots->ptr[1] = i >> 8;
+  bots->ptr[2] = i >> 16;
+  bots->ptr += 3;
+}
+
+void
 swfdec_bots_put_u32 (SwfdecBots *bots, guint i)
 {
   g_return_if_fail (i <= G_MAXUINT32);
@@ -324,7 +336,7 @@ swfdec_bots_put_double (SwfdecBots *bots, double value)
     double d;
   } conv;
 
-  swfdec_bots_ensure_bits (bots, 8);
+  swfdec_bots_prepare_bytes (bots, 8);
 
   conv.d = value;
 
@@ -335,6 +347,22 @@ swfdec_bots_put_double (SwfdecBots *bots, double value)
   swfdec_bots_put_u32 (bots, GUINT32_TO_LE (conv.i[0]));
   swfdec_bots_put_u32 (bots, GUINT32_TO_LE (conv.i[1]));
 #endif
+}
+
+void
+swfdec_bots_put_bdouble (SwfdecBots *bots, double value)
+{
+  union {
+    double d;
+    guint64 u64;
+  } u;
+
+  swfdec_bots_prepare_bytes (bots, 8);
+
+  u.d = value;
+  u.u64 = GUINT64_TO_BE (u.u64);
+  memcpy (bots->ptr, &u.u64, 8);
+  bots->ptr += 8;
 }
 
 static guint
