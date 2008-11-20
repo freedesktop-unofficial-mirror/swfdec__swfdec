@@ -131,11 +131,36 @@ swfdec_rtmp_socket_rtmp_stream_target_parse (SwfdecStreamTarget *target, SwfdecS
 }
 
 static void
+swfdec_rtmp_socket_rtmp_ensure_closed (SwfdecRtmpSocketRtmp *rtmp)
+{
+  if (rtmp->socket == NULL)
+    return;
+
+  swfdec_stream_ensure_closed (SWFDEC_STREAM (rtmp->socket));
+  swfdec_stream_set_target (SWFDEC_STREAM (rtmp->socket), NULL);
+  g_object_unref (rtmp->socket);
+  rtmp->socket = NULL;
+
+  if (rtmp->url) {
+    swfdec_url_free (rtmp->url);
+    rtmp->url = NULL;
+  }
+  if (rtmp->ping) {
+    GSList *walk;
+    for (walk = rtmp->ping; walk; walk = walk->next) {
+      if (walk->data)
+	swfdec_buffer_unref (walk->data);
+    }
+    g_slist_free (rtmp->ping);
+    rtmp->ping = NULL;
+  }
+}
+
+static void
 swfdec_rtmp_socket_rtmp_stream_target_close (SwfdecStreamTarget *target, SwfdecStream *stream)
 {
-  //SwfdecRtmpSocket *sock = SWFDEC_RTMP_SOCKET (target);
-
   SWFDEC_FIXME ("anything to do now?");
+  swfdec_rtmp_socket_rtmp_ensure_closed (SWFDEC_RTMP_SOCKET_RTMP (target));
 }
 
 static void
@@ -166,19 +191,7 @@ swfdec_rtmp_socket_rtmp_dispose (GObject *object)
 {
   SwfdecRtmpSocketRtmp *rtmp = SWFDEC_RTMP_SOCKET_RTMP (object);
 
-  if (rtmp->url) {
-    swfdec_url_free (rtmp->url);
-    rtmp->url = NULL;
-  }
-  if (rtmp->ping) {
-    GSList *walk;
-    for (walk = rtmp->ping; walk; walk = walk->next) {
-      if (walk->data)
-	swfdec_buffer_unref (walk->data);
-    }
-    g_slist_free (rtmp->ping);
-    rtmp->ping = NULL;
-  }
+  swfdec_rtmp_socket_rtmp_ensure_closed (rtmp);
 
   G_OBJECT_CLASS (swfdec_rtmp_socket_rtmp_parent_class)->dispose (object);
 }
@@ -200,7 +213,9 @@ swfdec_rtmp_socket_rtmp_open (SwfdecRtmpSocket *sock, const SwfdecURL *url)
 static void
 swfdec_rtmp_socket_rtmp_close (SwfdecRtmpSocket *sock)
 {
-  SWFDEC_FIXME ("do something useful");
+  SwfdecRtmpSocketRtmp *rtmp = SWFDEC_RTMP_SOCKET_RTMP (sock);
+
+  swfdec_rtmp_socket_rtmp_ensure_closed (rtmp);
 }
 
 static void
