@@ -37,6 +37,9 @@ typedef struct _SwfdecRtmpControlChannelClass SwfdecRtmpControlChannelClass;
 
 struct _SwfdecRtmpControlChannel {
   SwfdecRtmpChannel		channel;
+
+  guint				server_bandwidth;
+  guint				client_bandwidth;
 };
 
 struct _SwfdecRtmpControlChannelClass {

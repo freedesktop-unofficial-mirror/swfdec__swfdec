@@ -23,8 +23,8 @@
 
 #include "swfdec_rtmp_rpc_channel.h"
 
+#include "swfdec_amf.h"
 #include "swfdec_debug.h"
-#include "swfdec_rtmp_socket.h"
 
 /*** SwfdecRtmpRpcChannel ***/
 
@@ -68,21 +68,46 @@ swfdec_rtmp_rpc_channel_init (SwfdecRtmpRpcChannel *rpc)
 
 void
 swfdec_rtmp_rpc_channel_send (SwfdecRtmpRpcChannel *rpc,
-    SwfdecBuffer *command)
+    SwfdecAsValue name, SwfdecAsObject *return_object, 
+    guint argc, const SwfdecAsValue *argv)
 {
   SwfdecRtmpChannel *channel;
   SwfdecRtmpHeader header;
+  SwfdecAsContext *cx;
+  SwfdecBots *bots;
+  SwfdecBuffer *buffer;
+  guint i;
 
   g_return_if_fail (SWFDEC_IS_RTMP_RPC_CHANNEL (rpc));
-  g_return_if_fail (command != NULL);
+  g_return_if_fail (argc == 0 || argv != NULL);
 
   channel = SWFDEC_RTMP_CHANNEL (rpc);
+  cx = swfdec_gc_object_get_context (channel->conn);
+
+  /* prepare buffer to encode */
+  bots = swfdec_bots_new ();
+  swfdec_amf_encode (cx, bots, name);
+  if (return_object) {
+    swfdec_amf_encode (cx, bots, swfdec_as_value_from_number (cx, ++rpc->id));
+  } else {
+    swfdec_amf_encode (cx, bots, swfdec_as_value_from_number (cx, 0));
+  }
+  if (argc == 0) {
+    swfdec_amf_encode (cx, bots, SWFDEC_AS_VALUE_NULL);
+  } else {
+    for (i = 0; i < argc; i++) {
+      swfdec_amf_encode (cx, bots, argv[i]);
+    }
+  }
+  buffer = swfdec_bots_close (bots);
+
+  /* prepare header */
   header.channel = channel->id;
   header.timestamp = 0;
-  header.size = command->length;
+  header.size = buffer->length;
   header.type = SWFDEC_RTMP_PACKET_INVOKE;
   header.stream = 0;
 
-  swfdec_rtmp_channel_send (channel, &header, command);
+  swfdec_rtmp_channel_send (channel, &header, buffer);
 }
 

@@ -66,15 +66,7 @@ swfdec_net_connection_do_connect (SwfdecAsContext *cx, SwfdecAsObject *object,
     /* send connect command. Equivalent to:
      * nc.call ("connect", null, { ... }); */
     SwfdecAsObject *o;
-    SwfdecBots *bots;
     SwfdecMovie *movie;
-    SwfdecBuffer *buffer;
-
-    bots = swfdec_bots_new ();
-    SWFDEC_AS_VALUE_SET_STRING (&val, SWFDEC_AS_STR_connect);
-    swfdec_amf_encode (cx, bots, val);
-    val = swfdec_as_value_from_number (cx, 1);
-    swfdec_amf_encode (cx, bots, val);
 
     o = swfdec_as_object_new_empty (cx);
     /* app */
@@ -109,13 +101,13 @@ swfdec_net_connection_do_connect (SwfdecAsContext *cx, SwfdecAsObject *object,
     val = swfdec_as_value_from_number (cx, 124);
     swfdec_as_object_set_variable (o, SWFDEC_AS_STR_videoCodecs, &val);
 
-    SWFDEC_AS_VALUE_SET_OBJECT (&val, o);
-    swfdec_amf_encode (cx, bots, val);
-    swfdec_url_free (url);
-
-    buffer = swfdec_bots_close (bots);
+    val = SWFDEC_AS_VALUE_FROM_OBJECT (o);
     swfdec_rtmp_rpc_channel_send (SWFDEC_RTMP_RPC_CHANNEL (
-	  swfdec_rtmp_connection_get_rpc_channel (conn)), buffer);
+	  swfdec_rtmp_connection_get_rpc_channel (conn)), 
+	SWFDEC_AS_VALUE_FROM_STRING (SWFDEC_AS_STR_connect), o,
+	1, &val);
+
+    swfdec_url_free (url);
   }
 }
 
@@ -143,16 +135,14 @@ swfdec_net_connection_do_call (SwfdecAsContext *cx, SwfdecAsObject *object,
   if (ret_cb) {
     SWFDEC_FIXME ("implement return callbacks");
   }
-  if (argc > 2) {
-    SWFDEC_FIXME ("implement argument encoding");
-  }
 
   bots = swfdec_bots_new ();
   swfdec_amf_encode (cx, bots, name);
 
   buffer = swfdec_bots_close (bots);
   swfdec_rtmp_rpc_channel_send (SWFDEC_RTMP_RPC_CHANNEL (
-	swfdec_rtmp_connection_get_rpc_channel (conn)), buffer);
+	swfdec_rtmp_connection_get_rpc_channel (conn)), name,
+      ret_cb, MAX (2, argc) - 2, argv + 2);
 }
 
 SWFDEC_AS_NATIVE (2100, 3, swfdec_net_connection_do_addHeader)

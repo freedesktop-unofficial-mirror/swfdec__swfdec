@@ -37,6 +37,8 @@ typedef struct _SwfdecRtmpRpcChannelClass SwfdecRtmpRpcChannelClass;
 
 struct _SwfdecRtmpRpcChannel {
   SwfdecRtmpChannel		channel;
+
+  guint				id;		/* last id used for RPC call */
 };
 
 struct _SwfdecRtmpRpcChannelClass {
@@ -46,7 +48,10 @@ struct _SwfdecRtmpRpcChannelClass {
 GType			swfdec_rtmp_rpc_channel_get_type	(void);
 
 void			swfdec_rtmp_rpc_channel_send		(SwfdecRtmpRpcChannel *	rpc,
-								 SwfdecBuffer *		command);
+								 SwfdecAsValue		name,
+								 SwfdecAsObject *	return_object,
+								 guint			argc,
+								 const SwfdecAsValue *	argv);
 
 
 G_END_DECLS
