@@ -57,7 +57,7 @@ swfdec_rtmp_socket_init (SwfdecRtmpSocket *sock)
 }
 
 static void
-swfdec_rtmp_socket_open (SwfdecRtmpSocket *sock, const char *url)
+swfdec_rtmp_socket_open (SwfdecRtmpSocket *sock, const SwfdecURL *url)
 {
   SwfdecRtmpSocketClass *klass;
 
@@ -69,19 +69,17 @@ swfdec_rtmp_socket_open (SwfdecRtmpSocket *sock, const char *url)
 }
 
 SwfdecRtmpSocket *
-swfdec_rtmp_socket_new (SwfdecRtmpConnection *conn, const char *url)
+swfdec_rtmp_socket_new (SwfdecRtmpConnection *conn, const SwfdecURL *url)
 {
   SwfdecRtmpSocket *sock;
   SwfdecPlayer *player;
-  SwfdecURL *parse;
   const char *protocol;
   
   g_return_val_if_fail (SWFDEC_IS_RTMP_CONNECTION (conn), NULL);
   g_return_val_if_fail (url != NULL, NULL);
 
   player = SWFDEC_PLAYER (swfdec_gc_object_get_context (conn));
-  parse = swfdec_player_create_url (player, url);
-  protocol = swfdec_url_get_protocol (parse);
+  protocol = swfdec_url_get_protocol (url);
   if (g_str_equal (protocol, "rtmp")) {
     sock = g_object_new (SWFDEC_TYPE_RTMP_SOCKET_RTMP, NULL);
   } else {
@@ -94,7 +92,6 @@ swfdec_rtmp_socket_new (SwfdecRtmpConnection *conn, const char *url)
   } else {
     swfdec_rtmp_socket_open (sock, url);
   }
-  swfdec_url_free (parse);
   return sock;
 }
 

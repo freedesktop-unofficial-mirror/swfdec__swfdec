@@ -536,6 +536,13 @@ const SwfdecAsConstantStringValue swfdec_as_strings[] = {
   SWFDEC_AS_CONSTANT_STRING ("Invalid Date")
   SWFDEC_AS_CONSTANT_STRING ("auto")
   SWFDEC_AS_CONSTANT_STRING ("Matrix")
+  SWFDEC_AS_CONSTANT_STRING ("app")
+  SWFDEC_AS_CONSTANT_STRING ("swfUrl")
+  SWFDEC_AS_CONSTANT_STRING ("tcUrl")
+  SWFDEC_AS_CONSTANT_STRING ("flashVer")
+  SWFDEC_AS_CONSTANT_STRING ("fpad")
+  SWFDEC_AS_CONSTANT_STRING ("audioCodecs")
+  SWFDEC_AS_CONSTANT_STRING ("videoCodecs")
   /* add more here */
   { 0, 0, "" }
 };

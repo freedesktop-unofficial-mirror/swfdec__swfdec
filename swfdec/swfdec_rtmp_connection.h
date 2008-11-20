@@ -22,10 +22,12 @@
 
 #include <swfdec/swfdec.h>
 #include <swfdec/swfdec_as_relay.h>
+#include <swfdec/swfdec_rtmp_header.h>
 
 G_BEGIN_DECLS
 
 /* forward declarations */
+typedef struct _SwfdecRtmpChannel SwfdecRtmpChannel;
 typedef struct _SwfdecRtmpSocket SwfdecRtmpSocket;
 typedef struct _SwfdecRtmpStream SwfdecRtmpStream;
 
@@ -40,22 +42,30 @@ typedef struct _SwfdecRtmpConnectionClass SwfdecRtmpConnectionClass;
 #define SWFDEC_RTMP_CONNECTION_GET_CLASS(obj)          (G_TYPE_INSTANCE_GET_CLASS ((obj), SWFDEC_TYPE_RTMP_CONNECTION, SwfdecRtmpConnectionClass))
 
 struct _SwfdecRtmpConnection {
-  SwfdecAsRelay		relay;
+  SwfdecAsRelay			relay;
 
-  SwfdecRtmpSocket *	socket;		/* socket we're using for read/write */
-  /* FIXME: make this a GArray for size savings? Are 256 or 512 bytes really worth it? */
-  SwfdecRtmpStream *	streams[64];	/* the streams we're using */
+  SwfdecRtmpSocket *		socket;		/* socket we're using for read/write */
+  SwfdecRtmpChannel *		channels[64];	/* the channels in use by this connection */
 };
 
 struct _SwfdecRtmpConnectionClass {
-  SwfdecAsRelayClass	relay_class;
+  SwfdecAsRelayClass		relay_class;
 };
 
-GType			swfdec_rtmp_connection_get_type	(void);
+GType			swfdec_rtmp_connection_get_type		(void);
 
-void			swfdec_rtmp_connection_connect	(SwfdecRtmpConnection *	conn,
-							 const char *		url);
-void			swfdec_rtmp_connection_close	(SwfdecRtmpConnection *	conn);
+void			swfdec_rtmp_connection_connect	  	(SwfdecRtmpConnection *	conn,
+								 const SwfdecURL *	url);
+void			swfdec_rtmp_connection_close		(SwfdecRtmpConnection *	conn);
+
+void			swfdec_rtmp_connection_receive		(SwfdecRtmpConnection *	conn,
+								 SwfdecBufferQueue *	queue);
+
+#define swfdec_rtmp_connection_get_command_channel(conn) ((conn)->channels[2])
+#define swfdec_rtmp_connection_get_rpc_channel(conn) ((conn)->channels[3])
+SwfdecRtmpChannel *	swfdec_rtmp_connection_register_channel	(SwfdecRtmpConnection *	conn,
+								 int			id,
+								 GType			channel_type);
 
 
 G_END_DECLS

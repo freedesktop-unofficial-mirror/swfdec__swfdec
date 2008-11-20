@@ -40,7 +40,7 @@ struct _SwfdecRtmpSocketRtmp {
 
   SwfdecSocket *	socket;		/* the socket we use */
   SwfdecURL *		url;		/* the URL we're opening */
-  SwfdecBufferQueue *	ping;		/* ping buffer on startup or NULL if startup is done */
+  GSList *		ping;		/* buffers on startup waiting to be sent down */
 };
 
 struct _SwfdecRtmpSocketRtmpClass {

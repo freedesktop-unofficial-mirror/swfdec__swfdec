@@ -47,7 +47,7 @@ struct _SwfdecRtmpSocketClass {
 
   /* actually open the RTMP connection */
   void			(* open)			(SwfdecRtmpSocket *	socket,
-							 const char *		url);
+							 const SwfdecURL *	url);
   /* close the (open) RTMP connection */
   void			(* close)			(SwfdecRtmpSocket *	socket);
   /* send data down the RTMP connection (the conn will be open) */
@@ -58,7 +58,7 @@ struct _SwfdecRtmpSocketClass {
 GType			swfdec_rtmp_socket_get_type	(void);
 
 SwfdecRtmpSocket *	swfdec_rtmp_socket_new		(SwfdecRtmpConnection *	conn,
-							 const char *		url);
+							 const SwfdecURL *	url);
 
 void			swfdec_rtmp_socket_receive	(SwfdecRtmpSocket *	socket,
 							 SwfdecBuffer *		data);

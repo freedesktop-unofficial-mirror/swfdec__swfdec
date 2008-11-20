@@ -221,9 +221,9 @@ swfdec_bots_put_bu24 (SwfdecBots *bots, guint i)
   g_return_if_fail (i <= G_MAXUINT32);
 
   swfdec_bots_prepare_bytes (bots, 3);
-  bots->ptr[0] = i;
+  bots->ptr[0] = i >> 16;
   bots->ptr[1] = i >> 8;
-  bots->ptr[2] = i >> 16;
+  bots->ptr[2] = i;
   bots->ptr += 3;
 }
 

@@ -1,5 +1,5 @@
 /* Swfdec
- * Copyright (C) 2007 Benjamin Otte <otte@gnome.org>
+ * Copyright (C) 2007-2008 Benjamin Otte <otte@gnome.org>
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -24,6 +24,7 @@
 #include "swfdec_amf.h"
 #include "swfdec_as_array.h"
 #include "swfdec_as_date.h"
+#include "swfdec_as_internal.h"
 #include "swfdec_as_strings.h"
 #include "swfdec_debug.h"
 
@@ -216,28 +217,61 @@ swfdec_amf_encode (SwfdecAsContext *context,  SwfdecBots *bots,
       swfdec_bots_put_bdouble (bots, SWFDEC_AS_VALUE_GET_NUMBER (val));
       break;
     case SWFDEC_AS_TYPE_STRING:
-    {
-      const char *s = SWFDEC_AS_VALUE_GET_STRING (val);
-      gsize len = SWFDEC_AS_VALUE_STRLEN (val);
-      if (len > G_MAXUINT32) {
-	SWFDEC_ERROR ("string is more than 2^32 bytes, clamping");
-	len = G_MAXUINT32;
+      {
+	const char *s = SWFDEC_AS_VALUE_GET_STRING (val);
+	gsize len = SWFDEC_AS_VALUE_STRLEN (val);
+	if (len > G_MAXUINT32) {
+	  SWFDEC_ERROR ("string is more than 2^32 bytes, clamping");
+	  len = G_MAXUINT32;
+	}
+	if (len > G_MAXUINT16) {
+	  swfdec_bots_put_u8 (bots, SWFDEC_AMF_BIG_STRING);
+	  swfdec_bots_put_bu32 (bots, len);
+	} else {
+	  swfdec_bots_put_u8 (bots, SWFDEC_AMF_STRING);
+	  swfdec_bots_put_bu16 (bots, len);
+	}
+	swfdec_bots_put_data (bots, (const guchar *) s, len);
       }
-      if (len > G_MAXUINT16) {
-	swfdec_bots_put_u8 (bots, SWFDEC_AMF_BIG_STRING);
-	swfdec_bots_put_u32 (bots, len);
-      } else {
-	swfdec_bots_put_u8 (bots, SWFDEC_AMF_STRING);
-	swfdec_bots_put_u16 (bots, len);
-      }
-      swfdec_bots_put_data (bots, (guchar *) s, len);
-    }
+      break;
     case SWFDEC_AS_TYPE_OBJECT:
-      SWFDEC_ERROR ("implement encoding of objects?");
-      return FALSE;
+      {
+	SwfdecAsObject *object = SWFDEC_AS_VALUE_GET_OBJECT (val);
+	if (object->array) {
+	  SWFDEC_ERROR ("implement encoding of arrays?");
+	  return FALSE;
+	} else {
+	  GSList *walk, *list;
+	  swfdec_bots_put_u8 (bots, SWFDEC_AMF_OBJECT);
+	  list = swfdec_as_object_enumerate (object);
+	  for (walk = list; walk; walk = walk->next) {
+	    const char *name = walk->data;
+	    gsize len = SWFDEC_AS_VALUE_STRLEN (SWFDEC_AS_VALUE_FROM_STRING (name));
+	    SwfdecAsObject *o;
+	    SwfdecAsValue *tmp;
+	    if (len > G_MAXUINT16) {
+	      SWFDEC_ERROR ("property name too long, calmping");
+	      len = G_MAXUINT16;
+	    }
+	    swfdec_bots_put_bu16 (bots, len);
+	    swfdec_bots_put_data (bots, (const guchar *) name, len);
+	    o = object;
+	    while ((tmp = swfdec_as_object_peek_variable (o, name)) == NULL) {
+	      o = o->prototype;
+	      g_assert (o);
+	    }
+	    swfdec_amf_encode (context, bots, *tmp);
+	  }
+	  g_slist_free (list);
+	  swfdec_bots_put_u16 (bots, 0); /* property name */
+	  swfdec_bots_put_u8 (bots, SWFDEC_AMF_END_OBJECT);
+	}
+      }
+      break;
     case SWFDEC_AS_TYPE_MOVIE:
-      SWFDEC_ERROR ("no clue how to encode movieclips, what now?");
-      return FALSE;
+      /* MovieClip objects are unsupported */
+      swfdec_bots_put_u8 (bots, SWFDEC_AMF_UNDEFINED);
+      break;
     case SWFDEC_AS_TYPE_INT:
     default:
       g_assert_not_reached ();

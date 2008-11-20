@@ -75,8 +75,7 @@ swfdec_rtmp_socket_rtmp_stream_target_open (SwfdecStreamTarget *target, SwfdecSt
 
   send = swfdec_rtmp_create_initial_buffer (
       swfdec_gc_object_get_context (SWFDEC_RTMP_SOCKET (rtmp)->conn));
-  rtmp->ping = swfdec_buffer_queue_new ();
-  swfdec_buffer_queue_push (rtmp->ping, swfdec_buffer_new_subbuffer (send, 1, 1536));
+  rtmp->ping = g_slist_prepend (rtmp->ping, swfdec_buffer_new_subbuffer (send, 1, 1536));
   swfdec_socket_send (SWFDEC_SOCKET (stream), send);
 }
 
@@ -87,30 +86,47 @@ swfdec_rtmp_socket_rtmp_stream_target_parse (SwfdecStreamTarget *target, SwfdecS
   SwfdecBufferQueue *queue = swfdec_stream_get_queue (stream);
 
   if (rtmp->ping) {
-    SwfdecBuffer *send_back, *test, *compare;
-    guint first_byte;
-    if (swfdec_buffer_queue_get_depth (queue) < 1536 * 2 + 1)
-      return FALSE;
-    compare = swfdec_buffer_queue_pull (queue, 1);
-    first_byte = compare->data[0];
-    swfdec_buffer_unref (compare);
-    send_back = swfdec_buffer_queue_pull (queue, 1536);
-    compare = swfdec_buffer_queue_pull (queue, 1536);
-    test = swfdec_buffer_queue_pull (rtmp->ping, 1536);
-    if (first_byte != 3 || memcmp (test->data, compare->data, 1536) != 0) {
-      swfdec_rtmp_socket_error (SWFDEC_RTMP_SOCKET (rtmp),
-	  "handshake data is wrong, closing connection");
-      return TRUE;
+    if (g_slist_find (rtmp->ping, NULL)) {
+      /* first ever reply */
+      SwfdecBuffer *send, *test, *compare;
+      guint first_byte;
+      if (swfdec_buffer_queue_get_depth (queue) < 1536 * 2 + 1)
+	return FALSE;
+      compare = swfdec_buffer_queue_pull (queue, 1);
+      first_byte = compare->data[0];
+      swfdec_buffer_unref (compare);
+      send = swfdec_buffer_queue_pull (queue, 1536);
+      compare = swfdec_buffer_queue_pull (queue, 1536);
+      test = rtmp->ping->data;
+      rtmp->ping = g_slist_remove (rtmp->ping, test);
+      if (first_byte != 3 || memcmp (test->data, compare->data, 1536) != 0) {
+	swfdec_rtmp_socket_error (SWFDEC_RTMP_SOCKET (rtmp),
+	    "handshake data is wrong, closing connection");
+	return TRUE;
+      }
+      swfdec_buffer_unref (test);
+      swfdec_buffer_unref (compare);
+      g_assert (rtmp->ping->data == NULL);
+      rtmp->ping = g_slist_remove (rtmp->ping, NULL);
+      /* send back 1536 bytes buffer */
+      swfdec_socket_send (rtmp->socket, send);
+      /* send connect command */
+      send = rtmp->ping->data;
+      rtmp->ping = g_slist_remove (rtmp->ping, send);
+      swfdec_socket_send (rtmp->socket, send);
+    } else {
+      /* reply to connect command */
+      GSList *walk;
+      for (walk = rtmp->ping; walk; walk = walk->next) {
+	SwfdecBuffer *send = walk->data;
+	swfdec_socket_send (rtmp->socket, send);
+      }
+      g_slist_free (rtmp->ping);
+      rtmp->ping = NULL;
     }
-    swfdec_buffer_unref (test);
-    swfdec_buffer_unref (compare);
-    swfdec_socket_send (rtmp->socket, send_back);
-    send_back = swfdec_buffer_queue_pull (rtmp->ping, 
-	swfdec_buffer_queue_get_depth (rtmp->ping));
-    swfdec_socket_send (rtmp->socket, send_back);
-    swfdec_buffer_queue_unref (rtmp->ping);
-    rtmp->ping = NULL;
   }
+
+  swfdec_rtmp_connection_receive (SWFDEC_RTMP_SOCKET (rtmp)->conn, queue);
   return TRUE;
 }
 
@@ -155,7 +171,12 @@ swfdec_rtmp_socket_rtmp_dispose (GObject *object)
     rtmp->url = NULL;
   }
   if (rtmp->ping) {
-    swfdec_buffer_queue_unref (rtmp->ping);
+    GSList *walk;
+    for (walk = rtmp->ping; walk; walk = walk->next) {
+      if (walk->data)
+	swfdec_buffer_unref (walk->data);
+    }
+    g_slist_free (rtmp->ping);
     rtmp->ping = NULL;
   }
 
@@ -163,16 +184,17 @@ swfdec_rtmp_socket_rtmp_dispose (GObject *object)
 }
 
 static void
-swfdec_rtmp_socket_rtmp_open (SwfdecRtmpSocket *sock, const char *url_string)
+swfdec_rtmp_socket_rtmp_open (SwfdecRtmpSocket *sock, const SwfdecURL *url)
 {
   SwfdecPlayer *player = SWFDEC_PLAYER (swfdec_gc_object_get_context (sock->conn));
   SwfdecRtmpSocketRtmp *rtmp = SWFDEC_RTMP_SOCKET_RTMP (sock);
 
-  rtmp->url = swfdec_player_create_url (player, url_string);
+  rtmp->url = swfdec_url_copy (url);
   rtmp->socket = swfdec_player_create_socket (player, 
       swfdec_url_get_host (rtmp->url) ? swfdec_url_get_host (rtmp->url) : "localhost",
       swfdec_url_get_port (rtmp->url) ? swfdec_url_get_port (rtmp->url) : 1935);
   swfdec_stream_set_target (SWFDEC_STREAM (rtmp->socket), SWFDEC_STREAM_TARGET (rtmp));
+  rtmp->ping = g_slist_prepend (rtmp->ping, NULL); /* magic value */
 }
 
 static void
@@ -184,7 +206,13 @@ swfdec_rtmp_socket_rtmp_close (SwfdecRtmpSocket *sock)
 static void
 swfdec_rtmp_socket_rtmp_send (SwfdecRtmpSocket *sock, SwfdecBuffer *data)
 {
-  SWFDEC_FIXME ("do something useful");
+  SwfdecRtmpSocketRtmp *rtmp = SWFDEC_RTMP_SOCKET_RTMP (sock);
+
+  if (rtmp->ping) {
+    rtmp->ping = g_slist_append (rtmp->ping, data);
+  } else {
+    swfdec_socket_send (rtmp->socket, data);
+  }
 }
 
 static void

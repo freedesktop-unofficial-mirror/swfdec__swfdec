@@ -21,15 +21,22 @@
 #include "config.h"
 #endif
 
+#include "swfdec_rtmp_connection.h"
+
 #include <string.h>
+
+#include "swfdec_amf.h"
 #include "swfdec_as_context.h"
 #include "swfdec_as_frame_internal.h"
 #include "swfdec_as_internal.h"
 #include "swfdec_as_object.h"
 #include "swfdec_as_strings.h"
+#include "swfdec_bots.h"
 #include "swfdec_debug.h"
 #include "swfdec_internal.h"
-#include "swfdec_rtmp_connection.h"
+#include "swfdec_player_internal.h"
+#include "swfdec_resource.h"
+#include "swfdec_rtmp_rpc_channel.h"
 
 /*** AS CODE ***/
 
@@ -40,12 +47,12 @@ swfdec_net_connection_do_connect (SwfdecAsContext *cx, SwfdecAsObject *object,
 {
   SwfdecRtmpConnection *conn;
   SwfdecAsValue val;
-  const char *url;
+  SwfdecURL *url;
 
   SWFDEC_AS_CHECK (SWFDEC_TYPE_RTMP_CONNECTION, &conn, "v", &val);
 
   if (SWFDEC_AS_VALUE_IS_STRING (val)) {
-    url = SWFDEC_AS_VALUE_GET_STRING (val);
+    url = swfdec_player_create_url (SWFDEC_PLAYER (cx), SWFDEC_AS_VALUE_GET_STRING (val));
   } else if (SWFDEC_AS_VALUE_IS_NULL (val)) {
     url = NULL;
   } else {
@@ -54,6 +61,62 @@ swfdec_net_connection_do_connect (SwfdecAsContext *cx, SwfdecAsObject *object,
     url = NULL;
   }
   swfdec_rtmp_connection_connect (conn, url);
+  
+  if (url) {
+    /* send connect command. Equivalent to:
+     * nc.call ("connect", null, { ... }); */
+    SwfdecAsObject *o;
+    SwfdecBots *bots;
+    SwfdecMovie *movie;
+    SwfdecBuffer *buffer;
+
+    bots = swfdec_bots_new ();
+    SWFDEC_AS_VALUE_SET_STRING (&val, SWFDEC_AS_STR_connect);
+    swfdec_amf_encode (cx, bots, val);
+    val = swfdec_as_value_from_number (cx, 1);
+    swfdec_amf_encode (cx, bots, val);
+
+    o = swfdec_as_object_new_empty (cx);
+    /* app */
+    SWFDEC_AS_VALUE_SET_STRING (&val, swfdec_as_context_get_string (cx, 
+	  swfdec_url_get_path (url) ? swfdec_url_get_path (url) : ""));
+    swfdec_as_object_set_variable (o, SWFDEC_AS_STR_app, &val);
+    /* swfUrl */
+    movie = swfdec_as_frame_get_target (cx->frame);
+    if (movie) {
+      SWFDEC_AS_VALUE_SET_STRING (&val, swfdec_as_context_get_string (cx, 
+	  swfdec_url_get_url (swfdec_loader_get_url (movie->resource->loader))));
+      swfdec_as_object_set_variable (o, SWFDEC_AS_STR_swfUrl, &val);
+    } else {
+      SWFDEC_FIXME ("no movie, where do we grab our url from?");
+    }
+    /* tcUrl */
+    SWFDEC_AS_VALUE_SET_STRING (&val, swfdec_as_context_get_string (cx, 
+	  swfdec_url_get_url (url)));
+    swfdec_as_object_set_variable (o, SWFDEC_AS_STR_tcUrl, &val);
+    /* flashVer */
+    SWFDEC_AS_VALUE_SET_STRING (&val, swfdec_as_context_get_string (cx, 
+	  SWFDEC_PLAYER (cx)->priv->system->version));
+    swfdec_as_object_set_variable (o, SWFDEC_AS_STR_flashVer, &val);
+    /* fpad */
+    val = SWFDEC_AS_VALUE_TRUE;
+    swfdec_as_object_set_variable (o, SWFDEC_AS_STR_fpad, &val);
+    /* FIXME: reverse engineer the values used here */
+    /* audioCodecs */
+    val = swfdec_as_value_from_number (cx, 615);
+    swfdec_as_object_set_variable (o, SWFDEC_AS_STR_audioCodecs, &val);
+    /* videoCodecs */
+    val = swfdec_as_value_from_number (cx, 124);
+    swfdec_as_object_set_variable (o, SWFDEC_AS_STR_videoCodecs, &val);
+
+    SWFDEC_AS_VALUE_SET_OBJECT (&val, o);
+    swfdec_amf_encode (cx, bots, val);
+    swfdec_url_free (url);
+
+    buffer = swfdec_bots_close (bots);
+    swfdec_rtmp_rpc_channel_send (SWFDEC_RTMP_RPC_CHANNEL (
+	  swfdec_rtmp_connection_get_rpc_channel (conn)), buffer);
+  }
 }
 
 SWFDEC_AS_NATIVE (2100, 1, swfdec_net_connection_do_close)
@@ -69,7 +132,27 @@ void
 swfdec_net_connection_do_call (SwfdecAsContext *cx, SwfdecAsObject *object,
     guint argc, SwfdecAsValue *argv, SwfdecAsValue *rval)
 {
-  SWFDEC_STUB ("NetConnection.call");
+  SwfdecRtmpConnection *conn;
+  SwfdecAsObject *ret_cb = NULL;
+  SwfdecBots *bots;
+  SwfdecBuffer *buffer;
+  SwfdecAsValue name;
+
+  SWFDEC_AS_CHECK (SWFDEC_TYPE_RTMP_CONNECTION, &conn, "v|O", &name, &ret_cb);
+
+  if (ret_cb) {
+    SWFDEC_FIXME ("implement return callbacks");
+  }
+  if (argc > 2) {
+    SWFDEC_FIXME ("implement argument encoding");
+  }
+
+  bots = swfdec_bots_new ();
+  swfdec_amf_encode (cx, bots, name);
+
+  buffer = swfdec_bots_close (bots);
+  swfdec_rtmp_rpc_channel_send (SWFDEC_RTMP_RPC_CHANNEL (
+	swfdec_rtmp_connection_get_rpc_channel (conn)), buffer);
 }
 
 SWFDEC_AS_NATIVE (2100, 3, swfdec_net_connection_do_addHeader)

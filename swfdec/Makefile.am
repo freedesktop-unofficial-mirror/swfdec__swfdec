@@ -130,7 +130,11 @@ libswfdec_source_files = \
 	swfdec_renderer.c \
 	swfdec_resource.c \
 	swfdec_ringbuffer.c \
+	swfdec_rtmp_channel.c \
+	swfdec_rtmp_control_channel.c \
 	swfdec_rtmp_connection.c \
+	swfdec_rtmp_header.c \
+	swfdec_rtmp_rpc_channel.c \
 	swfdec_rtmp_socket.c \
 	swfdec_rtmp_socket_rtmp.c \
 	swfdec_rtmp_stream.c \
@@ -323,7 +327,11 @@ noinst_HEADERS = \
 	swfdec_renderer_internal.h \
 	swfdec_resource.h \
 	swfdec_ringbuffer.h \
+	swfdec_rtmp_channel.h \
+	swfdec_rtmp_control_channel.h \
 	swfdec_rtmp_connection.h \
+	swfdec_rtmp_header.h \
+	swfdec_rtmp_rpc_channel.h \
 	swfdec_rtmp_socket.h \
 	swfdec_rtmp_socket_rtmp.h \
 	swfdec_rtmp_stream.h \
