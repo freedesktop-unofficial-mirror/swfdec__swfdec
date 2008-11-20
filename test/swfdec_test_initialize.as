@@ -18,6 +18,7 @@
  */
 
 Buffer = Native.Buffer;
+Buffer.fromString = Native.Buffer_fromString;
 Buffer.load = Native.Buffer_load;
 Buffer.prototype = {};
 Buffer.prototype.diff = Native.Buffer_diff;

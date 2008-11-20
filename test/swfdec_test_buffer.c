@@ -250,7 +250,7 @@ swfdec_test_buffer_toString (SwfdecAsContext *cx, SwfdecAsObject *object, guint 
   b = buffer->buffer;
   if (!convert) {
     if (g_utf8_validate ((const char *) b->data, b->length, NULL)) {
-      char *s = g_memdup (b->data, b->length);
+      char *s = g_strndup ((const char *) b->data, b->length);
       SWFDEC_AS_VALUE_SET_STRING (retval, swfdec_as_context_give_string (cx, s ? s : g_strdup ("")));
     } else {
       swfdec_test_throw (cx, "Buffer contents are not valid utf-8");
@@ -303,10 +303,17 @@ swfdec_test_buffer_toString (SwfdecAsContext *cx, SwfdecAsObject *object, guint 
   SWFDEC_AS_VALUE_SET_STRING (retval, swfdec_as_context_give_string (cx, g_string_free (string, FALSE)));
 }
 
-static GString *
-swfdec_test_buffer_fromString (SwfdecAsContext *cx, const char *s)
+SWFDEC_TEST_FUNCTION ("Buffer_fromString", swfdec_test_buffer_fromString)
+void
+swfdec_test_buffer_fromString (SwfdecAsContext *cx, SwfdecAsObject *object, guint argc,
+    SwfdecAsValue *argv, SwfdecAsValue *retval)
 {
-  GString *string = g_string_new ("");
+  GString *string;
+  const char *s;
+
+  SWFDEC_AS_CHECK (0, NULL, "s", &s);
+  
+  string = g_string_new ("");
 
   while (*s) {
     if (*s == '\\') {
@@ -369,7 +376,11 @@ swfdec_test_buffer_fromString (SwfdecAsContext *cx, const char *s)
     }
     s++;
   }
-  return string;
+
+  SWFDEC_AS_VALUE_SET_OBJECT (retval,
+      swfdec_as_relay_get_as_object (SWFDEC_AS_RELAY (swfdec_test_buffer_new (cx, 
+	  swfdec_buffer_new_for_data ((guchar *) string->str, string->len)))));
+  g_string_free (string, FALSE);
 }
 
 SwfdecBuffer *
@@ -389,10 +400,6 @@ swfdec_test_buffer_from_args (SwfdecAsContext *cx, guint argc, SwfdecAsValue *ar
     } else if (SWFDEC_AS_VALUE_IS_NUMBER (argv[i])) {
       b = swfdec_buffer_new (1);
       b->data[0] = swfdec_as_value_to_integer (cx, argv[i]);
-    } else if (SWFDEC_AS_VALUE_IS_STRING (argv[i])) {
-      GString *s = swfdec_test_buffer_fromString (cx, SWFDEC_AS_VALUE_GET_STRING (argv[i]));
-      b = swfdec_buffer_new_for_data ((guchar *) s->str, s->len);
-      g_string_free (s, FALSE);
     }
     if (b == NULL) {
       const char *s = swfdec_as_value_to_string (cx, argv[i]);
