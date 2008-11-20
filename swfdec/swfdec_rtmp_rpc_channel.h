@@ -20,6 +20,7 @@
 #ifndef _SWFDEC_RTMP_RPC_CHANNEL_H_
 #define _SWFDEC_RTMP_RPC_CHANNEL_H_
 
+#include <swfdec/swfdec_ringbuffer.h>
 #include <swfdec/swfdec_rtmp_channel.h>
 
 G_BEGIN_DECLS
@@ -39,6 +40,7 @@ struct _SwfdecRtmpRpcChannel {
   SwfdecRtmpChannel		channel;
 
   guint				id;		/* last id used for RPC call */
+  GHashTable *			pending;	/* int => SwfdecAsObject mapping of calls having pending replies */
 };
 
 struct _SwfdecRtmpRpcChannelClass {
@@ -49,7 +51,7 @@ GType			swfdec_rtmp_rpc_channel_get_type	(void);
 
 void			swfdec_rtmp_rpc_channel_send		(SwfdecRtmpRpcChannel *	rpc,
 								 SwfdecAsValue		name,
-								 SwfdecAsObject *	return_object,
+								 SwfdecAsObject *	reply_to,
 								 guint			argc,
 								 const SwfdecAsValue *	argv);
 

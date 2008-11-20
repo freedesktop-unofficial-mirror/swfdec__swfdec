@@ -37,6 +37,7 @@
 #include "swfdec_player_internal.h"
 #include "swfdec_resource.h"
 #include "swfdec_rtmp_rpc_channel.h"
+#include "swfdec_sandbox.h"
 
 /*** AS CODE ***/
 
@@ -189,5 +190,6 @@ swfdec_net_connection_construct (SwfdecAsContext *cx, SwfdecAsObject *object,
   }
 
   conn = g_object_new (SWFDEC_TYPE_RTMP_CONNECTION, "context", cx, NULL);
+  conn->sandbox = swfdec_sandbox_get (SWFDEC_PLAYER (cx));
   swfdec_as_object_set_relay (o, SWFDEC_AS_RELAY (conn));
 }

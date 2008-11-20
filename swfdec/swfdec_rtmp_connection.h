@@ -23,8 +23,10 @@
 #include <swfdec/swfdec.h>
 #include <swfdec/swfdec_as_relay.h>
 #include <swfdec/swfdec_rtmp_header.h>
+#include <swfdec/swfdec_types.h>
 
 G_BEGIN_DECLS
+
 
 /* forward declarations */
 typedef struct _SwfdecRtmpChannel SwfdecRtmpChannel;
@@ -44,6 +46,7 @@ typedef struct _SwfdecRtmpConnectionClass SwfdecRtmpConnectionClass;
 struct _SwfdecRtmpConnection {
   SwfdecAsRelay			relay;
 
+  SwfdecSandbox *		sandbox;	/* sandbox we execute functions in or NULL */
   SwfdecRtmpSocket *		socket;		/* socket we're using for read/write */
   SwfdecRtmpChannel *		channels[64];	/* the channels in use by this connection */
 };

@@ -148,6 +148,20 @@ swfdec_amf_decode_date (SwfdecAsContext *context, SwfdecBits *bits, SwfdecAsValu
   return TRUE;
 }
 
+static gboolean
+swfdec_amf_decode_null (SwfdecAsContext *context, SwfdecBits *bits, SwfdecAsValue *val)
+{
+  SWFDEC_AS_VALUE_SET_NULL (val);
+  return TRUE;
+}
+
+static gboolean
+swfdec_amf_decode_undefined (SwfdecAsContext *context, SwfdecBits *bits, SwfdecAsValue *val)
+{
+  SWFDEC_AS_VALUE_SET_UNDEFINED (val);
+  return TRUE;
+}
+
 typedef gboolean (* SwfdecAmfParseFunc) (SwfdecAsContext *cx, SwfdecBits *bits, SwfdecAsValue *val);
 
 static const SwfdecAmfParseFunc parse_funcs[SWFDEC_AMF_N_TYPES] = {
@@ -158,10 +172,10 @@ static const SwfdecAmfParseFunc parse_funcs[SWFDEC_AMF_N_TYPES] = {
   [SWFDEC_AMF_MIXED_ARRAY] = swfdec_amf_decode_mixed_array,
   [SWFDEC_AMF_ARRAY] = swfdec_amf_decode_array,
   [SWFDEC_AMF_DATE] = swfdec_amf_decode_date,
+  [SWFDEC_AMF_NULL] = swfdec_amf_decode_null,
+  [SWFDEC_AMF_UNDEFINED] = swfdec_amf_decode_undefined,
 #if 0
   SWFDEC_AMF_MOVIECLIP = 4,
-  SWFDEC_AMF_NULL = 5,
-  SWFDEC_AMF_UNDEFINED = 6,
   SWFDEC_AMF_REFERENCE = 7,
   SWFDEC_AMF_END_OBJECT = 9,
   SWFDEC_AMF_BIG_STRING = 12,
