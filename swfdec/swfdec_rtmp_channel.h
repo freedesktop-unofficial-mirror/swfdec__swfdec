@@ -49,6 +49,7 @@ struct _SwfdecRtmpChannel {
 struct _SwfdecRtmpChannelClass {
   GObjectClass			object_class;
 
+  void				(* mark)			(SwfdecRtmpChannel *	channel);
   void				(* receive)			(SwfdecRtmpChannel *	channel,
 								 const SwfdecRtmpHeader *header,
 								 SwfdecBuffer *		buffer);

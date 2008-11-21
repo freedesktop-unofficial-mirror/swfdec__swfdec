@@ -171,6 +171,19 @@ swfdec_rtmp_rpc_channel_receive (SwfdecRtmpChannel *channel,
 }
 
 static void
+swfdec_rtmp_rpc_channel_mark (SwfdecRtmpChannel *channel)
+{
+  SwfdecRtmpRpcChannel *rpc = SWFDEC_RTMP_RPC_CHANNEL (channel);
+  GHashTableIter iter;
+  gpointer value;
+
+  for (g_hash_table_iter_init (&iter, rpc->pending);
+       g_hash_table_iter_next (&iter, NULL, &value);) {
+    swfdec_as_object_mark (value);
+  }
+}
+
+static void
 swfdec_rtmp_rpc_channel_dispose (GObject *object)
 {
   SwfdecRtmpRpcChannel *rpc = SWFDEC_RTMP_RPC_CHANNEL (object);
@@ -191,6 +204,7 @@ swfdec_rtmp_rpc_channel_class_init (SwfdecRtmpRpcChannelClass *klass)
 
   object_class->dispose = swfdec_rtmp_rpc_channel_dispose;
 
+  channel_class->mark = swfdec_rtmp_rpc_channel_mark;
   channel_class->receive = swfdec_rtmp_rpc_channel_receive;
 }
 

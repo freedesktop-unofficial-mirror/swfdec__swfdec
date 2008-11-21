@@ -36,6 +36,23 @@
 G_DEFINE_TYPE (SwfdecRtmpConnection, swfdec_rtmp_connection, SWFDEC_TYPE_AS_RELAY)
 
 static void
+swfdec_rtmp_connection_mark (SwfdecGcObject *object)
+{
+  SwfdecRtmpConnection *conn = SWFDEC_RTMP_CONNECTION (object);
+  guint i;
+
+  for (i = 0; i < 64; i++) {
+    if (conn->channels[i]) {
+      SwfdecRtmpChannelClass *klass = SWFDEC_RTMP_CHANNEL_GET_CLASS (conn->channels[i]);
+      if (klass->mark)
+	klass->mark (conn->channels[i]);
+    }
+  }
+
+  SWFDEC_GC_OBJECT_CLASS (swfdec_rtmp_connection_parent_class)->mark (object);
+}
+
+static void
 swfdec_rtmp_connection_dispose (GObject *object)
 {
   SwfdecRtmpConnection *conn = SWFDEC_RTMP_CONNECTION (object);
@@ -50,8 +67,11 @@ static void
 swfdec_rtmp_connection_class_init (SwfdecRtmpConnectionClass *klass)
 {
   GObjectClass *object_class = G_OBJECT_CLASS (klass);
+  SwfdecGcObjectClass *gc_class = SWFDEC_GC_OBJECT_CLASS (klass);
 
   object_class->dispose = swfdec_rtmp_connection_dispose;
+
+  gc_class->mark = swfdec_rtmp_connection_mark;
 }
 
 static void
