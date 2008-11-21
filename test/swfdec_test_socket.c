@@ -156,13 +156,16 @@ swfdec_test_socket_plugin_send (SwfdecTestPluginSocket *plugin, unsigned char *d
   SwfdecTestSocket *sock = plugin->data;
   SwfdecAsContext *cx = swfdec_gc_object_get_context (sock);
   SwfdecTestBuffer *buffer;
-  SwfdecAsValue val;
+  SwfdecAsValue val, retval;
 
   buffer = swfdec_test_buffer_new (cx, swfdec_buffer_new_for_data (g_memdup (data, length), length));
   SWFDEC_AS_VALUE_SET_OBJECT (&val, swfdec_as_relay_get_as_object (SWFDEC_AS_RELAY (buffer)));
   swfdec_as_relay_call (SWFDEC_AS_RELAY (sock), swfdec_as_context_get_string (cx, "onData"),
-      1, &val, NULL);
-  return length;
+      1, &val, &retval);
+  if (SWFDEC_AS_VALUE_IS_UNDEFINED (retval))
+    return length;
+  else
+    return (unsigned int) swfdec_as_value_to_integer (cx, retval);
 }
 
 static void

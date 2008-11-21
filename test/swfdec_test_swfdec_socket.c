@@ -60,11 +60,8 @@ static gsize
 swfdec_test_swfdec_socket_send (SwfdecSocket *sock, SwfdecBuffer *buffer)
 {
   SwfdecTestSwfdecSocket *test = SWFDEC_TEST_SWFDEC_SOCKET (sock);
-  gulong length;
 
-  length = test->plugin.send (&test->plugin, buffer->data, buffer->length);
-  swfdec_buffer_unref (buffer);
-  return length;
+  return test->plugin.send (&test->plugin, buffer->data, buffer->length);
 }
 
 static void
