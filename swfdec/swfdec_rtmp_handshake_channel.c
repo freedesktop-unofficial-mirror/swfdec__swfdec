@@ -271,3 +271,25 @@ swfdec_rtmp_handshake_channel_init (SwfdecRtmpHandshakeChannel *command)
 {
 }
 
+void
+swfdec_rtmp_handshake_channel_connected (SwfdecRtmpHandshakeChannel *shake,
+    guint argc, const SwfdecAsValue *argv)
+{
+  SwfdecRtmpConnection *conn;
+
+  g_return_if_fail (SWFDEC_IS_RTMP_HANDSHAKE_CHANNEL (shake));
+
+  conn = SWFDEC_RTMP_CHANNEL (shake)->conn;
+
+  /* FIXME: Do something with the result value */
+
+  if (argc >= 2) {
+    swfdec_rtmp_connection_on_status (conn, argv[1]);
+  } else {
+    SWFDEC_ERROR ("no 2nd argument in connect reply");
+  }
+
+  g_object_unref (conn->channels[0]);
+  conn->channels[0] = NULL;
+  swfdec_rtmp_socket_send (conn->socket);
+}

@@ -26,6 +26,7 @@
 #include "swfdec_amf.h"
 #include "swfdec_as_strings.h"
 #include "swfdec_debug.h"
+#include "swfdec_rtmp_handshake_channel.h"
 #include "swfdec_rtmp_socket.h"
 #include "swfdec_sandbox.h"
 
@@ -71,42 +72,39 @@ swfdec_rtmp_rpc_channel_do_send (SwfdecRtmpRpcChannel *rpc, SwfdecAsValue name,
 }
 
 static void
-swfdec_rtmp_rpc_channel_connected (SwfdecRtmpConnection *conn)
-{
-  g_object_unref (conn->channels[0]);
-  conn->channels[0] = NULL;
-  swfdec_rtmp_socket_send (conn->socket);
-}
-
-static void
 swfdec_rtmp_rpc_channel_receive_reply (SwfdecRtmpChannel *channel, SwfdecBits *bits)
 {
   SwfdecAsContext *cx = swfdec_gc_object_get_context (channel->conn);
   SwfdecAsObject *reply_to;
-  SwfdecAsValue val;
-  guint id;
+  SwfdecAsValue val[2], tmp;
+  guint id, i;
 
-  if (!swfdec_amf_decode (cx, bits, &val)) {
+  if (!swfdec_amf_decode (cx, bits, &tmp)) {
     SWFDEC_ERROR ("could not decode reply id");
     return;
   }
-  id = swfdec_as_value_to_integer (cx, val);
+  id = swfdec_as_value_to_integer (cx, tmp);
   reply_to = g_hash_table_lookup (SWFDEC_RTMP_RPC_CHANNEL (channel)->pending, 
       GUINT_TO_POINTER (id));
-  if (id == 1)
-    swfdec_rtmp_rpc_channel_connected (channel->conn);
   if (reply_to == NULL) {
     SWFDEC_ERROR ("no object to send a reply to");
     return;
   }
   g_hash_table_steal (SWFDEC_RTMP_RPC_CHANNEL (channel)->pending, GUINT_TO_POINTER (id));
   
-  if (!swfdec_amf_decode (cx, bits, &val)) {
-    SWFDEC_ERROR ("could not decode reply value");
-    return;
+  for (i = 0; swfdec_bits_left (bits) && i < 2; i++) {
+    if (!swfdec_amf_decode (cx, bits, &val[i])) {
+      SWFDEC_ERROR ("could not decode reply value");
+      return;
+    }
   }
 
-  swfdec_as_object_call (reply_to, SWFDEC_AS_STR_onResult, 1, &val, NULL);
+  if (id == 1 && SWFDEC_IS_RTMP_HANDSHAKE_CHANNEL (channel->conn->channels[0])) {
+    swfdec_rtmp_handshake_channel_connected (SWFDEC_RTMP_HANDSHAKE_CHANNEL (channel->conn->channels[0]),
+	  i, val);
+  } else {
+    swfdec_as_object_call (reply_to, SWFDEC_AS_STR_onResult, 1, val, NULL);
+  }
 }
 
 static void

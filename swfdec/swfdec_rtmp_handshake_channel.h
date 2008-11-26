@@ -51,6 +51,10 @@ GType		swfdec_rtmp_handshake_channel_get_type	(void);
 void		swfdec_rtmp_handshake_channel_start	(SwfdecRtmpHandshakeChannel *	  channel);
 gboolean	swfdec_rtmp_handshake_channel_receive	(SwfdecRtmpHandshakeChannel *	  channel,
 							 SwfdecBufferQueue *		  queue);
+void		swfdec_rtmp_handshake_channel_connected	(SwfdecRtmpHandshakeChannel *	  shake,
+							 guint				  argc,
+							 const SwfdecAsValue *		  argv);
+
 
 G_END_DECLS
 #endif

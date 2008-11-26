@@ -73,6 +73,8 @@ void			swfdec_rtmp_connection_error		(SwfdecRtmpConnection *	conn,
 void			swfdec_rtmp_connection_errorv		(SwfdecRtmpConnection *	conn,
 								 const char *		error,
 								 va_list		args) G_GNUC_PRINTF (2, 0);
+void			swfdec_rtmp_connection_on_status	(SwfdecRtmpConnection *	conn,
+								 SwfdecAsValue		value);
 
 #define swfdec_rtmp_connection_get_command_channel(conn) ((conn)->channels[2])
 #define swfdec_rtmp_connection_get_rpc_channel(conn) ((conn)->channels[3])

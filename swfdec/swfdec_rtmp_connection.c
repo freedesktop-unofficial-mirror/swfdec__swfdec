@@ -25,6 +25,7 @@
 
 #include <string.h>
 
+#include "swfdec_as_strings.h"
 #include "swfdec_bots.h"
 #include "swfdec_debug.h"
 #include "swfdec_rtmp_control_channel.h"
@@ -188,3 +189,10 @@ swfdec_rtmp_connection_errorv (SwfdecRtmpConnection *conn, const char *error, va
   swfdec_rtmp_connection_close (conn);
 }
 
+void
+swfdec_rtmp_connection_on_status (SwfdecRtmpConnection *conn, SwfdecAsValue value)
+{
+  g_return_if_fail (SWFDEC_IS_RTMP_CONNECTION (conn));
+
+  swfdec_as_relay_call (SWFDEC_AS_RELAY (conn), SWFDEC_AS_STR_onStatus, 1, &value, NULL);
+}
