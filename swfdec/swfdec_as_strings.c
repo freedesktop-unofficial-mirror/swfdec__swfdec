@@ -545,6 +545,8 @@ const SwfdecAsConstantStringValue swfdec_as_strings[] = {
   SWFDEC_AS_CONSTANT_STRING ("videoCodecs")
   SWFDEC_AS_CONSTANT_STRING ("_result")
   SWFDEC_AS_CONSTANT_STRING ("onResult")
+  SWFDEC_AS_CONSTANT_STRING ("pageUrl")
+  SWFDEC_AS_CONSTANT_STRING ("videoFunction")
   /* add more here */
   { 0, 0, "" }
 };

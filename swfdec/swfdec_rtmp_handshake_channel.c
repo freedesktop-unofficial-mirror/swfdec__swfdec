@@ -70,6 +70,7 @@ swfdec_rtmp_handshake_channel_push_connect (SwfdecRtmpHandshakeChannel *shake)
    * nc.call ("connect", null, { ... }); */
   SwfdecAsObject *o;
   SwfdecAsValue val;
+  const SwfdecURL *url;
 
   conn = SWFDEC_RTMP_CHANNEL (shake)->conn;
   cx = swfdec_gc_object_get_context (conn);
@@ -82,14 +83,28 @@ swfdec_rtmp_handshake_channel_push_connect (SwfdecRtmpHandshakeChannel *shake)
 
   /* swfUrl */
   /* FIXME: which URL do we display here actually? */
-  SWFDEC_AS_VALUE_SET_STRING (&val, swfdec_as_context_get_string (cx, 
-      swfdec_url_get_url (SWFDEC_PLAYER (cx)->priv->url)));
+  url = SWFDEC_PLAYER (cx)->priv->url;
+  if (swfdec_url_has_protocol (url, "file")) {
+    const char *s = swfdec_url_get_path (url);
+    g_assert (s); /* files must have a path */
+    s = strrchr (s, '/');
+    g_assert (s); /* a full path even */
+    SWFDEC_AS_VALUE_SET_STRING (&val, swfdec_as_context_give_string (cx, 
+	  g_strconcat ("file://", s + 1, NULL)));
+  } else {
+    SWFDEC_AS_VALUE_SET_STRING (&val, swfdec_as_context_get_string (cx, 
+	swfdec_url_get_url (SWFDEC_PLAYER (cx)->priv->url)));
+  }
   swfdec_as_object_set_variable (o, SWFDEC_AS_STR_swfUrl, &val);
 
   /* tcUrl */
   SWFDEC_AS_VALUE_SET_STRING (&val, swfdec_as_context_get_string (cx, 
 	swfdec_url_get_url (conn->url)));
   swfdec_as_object_set_variable (o, SWFDEC_AS_STR_tcUrl, &val);
+
+  /* pageUrl */
+  SWFDEC_AS_VALUE_SET_UNDEFINED (&val);
+  swfdec_as_object_set_variable (o, SWFDEC_AS_STR_pageUrl, &val);
 
   /* flashVer */
   SWFDEC_AS_VALUE_SET_STRING (&val, swfdec_as_context_get_string (cx, 
@@ -110,11 +125,16 @@ swfdec_rtmp_handshake_channel_push_connect (SwfdecRtmpHandshakeChannel *shake)
   val = swfdec_as_value_from_number (cx, 124);
   swfdec_as_object_set_variable (o, SWFDEC_AS_STR_videoCodecs, &val);
 
+  /* videoFunction */
+  val = swfdec_as_value_from_number (cx, 1);
+  swfdec_as_object_set_variable (o, SWFDEC_AS_STR_videoFunction, &val);
+
   val = SWFDEC_AS_VALUE_FROM_OBJECT (o);
   swfdec_rtmp_rpc_channel_send (SWFDEC_RTMP_RPC_CHANNEL (
 	swfdec_rtmp_connection_get_rpc_channel (conn)), 
       SWFDEC_AS_VALUE_FROM_STRING (SWFDEC_AS_STR_connect), o,
       1, &val);
+  swfdec_rtmp_header_invalidate (&swfdec_rtmp_connection_get_rpc_channel (conn)->send_cache);
 }
 
 void
