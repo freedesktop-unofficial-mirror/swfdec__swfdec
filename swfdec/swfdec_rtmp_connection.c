@@ -28,6 +28,7 @@
 #include "swfdec_bots.h"
 #include "swfdec_debug.h"
 #include "swfdec_rtmp_control_channel.h"
+#include "swfdec_rtmp_handshake_channel.h"
 #include "swfdec_rtmp_rpc_channel.h"
 #include "swfdec_rtmp_socket.h"
 
@@ -60,6 +61,9 @@ swfdec_rtmp_connection_dispose (GObject *object)
   swfdec_rtmp_connection_close (conn);
   g_assert (conn->socket == NULL);
 
+  g_free (conn->error);
+  conn->error = NULL;
+
   G_OBJECT_CLASS (swfdec_rtmp_connection_parent_class)->dispose (object);
 }
 
@@ -88,12 +92,15 @@ swfdec_rtmp_connection_connect (SwfdecRtmpConnection *conn, const SwfdecURL *url
 
   if (url) {
     conn->socket = swfdec_rtmp_socket_new (conn, url);
+    conn->url = swfdec_url_copy (url);
   } else {
     SWFDEC_FIXME ("handle NULL urls in connect()");
   }
 
+  swfdec_rtmp_connection_register_channel (conn, 0, SWFDEC_TYPE_RTMP_HANDSHAKE_CHANNEL);
   swfdec_rtmp_connection_register_channel (conn, 2, SWFDEC_TYPE_RTMP_CONTROL_CHANNEL);
   swfdec_rtmp_connection_register_channel (conn, 3, SWFDEC_TYPE_RTMP_RPC_CHANNEL);
+  swfdec_rtmp_handshake_channel_start (SWFDEC_RTMP_HANDSHAKE_CHANNEL (conn->channels[0]));
 }
 
 void
@@ -107,11 +114,16 @@ swfdec_rtmp_connection_close (SwfdecRtmpConnection *conn)
     if (conn->channels[i] == NULL)
       continue;
     g_object_unref (conn->channels[i]);
+    conn->channels[i] = NULL;
   }
 
   if (conn->socket) {
     g_object_unref (conn->socket);
     conn->socket = NULL;
+  }
+  if (conn->url) {
+    swfdec_url_free (conn->url);
+    conn->url = NULL;
   }
 }
 
@@ -144,28 +156,35 @@ swfdec_rtmp_connection_register_channel	(SwfdecRtmpConnection *conn, int id,
 }
 
 void
-swfdec_rtmp_connection_receive (SwfdecRtmpConnection *conn, SwfdecBufferQueue *queue)
+swfdec_rtmp_connection_error (SwfdecRtmpConnection *conn, const char *error, ...)
 {
-  SwfdecBuffer *buffer;
-  SwfdecBits bits;
-  SwfdecRtmpHeaderSize header_size;
-  guint channel;
+  va_list args;
 
   g_return_if_fail (SWFDEC_IS_RTMP_CONNECTION (conn));
-  g_return_if_fail (queue != NULL);
+  g_return_if_fail (error != NULL);
 
-  do {
-    buffer = swfdec_buffer_queue_peek (queue, 1);
-    if (buffer == NULL)
-      break;
-    swfdec_bits_init (&bits, buffer);
-    header_size = swfdec_bits_getbits (&bits, 2);
-    channel = swfdec_bits_getbits (&bits, 6);
-    swfdec_buffer_unref (buffer);
-    if (conn->channels[channel] == NULL) {
-      SWFDEC_FIXME ("message on unknown channel %u, what now?", channel);
-      break;
-    }
-  } while (swfdec_rtmp_channel_receive (conn->channels[channel], queue, header_size));
+  va_start (args, error);
+  swfdec_rtmp_connection_errorv (conn, error, args);
+  va_end (args);
+}
+
+void
+swfdec_rtmp_connection_errorv (SwfdecRtmpConnection *conn, const char *error, va_list args)
+{
+  char *real_error;
+
+  g_return_if_fail (SWFDEC_IS_RTMP_CONNECTION (conn));
+  g_return_if_fail (error != NULL);
+
+  real_error = g_strdup_vprintf (error, args);
+  if (conn->error) {
+    SWFDEC_ERROR ("another error in rtmp socket: %s", real_error);
+    g_free (real_error);
+    return;
+  }
+
+  SWFDEC_ERROR ("error in rtmp socket: %s", real_error);
+  conn->error = real_error;
+  swfdec_rtmp_connection_close (conn);
 }
 

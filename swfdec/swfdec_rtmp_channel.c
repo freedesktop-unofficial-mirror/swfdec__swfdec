@@ -39,6 +39,10 @@ swfdec_rtmp_channel_dispose (GObject *object)
     swfdec_buffer_queue_unref (channel->recv_queue);
     channel->recv_queue = NULL;
   }
+  if (channel->send_queue) {
+    swfdec_buffer_queue_unref (channel->send_queue);
+    channel->send_queue = NULL;
+  }
 
   G_OBJECT_CLASS (swfdec_rtmp_channel_parent_class)->dispose (object);
 }
@@ -57,6 +61,7 @@ swfdec_rtmp_channel_init (SwfdecRtmpChannel *channel)
   swfdec_rtmp_header_invalidate (&channel->recv_cache);
   channel->recv_queue = swfdec_buffer_queue_new ();
   swfdec_rtmp_header_invalidate (&channel->send_cache);
+  channel->send_queue = swfdec_buffer_queue_new ();
   channel->block_size = 128;
 }
 
@@ -64,7 +69,6 @@ void
 swfdec_rtmp_channel_send (SwfdecRtmpChannel *channel,
     const SwfdecRtmpHeader *header, SwfdecBuffer *data)
 {
-  SwfdecRtmpSocketClass *klass;
   SwfdecBots *bots;
   gsize i;
 
@@ -78,14 +82,16 @@ swfdec_rtmp_channel_send (SwfdecRtmpChannel *channel,
   swfdec_rtmp_header_copy (&channel->send_cache, header);
 
   for (i = 0; i < data->length; i += channel->block_size) {
-    /* hack to write a simple continuation header */
-    if (i != 0)
-      swfdec_bots_put_u8 (bots, 0xC3);
+    if (i != 0) {
+      /* write a continuation header */
+      bots = swfdec_bots_new ();
+      swfdec_rtmp_header_write (header, bots, SWFDEC_RTMP_HEADER_1_BYTE);
+    }
     swfdec_bots_put_data (bots, data->data + i, MIN (channel->block_size, data->length - i));
+    swfdec_buffer_queue_push (channel->send_queue, swfdec_bots_close (bots));
   }
   
-  klass = SWFDEC_RTMP_SOCKET_GET_CLASS (channel->conn->socket);
-  klass->send (channel->conn->socket, swfdec_bots_close (bots));
+  swfdec_rtmp_socket_send (channel->conn->socket);
 }
 
 gboolean

@@ -26,6 +26,7 @@
 #include "swfdec_amf.h"
 #include "swfdec_as_strings.h"
 #include "swfdec_debug.h"
+#include "swfdec_rtmp_socket.h"
 #include "swfdec_sandbox.h"
 
 /*** SwfdecRtmpRpcChannel ***/
@@ -70,6 +71,14 @@ swfdec_rtmp_rpc_channel_do_send (SwfdecRtmpRpcChannel *rpc, SwfdecAsValue name,
 }
 
 static void
+swfdec_rtmp_rpc_channel_connected (SwfdecRtmpConnection *conn)
+{
+  g_object_unref (conn->channels[0]);
+  conn->channels[0] = NULL;
+  swfdec_rtmp_socket_send (conn->socket);
+}
+
+static void
 swfdec_rtmp_rpc_channel_receive_reply (SwfdecRtmpChannel *channel, SwfdecBits *bits)
 {
   SwfdecAsContext *cx = swfdec_gc_object_get_context (channel->conn);
@@ -84,6 +93,8 @@ swfdec_rtmp_rpc_channel_receive_reply (SwfdecRtmpChannel *channel, SwfdecBits *b
   id = swfdec_as_value_to_integer (cx, val);
   reply_to = g_hash_table_lookup (SWFDEC_RTMP_RPC_CHANNEL (channel)->pending, 
       GUINT_TO_POINTER (id));
+  if (id == 1)
+    swfdec_rtmp_rpc_channel_connected (channel->conn);
   if (reply_to == NULL) {
     SWFDEC_ERROR ("no object to send a reply to");
     return;

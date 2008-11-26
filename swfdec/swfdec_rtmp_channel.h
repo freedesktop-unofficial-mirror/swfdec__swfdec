@@ -43,6 +43,7 @@ struct _SwfdecRtmpChannel {
   SwfdecRtmpHeader		recv_cache;	/* cached header info for receiving data */
   SwfdecBufferQueue *		recv_queue;	/* Queue of semi-assembled packages when receiving */
   SwfdecRtmpHeader		send_cache;	/* cached header info for sending data */
+  SwfdecBufferQueue *		send_queue;	/* Queue of outgoing waiting for delivery */
   guint				block_size;	/* maximum size for a single message block (FIXME: is this constant?) */
 };
 

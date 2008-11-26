@@ -133,6 +133,7 @@ libswfdec_source_files = \
 	swfdec_rtmp_channel.c \
 	swfdec_rtmp_control_channel.c \
 	swfdec_rtmp_connection.c \
+	swfdec_rtmp_handshake_channel.c \
 	swfdec_rtmp_header.c \
 	swfdec_rtmp_rpc_channel.c \
 	swfdec_rtmp_socket.c \
@@ -330,6 +331,7 @@ noinst_HEADERS = \
 	swfdec_rtmp_channel.h \
 	swfdec_rtmp_control_channel.h \
 	swfdec_rtmp_connection.h \
+	swfdec_rtmp_handshake_channel.h \
 	swfdec_rtmp_header.h \
 	swfdec_rtmp_rpc_channel.h \
 	swfdec_rtmp_socket.h \

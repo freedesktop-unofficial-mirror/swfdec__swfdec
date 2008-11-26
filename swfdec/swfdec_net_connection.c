@@ -35,7 +35,6 @@
 #include "swfdec_debug.h"
 #include "swfdec_internal.h"
 #include "swfdec_player_internal.h"
-#include "swfdec_resource.h"
 #include "swfdec_rtmp_rpc_channel.h"
 #include "swfdec_sandbox.h"
 
@@ -63,53 +62,8 @@ swfdec_net_connection_do_connect (SwfdecAsContext *cx, SwfdecAsObject *object,
   }
   swfdec_rtmp_connection_connect (conn, url);
   
-  if (url) {
-    /* send connect command. Equivalent to:
-     * nc.call ("connect", null, { ... }); */
-    SwfdecAsObject *o;
-    SwfdecMovie *movie;
-
-    o = swfdec_as_object_new_empty (cx);
-    /* app */
-    SWFDEC_AS_VALUE_SET_STRING (&val, swfdec_as_context_get_string (cx, 
-	  swfdec_url_get_path (url) ? swfdec_url_get_path (url) : ""));
-    swfdec_as_object_set_variable (o, SWFDEC_AS_STR_app, &val);
-    /* swfUrl */
-    movie = swfdec_as_frame_get_target (cx->frame);
-    if (movie) {
-      SWFDEC_AS_VALUE_SET_STRING (&val, swfdec_as_context_get_string (cx, 
-	  swfdec_url_get_url (swfdec_loader_get_url (movie->resource->loader))));
-      swfdec_as_object_set_variable (o, SWFDEC_AS_STR_swfUrl, &val);
-    } else {
-      SWFDEC_FIXME ("no movie, where do we grab our url from?");
-    }
-    /* tcUrl */
-    SWFDEC_AS_VALUE_SET_STRING (&val, swfdec_as_context_get_string (cx, 
-	  swfdec_url_get_url (url)));
-    swfdec_as_object_set_variable (o, SWFDEC_AS_STR_tcUrl, &val);
-    /* flashVer */
-    SWFDEC_AS_VALUE_SET_STRING (&val, swfdec_as_context_get_string (cx, 
-	  SWFDEC_PLAYER (cx)->priv->system->version));
-    swfdec_as_object_set_variable (o, SWFDEC_AS_STR_flashVer, &val);
-    /* fpad */
-    val = SWFDEC_AS_VALUE_TRUE;
-    swfdec_as_object_set_variable (o, SWFDEC_AS_STR_fpad, &val);
-    /* FIXME: reverse engineer the values used here */
-    /* audioCodecs */
-    val = swfdec_as_value_from_number (cx, 615);
-    swfdec_as_object_set_variable (o, SWFDEC_AS_STR_audioCodecs, &val);
-    /* videoCodecs */
-    val = swfdec_as_value_from_number (cx, 124);
-    swfdec_as_object_set_variable (o, SWFDEC_AS_STR_videoCodecs, &val);
-
-    val = SWFDEC_AS_VALUE_FROM_OBJECT (o);
-    swfdec_rtmp_rpc_channel_send (SWFDEC_RTMP_RPC_CHANNEL (
-	  swfdec_rtmp_connection_get_rpc_channel (conn)), 
-	SWFDEC_AS_VALUE_FROM_STRING (SWFDEC_AS_STR_connect), o,
-	1, &val);
-
+  if (url)
     swfdec_url_free (url);
-  }
 }
 
 SWFDEC_AS_NATIVE (2100, 1, swfdec_net_connection_do_close)

@@ -24,6 +24,7 @@
 #include "swfdec_rtmp_socket.h"
 
 #include "swfdec_debug.h"
+#include "swfdec_rtmp_handshake_channel.h"
 #include "swfdec_player_internal.h"
 /* socket implementations for swfdec_rtmp_socket_new() */
 #include "swfdec_rtmp_socket_rtmp.h"
@@ -88,7 +89,7 @@ swfdec_rtmp_socket_new (SwfdecRtmpConnection *conn, const SwfdecURL *url)
 
   sock->conn = conn;
   if (G_OBJECT_TYPE (sock) == SWFDEC_TYPE_RTMP_SOCKET) {
-    swfdec_rtmp_socket_error (sock, "RTMP protocol %s is not supported", protocol);
+    swfdec_rtmp_connection_error (conn, "RTMP protocol %s is not supported", protocol);
   } else {
     swfdec_rtmp_socket_open (sock, url);
   }
@@ -96,43 +97,90 @@ swfdec_rtmp_socket_new (SwfdecRtmpConnection *conn, const SwfdecURL *url)
 }
 
 void
-swfdec_rtmp_socket_receive (SwfdecRtmpSocket *socket, SwfdecBuffer *data)
+swfdec_rtmp_socket_send (SwfdecRtmpSocket *socket)
 {
+  SwfdecRtmpSocketClass *klass;
+
   g_return_if_fail (SWFDEC_IS_RTMP_SOCKET (socket));
-  g_return_if_fail (data != NULL);
 
-  SWFDEC_FIXME ("implement");
+  klass = SWFDEC_RTMP_SOCKET_GET_CLASS (socket);
+  klass->send (socket);
 }
 
-void
-swfdec_rtmp_socket_error (SwfdecRtmpSocket *sock, const char *error, ...)
+/**
+ * swfdec_rtmp_socket_next_buffer:
+ * @socket: the socket that wants to send a buffer
+ *
+ * Checks if there are any pending buffers to be sent. If so, the next buffer
+ * to be processed is returned.
+ *
+ * Returns: The next buffer to send or %NULL
+ **/
+SwfdecBuffer *
+swfdec_rtmp_socket_next_buffer (SwfdecRtmpSocket *socket)
 {
-  va_list args;
+  SwfdecRtmpConnection *conn;
+  SwfdecBuffer *buffer;
+  guint i;
 
-  g_return_if_fail (SWFDEC_IS_RTMP_SOCKET (sock));
-  g_return_if_fail (error != NULL);
+  g_return_val_if_fail (SWFDEC_IS_RTMP_SOCKET (socket), NULL);
 
-  va_start (args, error);
-  swfdec_rtmp_socket_errorv (sock, error, args);
-  va_end (args);
-}
+  conn = socket->conn;
 
-void
-swfdec_rtmp_socket_errorv (SwfdecRtmpSocket *sock, const char *error, va_list args)
-{
-  char *real_error;
-
-  g_return_if_fail (SWFDEC_IS_RTMP_SOCKET (sock));
-  g_return_if_fail (error != NULL);
-
-  real_error = g_strdup_vprintf (error, args);
-  if (sock->error) {
-    SWFDEC_ERROR ("another error in rtmp socket: %s", real_error);
-    g_free (real_error);
-    return;
+  if (G_UNLIKELY (conn->channels[0] &&
+	SWFDEC_IS_RTMP_HANDSHAKE_CHANNEL (conn->channels[0]))) {
+    return swfdec_buffer_queue_pull_buffer (conn->channels[0]->send_queue);
   }
 
-  SWFDEC_ERROR ("error in rtmp socket: %s", real_error);
-  sock->error = real_error;
+  i = conn->send_channel;
+  do {
+    i = (i + 1) % 64;
+    if (conn->channels[i] == NULL)
+      continue;
+    buffer = swfdec_buffer_queue_pull_buffer (conn->channels[i]->send_queue);
+    if (buffer) {
+      conn->send_channel = i;
+      return buffer;
+    }
+  } while (i != conn->send_channel);
+  return NULL;
+}
+
+void
+swfdec_rtmp_socket_receive (SwfdecRtmpSocket *sock, SwfdecBufferQueue *queue)
+{
+  SwfdecBuffer *buffer;
+  SwfdecBits bits;
+  SwfdecRtmpHeaderSize header_size;
+  SwfdecRtmpConnection *conn;
+  guint channel;
+
+  g_return_if_fail (SWFDEC_IS_RTMP_SOCKET (sock));
+  g_return_if_fail (queue != NULL);
+
+  conn = sock->conn;
+
+  if (G_UNLIKELY (conn->channels[0] && 
+	SWFDEC_IS_RTMP_HANDSHAKE_CHANNEL (conn->channels[0]))) {
+    SwfdecRtmpHandshakeChannel *shake = SWFDEC_RTMP_HANDSHAKE_CHANNEL (conn->channels[0]);
+    if (shake->reply == NULL) {
+      while (swfdec_rtmp_handshake_channel_receive (SWFDEC_RTMP_HANDSHAKE_CHANNEL (conn->channels[0]), queue));
+      return;
+    }
+  }
+
+  do {
+    buffer = swfdec_buffer_queue_peek (queue, 1);
+    if (buffer == NULL)
+      break;
+    swfdec_bits_init (&bits, buffer);
+    header_size = swfdec_bits_getbits (&bits, 2);
+    channel = swfdec_bits_getbits (&bits, 6);
+    swfdec_buffer_unref (buffer);
+    if (conn->channels[channel] == NULL) {
+      SWFDEC_FIXME ("message on unknown channel %u, what now?", channel);
+      break;
+    }
+  } while (swfdec_rtmp_channel_receive (conn->channels[channel], queue, header_size));
 }
 

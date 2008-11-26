@@ -46,9 +46,12 @@ typedef struct _SwfdecRtmpConnectionClass SwfdecRtmpConnectionClass;
 struct _SwfdecRtmpConnection {
   SwfdecAsRelay			relay;
 
+  SwfdecURL *			url;		/* URL in use by this connection */
   SwfdecSandbox *		sandbox;	/* sandbox we execute functions in or NULL */
   SwfdecRtmpSocket *		socket;		/* socket we're using for read/write */
   SwfdecRtmpChannel *		channels[64];	/* the channels in use by this connection */
+  guint				send_channel;	/* last channel data was sent from (ensures round-robin) */
+  char *			error;		/* NULL or debug string for error message */
 };
 
 struct _SwfdecRtmpConnectionClass {
@@ -63,6 +66,13 @@ void			swfdec_rtmp_connection_close		(SwfdecRtmpConnection *	conn);
 
 void			swfdec_rtmp_connection_receive		(SwfdecRtmpConnection *	conn,
 								 SwfdecBufferQueue *	queue);
+void			swfdec_rtmp_connection_send		(SwfdecRtmpConnection *	conn);
+void			swfdec_rtmp_connection_error		(SwfdecRtmpConnection *	conn,
+								 const char *		error,
+								 ...) G_GNUC_PRINTF (2, 3);
+void			swfdec_rtmp_connection_errorv		(SwfdecRtmpConnection *	conn,
+								 const char *		error,
+								 va_list		args) G_GNUC_PRINTF (2, 0);
 
 #define swfdec_rtmp_connection_get_command_channel(conn) ((conn)->channels[2])
 #define swfdec_rtmp_connection_get_rpc_channel(conn) ((conn)->channels[3])
