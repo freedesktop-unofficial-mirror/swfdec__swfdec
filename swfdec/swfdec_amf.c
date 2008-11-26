@@ -69,8 +69,10 @@ swfdec_amf_decode_properties (SwfdecAsContext *context, SwfdecBits *bits, Swfdec
       return FALSE;
     name = SWFDEC_AS_VALUE_GET_STRING (val);
     /* FIXME: can we integrate this into swfdec_amf_decode() somehow? */
-    if (swfdec_bits_peek_u8 (bits) == SWFDEC_AMF_END_OBJECT)
+    if (swfdec_bits_peek_u8 (bits) == SWFDEC_AMF_END_OBJECT) {
+      swfdec_bits_get_u8 (bits);
       break;
+    }
     if (!swfdec_amf_decode (context, bits, &val))
       goto error;
     swfdec_as_object_set_variable (object, name, &val);
