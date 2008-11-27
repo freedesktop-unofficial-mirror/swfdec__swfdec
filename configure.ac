@@ -314,6 +314,7 @@ test/gnash/misc-mtasc.all/Makefile
 test/gnash/misc-swfc.all/Makefile
 test/gnash/misc-swfmill.all/Makefile
 test/image/Makefile
+test/rtmp/Makefile
 test/sound/Makefile
 test/trace/Makefile
 test/various/Makefile

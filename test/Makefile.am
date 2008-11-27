@@ -1,4 +1,4 @@
-SUBDIRS = custom image sound trace various gnash
+SUBDIRS = custom image rtmp sound trace various gnash
 
 noinst_PROGRAMS = swfdec-test
 

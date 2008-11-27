@@ -1,0 +1,139 @@
+/* Swfdec
+ * Copyright (C) 2008 Benjamin Otte <otte@gnome.org>
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ * 
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ * 
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, 
+ * Boston, MA  02110-1301  USA
+ */
+
+Socket.prototype.nextCommand = function (required_command) {
+  if (!this.buffer)
+    return undefined;
+
+  var command = {};
+  command.command = String (this.buffer.sub (0, 4));
+  if (command.command != required_command)
+    return undefined;
+
+  var l = this.buffer.find (10);
+  if (l >= 0) {
+    command.data = this.buffer.sub (5, l - 5);
+    this.buffer = this.buffer.sub (l + 1);
+  } else {
+    command.data = this.buffer;
+    delete this.buffer;
+  }
+  command.data = Buffer.fromString (command.data.toString (false));
+  return command;
+};
+
+Socket.prototype.onData = function (data) {
+  if (this.commands[this.commands.length - 1].indexOf ("send ") == 0)
+    this.commands[this.commands.length - 1] += data;
+  else
+    this.commands.push ("send " + data);
+  if (this.buffer.find (10) <= this.commands[this.commands.length - 1].length)
+    this.nextCommand ("send");
+  this.do_send ();
+};
+
+Socket.prototype.do_send = function () {
+  tmp = this.nextCommand ("recv");
+  while (tmp) {
+    this.send (tmp.data);
+    if (this.commands[this.commands.length - 1].indexOf ("recv ") == 0)
+      this.commands[this.commands.length - 1] += tmp.data;
+    else
+      this.commands.push ("recv " + tmp.data);
+    tmp = this.nextCommand ("recv");
+  }
+};
+
+Test.prototype.onSocket = function (s) {
+  s.buffer = this.dumps[this.sockets.length];
+  s.commands = [];
+  s.do_send ();
+  this.sockets.push (s);
+};
+
+run_test = function (t, file) {
+  var e;
+  print ("Testing " + file);
+  try {
+    t.sockets = [];
+    t.dumps = [];
+    var basename = file + ".dump";
+    var filename = basename;
+    try {
+      /* try adding files until we fail */
+      for (var i = 1;;i++) {
+	t.dumps.push (Buffer.load (filename));
+	filename = basename + "." + i;
+      }
+    } catch (e) {
+      /* need to have a catch block or the try stmt will be ignored */
+    };
+    t.reset (file);
+    t.advance (0);
+    t.advance (Math.ceil (10000 / t.rate));
+    /* check socket data was identical */
+    var result = true;
+    if (t.sockets.length != t.dumps.length) {
+      error (t.dumps.length + " sockets expected, but only " + t.sockets.length + " were spawned");
+      result = false;
+    }
+    var length = Math.min (t.sockets.length, t.dumps.length);
+    for (var i = 0; i < length; i++) {
+      var s = t.sockets[i];
+      s.commands.push (""); /* we want a terminating newline */
+      var output = s.commands.join ("\n");
+      var diff = new Buffer (output);
+      diff = diff.diff (t.dumps[i]);
+      if (diff) {
+	error ("different output for socket " + i);
+	Native.print (diff);
+	result = false;
+      }
+    }
+    /* check the trace is fine */
+    var diff = t.trace.diff (Buffer.load (file + ".trace"));
+    if (diff) {
+      error ("different trace output");
+      Native.print (diff);
+      result = false;
+    }
+    t.reset ();
+    if (!result)
+      return false;
+  } catch (e) {
+    if (e) {
+      error (e);
+      return false;
+    }
+  };
+  Native.print ("  OK\n");
+  return true;
+};
+
+filenames.sort ();
+t = new Test ();
+fail = [];
+for (var f = 0; f < filenames.length; f++) {
+  if (!run_test (t, filenames[f]))
+    fail.push (filenames[f]);
+};
+if (fail.length > 0) {
+  error (fail.join ("\n       "));
+  throw (fail.length + " failures");
+}
