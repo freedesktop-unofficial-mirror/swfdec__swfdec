@@ -87,10 +87,6 @@ swfdec_net_connection_do_call (SwfdecAsContext *cx, SwfdecAsObject *object,
 
   SWFDEC_AS_CHECK (SWFDEC_TYPE_RTMP_CONNECTION, &conn, "v|O", &name, &ret_cb);
 
-  if (ret_cb) {
-    SWFDEC_FIXME ("implement return callbacks");
-  }
-
   bots = swfdec_bots_new ();
   swfdec_amf_encode (cx, bots, name);
 
