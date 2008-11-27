@@ -1476,6 +1476,7 @@ SharedObject.getDiskUsage = function () {
 
 SharedObject.getLocal = function () {
   var o = {}; o["Implement SharedObject.getLocal (static)"] ();
+  return o;
 };
 
 SharedObject.getRemote = function () {
