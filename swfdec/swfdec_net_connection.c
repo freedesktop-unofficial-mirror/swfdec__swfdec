@@ -81,16 +81,10 @@ swfdec_net_connection_do_call (SwfdecAsContext *cx, SwfdecAsObject *object,
 {
   SwfdecRtmpConnection *conn;
   SwfdecAsObject *ret_cb = NULL;
-  SwfdecBots *bots;
-  SwfdecBuffer *buffer;
   SwfdecAsValue name;
 
   SWFDEC_AS_CHECK (SWFDEC_TYPE_RTMP_CONNECTION, &conn, "v|O", &name, &ret_cb);
 
-  bots = swfdec_bots_new ();
-  swfdec_amf_encode (cx, bots, name);
-
-  buffer = swfdec_bots_close (bots);
   swfdec_rtmp_rpc_channel_send (SWFDEC_RTMP_RPC_CHANNEL (
 	swfdec_rtmp_connection_get_rpc_channel (conn)), name,
       ret_cb, MAX (2, argc) - 2, argv + 2);
