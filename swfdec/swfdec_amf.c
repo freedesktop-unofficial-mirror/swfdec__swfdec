@@ -28,38 +28,103 @@
 #include "swfdec_as_strings.h"
 #include "swfdec_debug.h"
 
+/*** context ***/
+
+struct _SwfdecAmfContext {
+  SwfdecAsContext *	context;
+  GPtrArray *		object_refs;
+};
+
+SwfdecAmfContext *
+swfdec_amf_context_new (SwfdecAsContext *context)
+{
+  SwfdecAmfContext *cx;
+
+  g_return_val_if_fail (SWFDEC_IS_AS_CONTEXT (context), NULL);
+
+  cx = g_slice_new0 (SwfdecAmfContext);
+  cx->context = context;
+  cx->object_refs = g_ptr_array_new ();
+
+  return cx;
+}
+
+void
+swfdec_amf_context_free (SwfdecAmfContext *cx)
+{
+  g_return_if_fail (cx != NULL);
+
+  g_ptr_array_free (cx->object_refs, TRUE);
+  g_slice_free (SwfdecAmfContext, cx);
+}
+
+static void
+swfdec_amf_context_add_object (SwfdecAmfContext *cx, SwfdecAsObject *object)
+{
+  g_return_if_fail (cx != NULL);
+  g_return_if_fail (object != NULL);
+
+  g_ptr_array_add (cx->object_refs, object);
+}
+
+static int
+swfdec_amf_context_find_object (SwfdecAmfContext *cx, SwfdecAsObject *object)
+{
+  guint i;
+
+  g_return_val_if_fail (cx != NULL, -1);
+  g_return_val_if_fail (object != NULL, -1);
+
+  for (i = 0; i < cx->object_refs->len; i++) {
+    if ((SwfdecAsObject *) g_ptr_array_index (cx->object_refs, i) == object)
+      return i;
+  }
+  return -1;
+}
+
+static SwfdecAsObject *
+swfdec_amf_context_get_object (SwfdecAmfContext *cx, guint id)
+{
+  g_return_val_if_fail (cx != NULL, NULL);
+
+  if (id >= cx->object_refs->len)
+    return NULL;
+
+  return g_ptr_array_index (cx->object_refs, id);
+}
+
 /*** decoding ***/
 
 static gboolean
-swfdec_amf_decode_boolean (SwfdecAsContext *context, SwfdecBits *bits, SwfdecAsValue *val)
+swfdec_amf_decode_boolean (SwfdecAmfContext *context, SwfdecBits *bits, SwfdecAsValue *val)
 {
   SWFDEC_AS_VALUE_SET_BOOLEAN (val, swfdec_bits_get_u8 (bits) ? TRUE : FALSE);
   return TRUE;
 }
 
 static gboolean
-swfdec_amf_decode_number (SwfdecAsContext *context, SwfdecBits *bits, SwfdecAsValue *val)
+swfdec_amf_decode_number (SwfdecAmfContext *context, SwfdecBits *bits, SwfdecAsValue *val)
 {
-  *val = swfdec_as_value_from_number (context, swfdec_bits_get_bdouble (bits));
+  *val = swfdec_as_value_from_number (context->context, swfdec_bits_get_bdouble (bits));
   return TRUE;
 }
 
 static gboolean
-swfdec_amf_decode_string (SwfdecAsContext *context, SwfdecBits *bits, SwfdecAsValue *val)
+swfdec_amf_decode_string (SwfdecAmfContext *context, SwfdecBits *bits, SwfdecAsValue *val)
 {
   guint len = swfdec_bits_get_bu16 (bits);
   char *s;
   
   /* FIXME: the supplied version is likely incorrect */
-  s = swfdec_bits_get_string_length (bits, len, context->version);
+  s = swfdec_bits_get_string_length (bits, len, context->context->version);
   if (s == NULL)
     return FALSE;
-  SWFDEC_AS_VALUE_SET_STRING (val, swfdec_as_context_give_string (context, s));
+  SWFDEC_AS_VALUE_SET_STRING (val, swfdec_as_context_give_string (context->context, s));
   return TRUE;
 }
 
 static gboolean
-swfdec_amf_decode_properties (SwfdecAsContext *context, SwfdecBits *bits, SwfdecAsObject *object)
+swfdec_amf_decode_properties (SwfdecAmfContext *context, SwfdecBits *bits, SwfdecAsObject *object)
 {
   while (swfdec_bits_left (bits)) {
     SwfdecAsValue val;
@@ -85,11 +150,12 @@ error:
 }
 
 static gboolean
-swfdec_amf_decode_object (SwfdecAsContext *context, SwfdecBits *bits, SwfdecAsValue *val)
+swfdec_amf_decode_object (SwfdecAmfContext *context, SwfdecBits *bits, SwfdecAsValue *val)
 {
   SwfdecAsObject *object;
   
-  object = swfdec_as_object_new (context, SWFDEC_AS_STR_Object, NULL);
+  object = swfdec_as_object_new (context->context, SWFDEC_AS_STR_Object, NULL);
+  swfdec_amf_context_add_object (context, object);
   if (!swfdec_amf_decode_properties (context, bits, object))
     return FALSE;
   SWFDEC_AS_VALUE_SET_OBJECT (val, object);
@@ -97,13 +163,14 @@ swfdec_amf_decode_object (SwfdecAsContext *context, SwfdecBits *bits, SwfdecAsVa
 }
 
 static gboolean
-swfdec_amf_decode_mixed_array (SwfdecAsContext *context, SwfdecBits *bits, SwfdecAsValue *val)
+swfdec_amf_decode_mixed_array (SwfdecAmfContext *context, SwfdecBits *bits, SwfdecAsValue *val)
 {
   guint len;
   SwfdecAsObject *array;
   
   len = swfdec_bits_get_bu32 (bits);
-  array = swfdec_as_array_new (context);
+  array = swfdec_as_array_new (context->context);
+  swfdec_amf_context_add_object (context, array);
   if (!swfdec_amf_decode_properties (context, bits, array))
     return FALSE;
   SWFDEC_AS_VALUE_SET_OBJECT (val, array);
@@ -111,13 +178,14 @@ swfdec_amf_decode_mixed_array (SwfdecAsContext *context, SwfdecBits *bits, Swfde
 }
 
 static gboolean
-swfdec_amf_decode_array (SwfdecAsContext *context, SwfdecBits *bits, SwfdecAsValue *val)
+swfdec_amf_decode_array (SwfdecAmfContext *context, SwfdecBits *bits, SwfdecAsValue *val)
 {
   guint i, len;
   SwfdecAsObject *array;
   
   len = swfdec_bits_get_bu32 (bits);
-  array = swfdec_as_array_new (context);
+  array = swfdec_as_array_new (context->context);
+  swfdec_amf_context_add_object (context, array);
   for (i = 0; i < len; i++) {
     SwfdecAsValue tmp;
     if (!swfdec_amf_decode (context, bits, &tmp))
@@ -134,12 +202,13 @@ fail:
 
 // FIXME: untested
 static gboolean
-swfdec_amf_decode_date (SwfdecAsContext *context, SwfdecBits *bits, SwfdecAsValue *val)
+swfdec_amf_decode_date (SwfdecAmfContext *context, SwfdecBits *bits, SwfdecAsValue *val)
 {
   SwfdecAsDate *date;
   SwfdecAsObject *object;
 
-  object = swfdec_as_object_new (context, SWFDEC_AS_STR_Date, NULL);
+  object = swfdec_as_object_new (context->context, SWFDEC_AS_STR_Date, NULL);
+  swfdec_amf_context_add_object (context, object);
   date = SWFDEC_AS_DATE (object->relay);
   date->milliseconds = swfdec_bits_get_bdouble (bits);
   date->utc_offset = swfdec_bits_get_bu16 (bits);
@@ -151,34 +220,48 @@ swfdec_amf_decode_date (SwfdecAsContext *context, SwfdecBits *bits, SwfdecAsValu
 }
 
 static gboolean
-swfdec_amf_decode_null (SwfdecAsContext *context, SwfdecBits *bits, SwfdecAsValue *val)
+swfdec_amf_decode_null (SwfdecAmfContext *context, SwfdecBits *bits, SwfdecAsValue *val)
 {
   SWFDEC_AS_VALUE_SET_NULL (val);
   return TRUE;
 }
 
 static gboolean
-swfdec_amf_decode_undefined (SwfdecAsContext *context, SwfdecBits *bits, SwfdecAsValue *val)
+swfdec_amf_decode_undefined (SwfdecAmfContext *context, SwfdecBits *bits, SwfdecAsValue *val)
 {
   SWFDEC_AS_VALUE_SET_UNDEFINED (val);
   return TRUE;
 }
 
-typedef gboolean (* SwfdecAmfParseFunc) (SwfdecAsContext *cx, SwfdecBits *bits, SwfdecAsValue *val);
+static gboolean
+swfdec_amf_decode_reference (SwfdecAmfContext *context, SwfdecBits *bits, SwfdecAsValue *val)
+{
+  SwfdecAsObject *o = swfdec_amf_context_get_object (context, swfdec_bits_get_bu16 (bits));
+
+  if (o == NULL) {
+    SWFDEC_ERROR ("invalid object reference");
+    return FALSE;
+  }
+
+  SWFDEC_AS_VALUE_SET_OBJECT (val, o);
+  return TRUE;
+}
+
+typedef gboolean (* SwfdecAmfParseFunc) (SwfdecAmfContext *cx, SwfdecBits *bits, SwfdecAsValue *val);
 
 static const SwfdecAmfParseFunc parse_funcs[SWFDEC_AMF_N_TYPES] = {
   [SWFDEC_AMF_NUMBER] = swfdec_amf_decode_number,
   [SWFDEC_AMF_BOOLEAN] = swfdec_amf_decode_boolean,
   [SWFDEC_AMF_STRING] = swfdec_amf_decode_string,
   [SWFDEC_AMF_OBJECT] = swfdec_amf_decode_object,
+  [SWFDEC_AMF_NULL] = swfdec_amf_decode_null,
+  [SWFDEC_AMF_UNDEFINED] = swfdec_amf_decode_undefined,
+  [SWFDEC_AMF_REFERENCE] = swfdec_amf_decode_reference,
   [SWFDEC_AMF_MIXED_ARRAY] = swfdec_amf_decode_mixed_array,
   [SWFDEC_AMF_ARRAY] = swfdec_amf_decode_array,
   [SWFDEC_AMF_DATE] = swfdec_amf_decode_date,
-  [SWFDEC_AMF_NULL] = swfdec_amf_decode_null,
-  [SWFDEC_AMF_UNDEFINED] = swfdec_amf_decode_undefined,
 #if 0
   SWFDEC_AMF_MOVIECLIP = 4,
-  SWFDEC_AMF_REFERENCE = 7,
   SWFDEC_AMF_END_OBJECT = 9,
   SWFDEC_AMF_BIG_STRING = 12,
   SWFDEC_AMF_RECORDSET = 14,
@@ -189,13 +272,13 @@ static const SwfdecAmfParseFunc parse_funcs[SWFDEC_AMF_N_TYPES] = {
 };
 
 gboolean
-swfdec_amf_decode (SwfdecAsContext *context, SwfdecBits *bits, 
+swfdec_amf_decode (SwfdecAmfContext *context, SwfdecBits *bits, 
     SwfdecAsValue *rval)
 {
   SwfdecAmfParseFunc func;
   guint type;
 
-  g_return_val_if_fail (SWFDEC_IS_AS_CONTEXT (context), FALSE);
+  g_return_val_if_fail (context != NULL, FALSE);
   g_return_val_if_fail (bits != NULL, FALSE);
   g_return_val_if_fail (rval != NULL, FALSE);
 
@@ -211,10 +294,10 @@ swfdec_amf_decode (SwfdecAsContext *context, SwfdecBits *bits,
 /*** encoding ***/
 
 gboolean
-swfdec_amf_encode (SwfdecAsContext *context,  SwfdecBots *bots,
+swfdec_amf_encode (SwfdecAmfContext *context, SwfdecBots *bots,
     SwfdecAsValue val)
 {
-  g_return_val_if_fail (SWFDEC_IS_AS_CONTEXT (context), FALSE);
+  g_return_val_if_fail (context != NULL, FALSE);
   g_return_val_if_fail (bots != NULL, FALSE);
 
   switch (SWFDEC_AS_VALUE_GET_TYPE (val)) {
@@ -253,6 +336,15 @@ swfdec_amf_encode (SwfdecAsContext *context,  SwfdecBots *bots,
     case SWFDEC_AS_TYPE_OBJECT:
       {
 	SwfdecAsObject *object = SWFDEC_AS_VALUE_GET_OBJECT (val);
+	int id = swfdec_amf_context_find_object (context, object);
+
+	if (id >= 0) {
+	  swfdec_bots_put_u8 (bots, SWFDEC_AMF_REFERENCE);
+	  swfdec_bots_put_bu16 (bots, id);
+	  break;
+	}
+
+	swfdec_amf_context_add_object (context, object);
 	if (object->array) {
 	  SWFDEC_ERROR ("implement encoding of arrays?");
 	  return FALSE;
@@ -295,4 +387,3 @@ swfdec_amf_encode (SwfdecAsContext *context,  SwfdecBots *bots,
   }
   return TRUE;
 }
-

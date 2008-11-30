@@ -129,11 +129,8 @@ swfdec_rtmp_handshake_channel_push_connect (SwfdecRtmpHandshakeChannel *shake)
   val = swfdec_as_value_from_number (cx, 1);
   swfdec_as_object_set_variable (o, SWFDEC_AS_STR_videoFunction, &val);
 
-  val = SWFDEC_AS_VALUE_FROM_OBJECT (o);
-  swfdec_rtmp_rpc_channel_send (SWFDEC_RTMP_RPC_CHANNEL (
-	swfdec_rtmp_connection_get_rpc_channel (conn)), 
-      SWFDEC_AS_VALUE_FROM_STRING (SWFDEC_AS_STR_connect), o,
-      1, &val);
+  swfdec_rtmp_rpc_channel_send_connect (SWFDEC_RTMP_RPC_CHANNEL (
+	swfdec_rtmp_connection_get_rpc_channel (conn)), SWFDEC_AS_VALUE_FROM_OBJECT (o));
   swfdec_rtmp_header_invalidate (&swfdec_rtmp_connection_get_rpc_channel (conn)->send_cache);
 }
 

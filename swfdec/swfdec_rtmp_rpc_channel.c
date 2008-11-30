@@ -36,30 +36,30 @@ G_DEFINE_TYPE (SwfdecRtmpRpcChannel, swfdec_rtmp_rpc_channel, SWFDEC_TYPE_RTMP_C
 
 static void
 swfdec_rtmp_rpc_channel_do_send (SwfdecRtmpRpcChannel *rpc, SwfdecAsValue name, 
-    guint id, guint argc, const SwfdecAsValue *argv)
+    guint id, SwfdecAsValue special, guint argc, const SwfdecAsValue *argv)
 {
   SwfdecRtmpChannel *channel;
   SwfdecRtmpHeader header;
-  SwfdecAsContext *cx;
+  SwfdecAsContext *context;
+  SwfdecAmfContext *cx;
   SwfdecBots *bots;
   SwfdecBuffer *buffer;
   guint i;
 
   channel = SWFDEC_RTMP_CHANNEL (rpc);
-  cx = swfdec_gc_object_get_context (channel->conn);
+  context = swfdec_gc_object_get_context (channel->conn);
 
   /* prepare buffer to encode */
+  cx = swfdec_amf_context_new (context);
   bots = swfdec_bots_new ();
   swfdec_amf_encode (cx, bots, name);
-  swfdec_amf_encode (cx, bots, swfdec_as_value_from_number (cx, id));
-  if (argc == 0) {
-    swfdec_amf_encode (cx, bots, SWFDEC_AS_VALUE_NULL);
-  } else {
-    for (i = 0; i < argc; i++) {
-      swfdec_amf_encode (cx, bots, argv[i]);
-    }
+  swfdec_amf_encode (cx, bots, swfdec_as_value_from_number (context, id));
+  swfdec_amf_encode (cx, bots, special);
+  for (i = 0; i < argc; i++) {
+    swfdec_amf_encode (cx, bots, argv[i]);
   }
   buffer = swfdec_bots_close (bots);
+  swfdec_amf_context_free (cx);
 
   /* prepare header */
   header.channel = channel->id;
@@ -72,9 +72,10 @@ swfdec_rtmp_rpc_channel_do_send (SwfdecRtmpRpcChannel *rpc, SwfdecAsValue name,
 }
 
 static void
-swfdec_rtmp_rpc_channel_receive_reply (SwfdecRtmpChannel *channel, SwfdecBits *bits)
+swfdec_rtmp_rpc_channel_receive_reply (SwfdecRtmpChannel *channel, 
+    SwfdecAmfContext *cx, SwfdecBits *bits)
 {
-  SwfdecAsContext *cx = swfdec_gc_object_get_context (channel->conn);
+  SwfdecAsContext *context = swfdec_gc_object_get_context (channel->conn);
   SwfdecAsObject *reply_to;
   SwfdecAsValue val[2], tmp;
   guint id, i;
@@ -83,14 +84,7 @@ swfdec_rtmp_rpc_channel_receive_reply (SwfdecRtmpChannel *channel, SwfdecBits *b
     SWFDEC_ERROR ("could not decode reply id");
     return;
   }
-  id = swfdec_as_value_to_integer (cx, tmp);
-  reply_to = g_hash_table_lookup (SWFDEC_RTMP_RPC_CHANNEL (channel)->pending, 
-      GUINT_TO_POINTER (id));
-  if (reply_to == NULL) {
-    SWFDEC_ERROR ("no object to send a reply to");
-    return;
-  }
-  g_hash_table_steal (SWFDEC_RTMP_RPC_CHANNEL (channel)->pending, GUINT_TO_POINTER (id));
+  id = swfdec_as_value_to_integer (context, tmp);
   
   for (i = 0; swfdec_bits_left (bits) && i < 2; i++) {
     if (!swfdec_amf_decode (cx, bits, &val[i])) {
@@ -98,30 +92,43 @@ swfdec_rtmp_rpc_channel_receive_reply (SwfdecRtmpChannel *channel, SwfdecBits *b
       return;
     }
   }
+  if (swfdec_bits_left (bits)) {
+    SWFDEC_FIXME ("more than 2 values in a reply?");
+  }
 
   if (id == 1 && SWFDEC_IS_RTMP_HANDSHAKE_CHANNEL (channel->conn->channels[0])) {
     swfdec_rtmp_handshake_channel_connected (SWFDEC_RTMP_HANDSHAKE_CHANNEL (channel->conn->channels[0]),
 	  i, val);
   } else {
-    swfdec_as_object_call (reply_to, SWFDEC_AS_STR_onResult, 1, val, NULL);
+    if (!SWFDEC_AS_VALUE_IS_NULL (val[0])) {
+      SWFDEC_FIXME ("first argument in reply is not null?");
+    }
+    reply_to = g_hash_table_lookup (SWFDEC_RTMP_RPC_CHANNEL (channel)->pending, 
+	GUINT_TO_POINTER (id));
+    if (reply_to == NULL) {
+      SWFDEC_ERROR ("no object to send a reply to");
+      return;
+    }
+    g_hash_table_steal (SWFDEC_RTMP_RPC_CHANNEL (channel)->pending, GUINT_TO_POINTER (id));
+    swfdec_as_object_call (reply_to, SWFDEC_AS_STR_onResult, 1, &val[1], NULL);
   }
 }
 
 static void
 swfdec_rtmp_rpc_channel_receive_call (SwfdecRtmpChannel *channel, 
-    SwfdecAsValue val, SwfdecBits *bits)
+    SwfdecAmfContext *cx, SwfdecAsValue val, SwfdecBits *bits)
 {
-  SwfdecAsContext *cx = swfdec_gc_object_get_context (channel->conn);
+  SwfdecAsContext *context = swfdec_gc_object_get_context (channel->conn);
   const char *name;
   guint id, i;
   SwfdecAsValue *args;
 
-  name = swfdec_as_value_to_string (cx, val);
+  name = swfdec_as_value_to_string (context, val);
   if (!swfdec_amf_decode (cx, bits, &val)) {
     SWFDEC_ERROR ("could not decode reply id");
     return;
   }
-  id = swfdec_as_value_to_integer (cx, val);
+  id = swfdec_as_value_to_integer (context, val);
   
   args = NULL;
   for (i = 0; swfdec_bits_left (bits); i++) {
@@ -140,7 +147,7 @@ swfdec_rtmp_rpc_channel_receive_call (SwfdecRtmpChannel *channel,
   /* send reply */
   if (id) {
     swfdec_rtmp_rpc_channel_do_send (SWFDEC_RTMP_RPC_CHANNEL (channel),
-	SWFDEC_AS_VALUE_FROM_STRING (SWFDEC_AS_STR__result), id, 1, &val);
+	SWFDEC_AS_VALUE_FROM_STRING (SWFDEC_AS_STR__result), id, val, 0, NULL);
   }
 }
 
@@ -148,14 +155,16 @@ static void
 swfdec_rtmp_rpc_channel_receive (SwfdecRtmpChannel *channel,
     const SwfdecRtmpHeader *header, SwfdecBuffer *buffer)
 {
-  SwfdecAsContext *cx;
+  SwfdecAsContext *context;
+  SwfdecAmfContext *cx;
   SwfdecAsValue val;
   SwfdecBits bits;
 
   if (header->stream != 0) {
     SWFDEC_FIXME ("not stream 0, but stream %u here?!", header->stream);
   }
-  cx = swfdec_gc_object_get_context (channel->conn);
+  context = swfdec_gc_object_get_context (channel->conn);
+  cx = swfdec_amf_context_new (context);
   swfdec_sandbox_use (channel->conn->sandbox);
   switch ((guint) header->type) {
     case SWFDEC_RTMP_PACKET_INVOKE:
@@ -166,9 +175,9 @@ swfdec_rtmp_rpc_channel_receive (SwfdecRtmpChannel *channel,
       }
       if (SWFDEC_AS_VALUE_IS_STRING (val) && 
 	  SWFDEC_AS_VALUE_GET_STRING (val) == SWFDEC_AS_STR__result) {
-	swfdec_rtmp_rpc_channel_receive_reply (channel, &bits);
+	swfdec_rtmp_rpc_channel_receive_reply (channel, cx, &bits);
       } else {
-	swfdec_rtmp_rpc_channel_receive_call (channel, val, &bits);
+	swfdec_rtmp_rpc_channel_receive_call (channel, cx, val, &bits);
       }
       break;
     default:
@@ -176,6 +185,7 @@ swfdec_rtmp_rpc_channel_receive (SwfdecRtmpChannel *channel,
       break;
   }
   swfdec_sandbox_unuse (channel->conn->sandbox);
+  swfdec_amf_context_free (cx);
   swfdec_buffer_unref (buffer);
 }
 
@@ -224,6 +234,14 @@ swfdec_rtmp_rpc_channel_init (SwfdecRtmpRpcChannel *rpc)
 }
 
 void
+swfdec_rtmp_rpc_channel_send_connect (SwfdecRtmpRpcChannel *rpc,
+    SwfdecAsValue connect)
+{
+  swfdec_rtmp_rpc_channel_do_send (rpc, SWFDEC_AS_VALUE_FROM_STRING (SWFDEC_AS_STR_connect),
+      ++rpc->id, connect, 0, NULL);
+}
+
+void
 swfdec_rtmp_rpc_channel_send (SwfdecRtmpRpcChannel *rpc,
     SwfdecAsValue name, SwfdecAsObject *reply_to, 
     guint argc, const SwfdecAsValue *argv)
@@ -239,6 +257,6 @@ swfdec_rtmp_rpc_channel_send (SwfdecRtmpRpcChannel *rpc,
   } else {
     id = 0;
   }
-  swfdec_rtmp_rpc_channel_do_send (rpc, name, id, argc, argv);
+  swfdec_rtmp_rpc_channel_do_send (rpc, name, id, SWFDEC_AS_VALUE_NULL, argc, argv);
 }
 

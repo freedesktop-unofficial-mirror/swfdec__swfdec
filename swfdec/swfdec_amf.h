@@ -49,12 +49,18 @@ typedef enum {
   SWFDEC_AMF_N_TYPES
 } SwfdecAmfType;
 
-gboolean	swfdec_amf_decode		(SwfdecAsContext *	context, 
-						 SwfdecBits *		bits,
-						 SwfdecAsValue *	rval);
-gboolean	swfdec_amf_encode		(SwfdecAsContext *	context, 
-						 SwfdecBots *		bots,
-						 SwfdecAsValue		val);
+typedef struct _SwfdecAmfContext SwfdecAmfContext;
+
+SwfdecAmfContext *	swfdec_amf_context_new		(SwfdecAsContext *	context);
+void			swfdec_amf_context_free		(SwfdecAmfContext *	context);
+
+gboolean		swfdec_amf_decode		(SwfdecAmfContext *	context,
+							 SwfdecBits *		bits, 
+							 SwfdecAsValue *	rval);
+
+gboolean		swfdec_amf_encode		(SwfdecAmfContext *	context, 
+							 SwfdecBots *		bots,
+							 SwfdecAsValue		val);
 
 
 G_END_DECLS

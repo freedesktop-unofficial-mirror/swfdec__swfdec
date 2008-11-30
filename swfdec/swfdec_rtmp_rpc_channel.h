@@ -49,6 +49,8 @@ struct _SwfdecRtmpRpcChannelClass {
 
 GType			swfdec_rtmp_rpc_channel_get_type	(void);
 
+void			swfdec_rtmp_rpc_channel_send_connect	(SwfdecRtmpRpcChannel *	rpc,
+								 SwfdecAsValue		connect);
 void			swfdec_rtmp_rpc_channel_send		(SwfdecRtmpRpcChannel *	rpc,
 								 SwfdecAsValue		name,
 								 SwfdecAsObject *	reply_to,
