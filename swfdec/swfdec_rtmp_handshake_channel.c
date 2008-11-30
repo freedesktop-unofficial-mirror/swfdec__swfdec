@@ -25,6 +25,7 @@
 
 #include <string.h>
 
+#include "swfdec_as_internal.h"
 #include "swfdec_as_strings.h"
 #include "swfdec_debug.h"
 #include "swfdec_player_internal.h"
@@ -39,14 +40,9 @@ static SwfdecBuffer *
 swfdec_rtmp_handshake_create (SwfdecAsContext *context)
 {
   SwfdecBots *bots;
-  GTimeVal tv;
   guint i, x;
   
-  swfdec_as_context_get_time (context, &tv);
-  /* we assume here that swfdec_as_context_get_time always returns a tv > start_time */
-  x = tv.tv_sec - context->start_time.tv_sec;
-  x *= 1000;
-  x += (tv.tv_usec - context->start_time.tv_usec) / 1000;
+  x = swfdec_as_context_get_lifetime (context);
 
   bots = swfdec_bots_new ();
   swfdec_bots_prepare_bytes (bots, 1 + 1536);

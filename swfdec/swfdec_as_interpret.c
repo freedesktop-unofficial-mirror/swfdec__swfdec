@@ -2200,16 +2200,8 @@ swfdec_action_type_of (SwfdecAsContext *cx, guint action, const guint8 *data, gu
 static void
 swfdec_action_get_time (SwfdecAsContext *cx, guint action, const guint8 *data, guint len)
 {
-  GTimeVal tv;
-  double diff;
-
-  swfdec_as_context_get_time (cx, &tv);
-  /* we assume here that swfdec_as_context_get_time always returns a tv > start_time */
-  diff = tv.tv_sec - cx->start_time.tv_sec;
-  diff *= 1000;
-  diff += (tv.tv_usec - cx->start_time.tv_usec) / 1000;
-
-  *swfdec_as_stack_push (cx) = swfdec_as_value_from_number (cx, diff);
+  *swfdec_as_stack_push (cx) = swfdec_as_value_from_integer (cx, 
+      swfdec_as_context_get_lifetime (cx));
 }
 
 static gboolean
