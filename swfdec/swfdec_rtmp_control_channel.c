@@ -43,7 +43,8 @@ swfdec_rtmp_control_channel_handle_ping (SwfdecRtmpChannel *channel, SwfdecBuffe
 }
 
 static void
-swfdec_rtmp_control_channel_handle_server_bandwidth (SwfdecRtmpChannel *channel, SwfdecBuffer *buffer)
+swfdec_rtmp_control_channel_handle_server_bandwidth (SwfdecRtmpChannel *channel,
+    const SwfdecRtmpHeader *org_header, SwfdecBuffer *buffer)
 {
   SwfdecRtmpControlChannel *control = SWFDEC_RTMP_CONTROL_CHANNEL (channel);
   SwfdecBits bits;
@@ -63,12 +64,12 @@ swfdec_rtmp_control_channel_handle_server_bandwidth (SwfdecRtmpChannel *channel,
   buffer = swfdec_bots_close (bots);
   header.channel = channel->id;
   /* FIXME: This also sends some negative timestamp, no clue what that timestamp means though */
-  header.timestamp = 0;
+  header.timestamp = org_header->timestamp - swfdec_rtmp_channel_get_lifetime (channel);
   header.size = buffer->length;
   header.type = SWFDEC_RTMP_PACKET_SERVER_BANDWIDTH;
   header.stream = 0;
 
-  swfdec_rtmp_channel_send (channel, &header, buffer);
+  swfdec_rtmp_channel_send_full (channel, &header, buffer);
   swfdec_buffer_unref (buffer);
 }
 
@@ -95,7 +96,7 @@ swfdec_rtmp_control_channel_receive (SwfdecRtmpChannel *channel,
       swfdec_rtmp_control_channel_handle_ping (channel, buffer);
       break;
     case SWFDEC_RTMP_PACKET_SERVER_BANDWIDTH:
-      swfdec_rtmp_control_channel_handle_server_bandwidth (channel, buffer);
+      swfdec_rtmp_control_channel_handle_server_bandwidth (channel, header, buffer);
       break;
     case SWFDEC_RTMP_PACKET_CLIENT_BANDWIDTH:
       swfdec_rtmp_control_channel_handle_client_bandwidth (channel, buffer);

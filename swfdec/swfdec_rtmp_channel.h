@@ -40,6 +40,7 @@ struct _SwfdecRtmpChannel {
 
   SwfdecRtmpConnection *	conn;		/* Connection this channel belongs to (holds reference) */
   guint				id;		/* id (0-63) inside connection */
+  GTimeVal			start_time;	/* context time when starting this channel */
   SwfdecRtmpHeader		recv_cache;	/* cached header info for receiving data */
   SwfdecBufferQueue *		recv_queue;	/* Queue of semi-assembled packages when receiving */
   SwfdecRtmpHeader		send_cache;	/* cached header info for sending data */
@@ -59,11 +60,16 @@ struct _SwfdecRtmpChannelClass {
 GType			swfdec_rtmp_channel_get_type		(void);
 
 void			swfdec_rtmp_channel_send		(SwfdecRtmpChannel *	channel,
+								 SwfdecRtmpPacketType	type,
+								 SwfdecBuffer *		data);
+void			swfdec_rtmp_channel_send_full		(SwfdecRtmpChannel *	channel,
 								 const SwfdecRtmpHeader *header,
 								 SwfdecBuffer *		data);
 gboolean		swfdec_rtmp_channel_receive		(SwfdecRtmpChannel *	channel,
 								 SwfdecBufferQueue *	queue,
 								 SwfdecRtmpHeaderSize	header_size);
+
+guint			swfdec_rtmp_channel_get_lifetime	(SwfdecRtmpChannel *	channel);
 
 
 

@@ -152,6 +152,8 @@ swfdec_rtmp_connection_register_channel	(SwfdecRtmpConnection *conn, int id,
   conn->channels[id] = g_object_new (channel_type, NULL);
   conn->channels[id]->conn = conn;
   conn->channels[id]->id = id;
+  swfdec_as_context_get_time (swfdec_gc_object_get_context (conn), 
+      &conn->channels[id]->start_time);
 
   return conn->channels[id];
 }

@@ -65,8 +65,26 @@ swfdec_rtmp_channel_init (SwfdecRtmpChannel *channel)
   channel->block_size = 128;
 }
 
+guint
+swfdec_rtmp_channel_get_lifetime (SwfdecRtmpChannel *channel)
+{
+  GTimeVal tv;
+  guint lifetime;
+
+  g_return_val_if_fail (SWFDEC_IS_RTMP_CHANNEL (channel), 0);
+
+  swfdec_as_context_get_time (swfdec_gc_object_get_context (channel->conn), &tv);
+
+  /* we just assume here that swfdec_as_context_get_time always returns a tv > start_time */
+  lifetime = tv.tv_sec - channel->start_time.tv_sec;
+  lifetime *= 1000;
+  lifetime += (tv.tv_usec - channel->start_time.tv_usec) / 1000;
+
+  return lifetime;
+}
+
 void
-swfdec_rtmp_channel_send (SwfdecRtmpChannel *channel,
+swfdec_rtmp_channel_send_full (SwfdecRtmpChannel *channel,
     const SwfdecRtmpHeader *header, SwfdecBuffer *data)
 {
   SwfdecBots *bots;
@@ -92,6 +110,24 @@ swfdec_rtmp_channel_send (SwfdecRtmpChannel *channel,
   }
   
   swfdec_rtmp_socket_send (channel->conn->socket);
+}
+
+void
+swfdec_rtmp_channel_send (SwfdecRtmpChannel *channel,
+    SwfdecRtmpPacketType type, SwfdecBuffer *data)
+{
+  SwfdecRtmpHeader header;
+
+  g_return_if_fail (SWFDEC_IS_RTMP_CHANNEL (channel));
+  g_return_if_fail (data != NULL);
+
+  header.channel = channel->id;
+  header.timestamp = swfdec_rtmp_channel_get_lifetime (channel);
+  header.size = data->length;
+  header.type = type;
+  header.stream = 0;
+
+  swfdec_rtmp_channel_send_full (channel, &header, data);
 }
 
 gboolean
