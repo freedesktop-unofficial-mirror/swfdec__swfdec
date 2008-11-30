@@ -211,9 +211,8 @@ swfdec_amf_decode_date (SwfdecAmfContext *context, SwfdecBits *bits, SwfdecAsVal
   swfdec_amf_context_add_object (context, object);
   date = SWFDEC_AS_DATE (object->relay);
   date->milliseconds = swfdec_bits_get_bdouble (bits);
-  date->utc_offset = swfdec_bits_get_bu16 (bits);
-  if (date->utc_offset > 12 * 60)
-    date->utc_offset -= 12 * 60;
+  /* Yes, this really is ignored - by both server and client */
+  /* date->utc_offset = (gint16) */ swfdec_bits_get_bu16 (bits);
   SWFDEC_AS_VALUE_SET_OBJECT (val, object);
 
   return TRUE;
@@ -341,6 +340,14 @@ swfdec_amf_encode (SwfdecAmfContext *context, SwfdecBots *bots,
 	if (id >= 0) {
 	  swfdec_bots_put_u8 (bots, SWFDEC_AMF_REFERENCE);
 	  swfdec_bots_put_bu16 (bots, id);
+	  break;
+	}
+
+	if (SWFDEC_IS_AS_DATE (object->relay)) {
+	  SwfdecAsDate *date = SWFDEC_AS_DATE (object->relay);
+	  swfdec_bots_put_u8 (bots, SWFDEC_AMF_DATE);
+	  swfdec_bots_put_bdouble (bots, date->milliseconds);
+	  swfdec_bots_put_bu16 (bots, date->utc_offset);
 	  break;
 	}
 
