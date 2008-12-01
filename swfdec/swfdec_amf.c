@@ -124,6 +124,20 @@ swfdec_amf_decode_string (SwfdecAmfContext *context, SwfdecBits *bits, SwfdecAsV
 }
 
 static gboolean
+swfdec_amf_decode_big_string (SwfdecAmfContext *context, SwfdecBits *bits, SwfdecAsValue *val)
+{
+  guint len = swfdec_bits_get_bu32 (bits);
+  char *s;
+  
+  /* FIXME: the supplied version is likely incorrect */
+  s = swfdec_bits_get_string_length (bits, len, context->context->version);
+  if (s == NULL)
+    return FALSE;
+  SWFDEC_AS_VALUE_SET_STRING (val, swfdec_as_context_give_string (context->context, s));
+  return TRUE;
+}
+
+static gboolean
 swfdec_amf_decode_properties (SwfdecAmfContext *context, SwfdecBits *bits, SwfdecAsObject *object)
 {
   while (swfdec_bits_left (bits)) {
@@ -249,25 +263,25 @@ swfdec_amf_decode_reference (SwfdecAmfContext *context, SwfdecBits *bits, Swfdec
 
 typedef gboolean (* SwfdecAmfParseFunc) (SwfdecAmfContext *cx, SwfdecBits *bits, SwfdecAsValue *val);
 
-static const SwfdecAmfParseFunc parse_funcs[SWFDEC_AMF_N_TYPES] = {
+static const SwfdecAmfParseFunc parse_funcs[] = {
   [SWFDEC_AMF_NUMBER] = swfdec_amf_decode_number,
   [SWFDEC_AMF_BOOLEAN] = swfdec_amf_decode_boolean,
   [SWFDEC_AMF_STRING] = swfdec_amf_decode_string,
   [SWFDEC_AMF_OBJECT] = swfdec_amf_decode_object,
+  [SWFDEC_AMF_MOVIECLIP] = NULL,
   [SWFDEC_AMF_NULL] = swfdec_amf_decode_null,
   [SWFDEC_AMF_UNDEFINED] = swfdec_amf_decode_undefined,
   [SWFDEC_AMF_REFERENCE] = swfdec_amf_decode_reference,
   [SWFDEC_AMF_SPARSE_ARRAY] = swfdec_amf_decode_sparse_array,
+  [SWFDEC_AMF_END_OBJECT] = NULL,
   [SWFDEC_AMF_DENSE_ARRAY] = swfdec_amf_decode_dense_array,
   [SWFDEC_AMF_DATE] = swfdec_amf_decode_date,
+  [SWFDEC_AMF_BIG_STRING] = swfdec_amf_decode_big_string,
 #if 0
-  SWFDEC_AMF_MOVIECLIP = 4,
-  SWFDEC_AMF_END_OBJECT = 9,
-  SWFDEC_AMF_BIG_STRING = 12,
-  SWFDEC_AMF_RECORDSET = 14,
-  SWFDEC_AMF_XML = 15,
-  SWFDEC_AMF_CLASS = 16,
-  SWFDEC_AMF_FLASH9 = 17,
+  [SWFDEC_AMF_RECORDSET] = NULL,
+  [SWFDEC_AMF_XML] = NULL,
+  [SWFDEC_AMF_CLASS] = NULL,
+  [SWFDEC_AMF_FLASH9] = NULL,
 #endif
 };
 
@@ -283,7 +297,7 @@ swfdec_amf_decode (SwfdecAmfContext *context, SwfdecBits *bits,
   g_return_val_if_fail (rval != NULL, FALSE);
 
   type = swfdec_bits_get_u8 (bits);
-  if (type >= SWFDEC_AMF_N_TYPES ||
+  if (type >= G_N_ELEMENTS (parse_funcs) ||
       (func = parse_funcs[type]) == NULL) {
     SWFDEC_ERROR ("no parse func for AMF type %u", type);
     return FALSE;
