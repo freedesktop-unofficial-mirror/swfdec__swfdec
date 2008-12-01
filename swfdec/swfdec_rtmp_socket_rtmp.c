@@ -72,7 +72,7 @@ swfdec_rtmp_socket_rtmp_stream_target_parse (SwfdecStreamTarget *target, SwfdecS
 {
   swfdec_rtmp_socket_receive (SWFDEC_RTMP_SOCKET (target), 
       swfdec_stream_get_queue (stream));
-  return TRUE;
+  return FALSE;
 }
 
 static void
