@@ -85,7 +85,7 @@ run_test = function (t, file) {
       /* need to have a catch block or the try stmt will be ignored */
     };
     t.reset (file);
-    t.advance (10 * 60 * 1000); /* 10 minutes - you're supposed to fscommand:quit */
+    t.advance (60 * 1000); /* 1 minute - you're supposed to fscommand:quit */
     /* check socket data was identical */
     var result = true;
     if (t.sockets.length != t.dumps.length) {
