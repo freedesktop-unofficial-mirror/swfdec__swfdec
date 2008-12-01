@@ -425,36 +425,17 @@ swfdec_amf_encode (SwfdecAmfContext *context, SwfdecBots *bots,
 
 	swfdec_amf_context_add_object (context, object);
 	if (object->array) {
-	  if (swfdec_as_array_is_dense (object)) {
-	    guint i, length;
-	    length = swfdec_as_array_get_length (object);
-	    swfdec_bots_put_u8 (bots, SWFDEC_AMF_DENSE_ARRAY);
-	    swfdec_bots_put_bu32 (bots, length);
-	    for (i = 0; i < length; i++) {
-	      const char *name = swfdec_as_integer_to_string (context->context, i);
-	      SwfdecAsObject *o = object;
-	      SwfdecAsValue *tmp;
-	      while ((tmp = swfdec_as_object_peek_variable (o, name)) == NULL) {
-		o = o->prototype;
-		g_assert (o);
-	      }
-	      if (!swfdec_amf_encode (context, bots, *tmp))
-		return FALSE;
-	    }
-	  } else {
-	    GSList *walk, *list;
-	    swfdec_bots_put_u8 (bots, SWFDEC_AMF_SPARSE_ARRAY);
-	    list = swfdec_as_object_enumerate (object);
-	    swfdec_bots_put_bu32 (bots, g_slist_length (list));
-	    for (walk = list; walk; walk = walk->next) {
-	      if (!swfdec_amf_encode_property (context, bots, object, walk->data))
-		return FALSE;
-	    }
-	    g_slist_free (list);
-	    swfdec_bots_put_u16 (bots, 0); /* property name */
-	    swfdec_bots_put_u8 (bots, SWFDEC_AMF_END_OBJECT);
+	  GSList *walk, *list;
+	  swfdec_bots_put_u8 (bots, SWFDEC_AMF_SPARSE_ARRAY);
+	  list = swfdec_as_object_enumerate (object);
+	  swfdec_bots_put_bu32 (bots, g_slist_length (list));
+	  for (walk = list; walk; walk = walk->next) {
+	    if (!swfdec_amf_encode_property (context, bots, object, walk->data))
+	      return FALSE;
 	  }
-	  return FALSE;
+	  g_slist_free (list);
+	  swfdec_bots_put_u16 (bots, 0); /* property name */
+	  swfdec_bots_put_u8 (bots, SWFDEC_AMF_END_OBJECT);
 	} else {
 	  GSList *walk, *list;
 	  swfdec_bots_put_u8 (bots, SWFDEC_AMF_OBJECT);
