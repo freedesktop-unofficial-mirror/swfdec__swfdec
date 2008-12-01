@@ -278,6 +278,7 @@ static const SwfdecAmfParseFunc parse_funcs[] = {
   [SWFDEC_AMF_DATE] = swfdec_amf_decode_date,
   [SWFDEC_AMF_BIG_STRING] = swfdec_amf_decode_big_string,
 #if 0
+  [SWFDEC_AMF_UNSUPPORTED] = NULL,
   [SWFDEC_AMF_RECORDSET] = NULL,
   [SWFDEC_AMF_XML] = NULL,
   [SWFDEC_AMF_CLASS] = NULL,

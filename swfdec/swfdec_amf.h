@@ -40,13 +40,11 @@ typedef enum {
   SWFDEC_AMF_DENSE_ARRAY = 10,
   SWFDEC_AMF_DATE = 11,
   SWFDEC_AMF_BIG_STRING = 12,
-  /* what is 13? */
+  SWFDEC_AMF_UNSUPPORTED = 13,
   SWFDEC_AMF_RECORDSET = 14,
   SWFDEC_AMF_XML = 15,
   SWFDEC_AMF_CLASS = 16,
-  SWFDEC_AMF_FLASH9 = 17,
-  /* add more items here */
-  SWFDEC_AMF_N_TYPES
+  SWFDEC_AMF_FLASH9 = 17
 } SwfdecAmfType;
 
 typedef struct _SwfdecAmfContext SwfdecAmfContext;
