@@ -308,6 +308,7 @@ swfdec_amf_decode (SwfdecAmfContext *context, SwfdecBits *bits,
 
 /*** encoding ***/
 
+/* NB: variable with given name must exist */
 static gboolean
 swfdec_amf_encode_property (SwfdecAmfContext *context, SwfdecBots *bots,
     SwfdecAsObject *object, const char *name)
