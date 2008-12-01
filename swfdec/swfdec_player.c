@@ -595,18 +595,7 @@ swfdec_player_add_external_action (SwfdecPlayer *player, gpointer object,
   action->func = action_func;
   action->data = action_data;
   if (!priv->external_timeout.callback) {
-    /* trigger execution immediately.
-     * But if initialized, keep at least 100ms from when the last external 
-     * timeout triggered. This is a crude method to get around infinite loops
-     * when script actions executed by external actions trigger another external
-     * action that would execute instantly.
-     */
-    if (priv->initialized) {
-      priv->external_timeout.timestamp = MAX (priv->time,
-	  priv->external_timeout.timestamp + SWFDEC_MSECS_TO_TICKS (100));
-    } else {
-      priv->external_timeout.timestamp = priv->time;
-    }
+    priv->external_timeout.timestamp = priv->time;
     priv->external_timeout.callback = swfdec_player_trigger_external_actions;
     swfdec_player_add_timeout (player, &priv->external_timeout);
   }
