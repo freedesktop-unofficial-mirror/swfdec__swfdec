@@ -54,6 +54,7 @@ swfdec_rtmp_socket_rtmp_do_send (SwfdecRtmpSocketRtmp *rtmp)
 	  written, rtmp->next->length - written);
       swfdec_buffer_unref (rtmp->next);
       rtmp->next = buffer;
+      break;
     }
   }
 }
@@ -113,7 +114,10 @@ swfdec_rtmp_socket_rtmp_stream_target_error (SwfdecStreamTarget *target, SwfdecS
 static void
 swfdec_rtmp_socket_rtmp_stream_target_writable (SwfdecStreamTarget *target, SwfdecStream *stream)
 {
-  swfdec_rtmp_socket_rtmp_do_send (SWFDEC_RTMP_SOCKET_RTMP (target));
+  SwfdecRtmpSocketRtmp *rtmp = SWFDEC_RTMP_SOCKET_RTMP (target);
+
+  g_assert (rtmp->next);
+  swfdec_rtmp_socket_rtmp_do_send (rtmp);
 }
 
 static void
