@@ -1295,3 +1295,59 @@ swfdec_as_array_construct (SwfdecAsContext *cx, SwfdecAsObject *object,
 
   SWFDEC_AS_VALUE_SET_OBJECT (ret, object);
 }
+
+typedef struct {
+  SwfdecAsContext *	context;
+  guint			array_length;
+  guint			count;
+} DenseData;
+
+static gboolean
+swfdec_as_array_is_dense_foreach (SwfdecAsObject *array, const char *variable, 
+    SwfdecAsValue *value, guint flags, gpointer datap)
+{
+  DenseData *data = datap;
+  double d;
+
+  if (flags & SWFDEC_AS_VARIABLE_HIDDEN)
+    return TRUE;
+
+  d = swfdec_as_value_to_number (data->context, SWFDEC_AS_VALUE_FROM_STRING (variable));
+  if (d != swfdec_as_double_to_integer (d))
+    return FALSE;
+
+  if (d >= data->array_length)
+    return FALSE;
+
+  data->count++;
+  return TRUE;
+}
+
+/**
+ * swfdec_as_array_is_dense:
+ * @array: the object to check
+ *
+ * Checks if the given array is an array that only contains numeric properties
+ * in the range from 0 to the length of the object. If so, it is considered a 
+ * dense array.
+ *
+ * Returns: %TRUE if the given object is a dense array
+ **/
+gboolean
+swfdec_as_array_is_dense (SwfdecAsObject *array)
+{
+  DenseData data;
+
+  g_return_val_if_fail (array != NULL, FALSE);
+
+  if (!array->array)
+    return FALSE;
+
+  data.context = array->context;
+  data.array_length = swfdec_as_array_get_length (array);
+  data.count = 0;
+  if (!swfdec_as_object_foreach (array, swfdec_as_array_is_dense_foreach, &data))
+    return FALSE;
+
+  return data.count == data.array_length;
+}

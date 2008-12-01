@@ -163,13 +163,14 @@ swfdec_amf_decode_object (SwfdecAmfContext *context, SwfdecBits *bits, SwfdecAsV
 }
 
 static gboolean
-swfdec_amf_decode_mixed_array (SwfdecAmfContext *context, SwfdecBits *bits, SwfdecAsValue *val)
+swfdec_amf_decode_sparse_array (SwfdecAmfContext *context, SwfdecBits *bits, SwfdecAsValue *val)
 {
   guint len;
   SwfdecAsObject *array;
   
   len = swfdec_bits_get_bu32 (bits);
   array = swfdec_as_array_new (context->context);
+  swfdec_as_array_set_length (array, len);
   swfdec_amf_context_add_object (context, array);
   if (!swfdec_amf_decode_properties (context, bits, array))
     return FALSE;
@@ -178,7 +179,7 @@ swfdec_amf_decode_mixed_array (SwfdecAmfContext *context, SwfdecBits *bits, Swfd
 }
 
 static gboolean
-swfdec_amf_decode_array (SwfdecAmfContext *context, SwfdecBits *bits, SwfdecAsValue *val)
+swfdec_amf_decode_dense_array (SwfdecAmfContext *context, SwfdecBits *bits, SwfdecAsValue *val)
 {
   guint i, len;
   SwfdecAsObject *array;
@@ -256,8 +257,8 @@ static const SwfdecAmfParseFunc parse_funcs[SWFDEC_AMF_N_TYPES] = {
   [SWFDEC_AMF_NULL] = swfdec_amf_decode_null,
   [SWFDEC_AMF_UNDEFINED] = swfdec_amf_decode_undefined,
   [SWFDEC_AMF_REFERENCE] = swfdec_amf_decode_reference,
-  [SWFDEC_AMF_MIXED_ARRAY] = swfdec_amf_decode_mixed_array,
-  [SWFDEC_AMF_ARRAY] = swfdec_amf_decode_array,
+  [SWFDEC_AMF_SPARSE_ARRAY] = swfdec_amf_decode_sparse_array,
+  [SWFDEC_AMF_DENSE_ARRAY] = swfdec_amf_decode_dense_array,
   [SWFDEC_AMF_DATE] = swfdec_amf_decode_date,
 #if 0
   SWFDEC_AMF_MOVIECLIP = 4,
@@ -291,6 +292,27 @@ swfdec_amf_decode (SwfdecAmfContext *context, SwfdecBits *bits,
 }
 
 /*** encoding ***/
+
+static gboolean
+swfdec_amf_encode_property (SwfdecAmfContext *context, SwfdecBots *bots,
+    SwfdecAsObject *object, const char *name)
+{
+  gsize len = SWFDEC_AS_VALUE_STRLEN (SWFDEC_AS_VALUE_FROM_STRING (name));
+  SwfdecAsObject *o;
+  SwfdecAsValue *tmp;
+  if (len > G_MAXUINT16) {
+    SWFDEC_ERROR ("property name too long, clamping");
+    len = G_MAXUINT16;
+  }
+  swfdec_bots_put_bu16 (bots, len);
+  swfdec_bots_put_data (bots, (const guchar *) name, len);
+  o = object;
+  while ((tmp = swfdec_as_object_peek_variable (o, name)) == NULL) {
+    o = o->prototype;
+    g_assert (o);
+  }
+  return swfdec_amf_encode (context, bots, *tmp);
+}
 
 gboolean
 swfdec_amf_encode (SwfdecAmfContext *context, SwfdecBots *bots,
@@ -353,29 +375,40 @@ swfdec_amf_encode (SwfdecAmfContext *context, SwfdecBots *bots,
 
 	swfdec_amf_context_add_object (context, object);
 	if (object->array) {
-	  SWFDEC_ERROR ("implement encoding of arrays?");
+	  if (swfdec_as_array_is_dense (object)) {
+	    guint i, length;
+	    length = swfdec_as_array_get_length (object);
+	    swfdec_bots_put_u8 (bots, SWFDEC_AMF_DENSE_ARRAY);
+	    swfdec_bots_put_bu32 (bots, length);
+	    for (i = 0; i < length; i++) {
+	      const char *name = swfdec_as_integer_to_string (context->context, i);
+	      SwfdecAsObject *o = object;
+	      SwfdecAsValue *tmp;
+	      while ((tmp = swfdec_as_object_peek_variable (o, name)) == NULL) {
+		o = o->prototype;
+		g_assert (o);
+	      }
+	      return swfdec_amf_encode (context, bots, *tmp);
+	    }
+	  } else {
+	    GSList *walk, *list;
+	    swfdec_bots_put_u8 (bots, SWFDEC_AMF_SPARSE_ARRAY);
+	    list = swfdec_as_object_enumerate (object);
+	    swfdec_bots_put_bu32 (bots, g_slist_length (list));
+	    for (walk = list; walk; walk = walk->next) {
+	      swfdec_amf_encode_property (context, bots, object, walk->data);
+	    }
+	    g_slist_free (list);
+	    swfdec_bots_put_u16 (bots, 0); /* property name */
+	    swfdec_bots_put_u8 (bots, SWFDEC_AMF_END_OBJECT);
+	  }
 	  return FALSE;
 	} else {
 	  GSList *walk, *list;
 	  swfdec_bots_put_u8 (bots, SWFDEC_AMF_OBJECT);
 	  list = swfdec_as_object_enumerate (object);
 	  for (walk = list; walk; walk = walk->next) {
-	    const char *name = walk->data;
-	    gsize len = SWFDEC_AS_VALUE_STRLEN (SWFDEC_AS_VALUE_FROM_STRING (name));
-	    SwfdecAsObject *o;
-	    SwfdecAsValue *tmp;
-	    if (len > G_MAXUINT16) {
-	      SWFDEC_ERROR ("property name too long, calmping");
-	      len = G_MAXUINT16;
-	    }
-	    swfdec_bots_put_bu16 (bots, len);
-	    swfdec_bots_put_data (bots, (const guchar *) name, len);
-	    o = object;
-	    while ((tmp = swfdec_as_object_peek_variable (o, name)) == NULL) {
-	      o = o->prototype;
-	      g_assert (o);
-	    }
-	    swfdec_amf_encode (context, bots, *tmp);
+	    swfdec_amf_encode_property (context, bots, object, walk->data);
 	  }
 	  g_slist_free (list);
 	  swfdec_bots_put_u16 (bots, 0); /* property name */

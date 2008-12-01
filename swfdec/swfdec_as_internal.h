@@ -112,6 +112,7 @@ SwfdecAsFunction *
 						 SwfdecAsNative		native);
 
 /* swfdec_as_array.h */
+gboolean	swfdec_as_array_is_dense	(SwfdecAsObject *	array);
 void		swfdec_as_array_remove_range	(SwfdecAsObject *	object,
 						 gint32			start_index,
 						 gint32			num);
