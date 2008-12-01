@@ -150,26 +150,30 @@ static gsize
 swfdec_gtk_socket_send (SwfdecSocket *sock, SwfdecBuffer *buffer)
 {
   SwfdecGtkSocket *gtk = SWFDEC_GTK_SOCKET (sock);
-  SoupSocketIOStatus status;
+  SoupSocketIOStatus status = SOUP_SOCKET_OK;
   GError *error = NULL;
-  gsize len;
+  gsize len, written = 0;
 
-  status = soup_socket_write (gtk->sock, buffer->data, buffer->length, 
-      &len, NULL, &error);
-  switch (status) {
-    case SOUP_SOCKET_OK:
-    case SOUP_SOCKET_WOULD_BLOCK:
-    case SOUP_SOCKET_EOF:
-      break;
-    case SOUP_SOCKET_ERROR:
-      swfdec_stream_error (SWFDEC_STREAM (gtk), "%s", error->message);
-      g_error_free (error);
-      return 0;
-    default:
-      g_warning ("unhandled status code %u from soup_socket_read()", (guint) status);
-      break;
+  while (written < buffer->length) {
+    status = soup_socket_write (gtk->sock, buffer->data + written, 
+	buffer->length - written, &len, NULL, &error);
+    written += len;
+    switch (status) {
+      case SOUP_SOCKET_OK:
+	break;
+      case SOUP_SOCKET_WOULD_BLOCK:
+      case SOUP_SOCKET_EOF:
+	return written;
+      case SOUP_SOCKET_ERROR:
+	swfdec_stream_error (SWFDEC_STREAM (gtk), "%s", error->message);
+	g_error_free (error);
+	return 0;
+      default:
+	g_warning ("unhandled status code %u from soup_socket_write()", (guint) status);
+	break;
+    }
   }
-  return len;
+  return written;
 }
 
 static void
