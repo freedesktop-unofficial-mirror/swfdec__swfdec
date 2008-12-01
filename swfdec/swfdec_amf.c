@@ -223,7 +223,6 @@ swfdec_amf_decode_date (SwfdecAmfContext *context, SwfdecBits *bits, SwfdecAsVal
   SwfdecAsObject *object;
 
   object = swfdec_as_object_new (context->context, SWFDEC_AS_STR_Date, NULL);
-  swfdec_amf_context_add_object (context, object);
   date = SWFDEC_AS_DATE (object->relay);
   date->milliseconds = swfdec_bits_get_bdouble (bits);
   /* Yes, this really is ignored - by both server and client */
@@ -261,6 +260,26 @@ swfdec_amf_decode_reference (SwfdecAmfContext *context, SwfdecBits *bits, Swfdec
   return TRUE;
 }
 
+static gboolean
+swfdec_amf_decode_xml (SwfdecAmfContext *context, SwfdecBits *bits, SwfdecAsValue *val)
+{
+  SwfdecAsObject *object;
+  SwfdecXml *xml;
+  guint len;
+  char *s;
+  
+  len = swfdec_bits_get_bu32 (bits);
+  /* FIXME: the version is ok? It's supposed to be UTF-8 */
+  s = swfdec_bits_get_string_length (bits, len, 7);
+  if (s == NULL)
+    return FALSE;
+  xml = swfdec_xml_new (context->context, s, FALSE);
+  object = swfdec_as_relay_get_as_object (SWFDEC_AS_RELAY (xml));
+  swfdec_amf_context_add_object (context, object);
+  SWFDEC_AS_VALUE_SET_OBJECT (val, object);
+  return TRUE;
+}
+
 typedef gboolean (* SwfdecAmfParseFunc) (SwfdecAmfContext *cx, SwfdecBits *bits, SwfdecAsValue *val);
 
 static const SwfdecAmfParseFunc parse_funcs[] = {
@@ -277,10 +296,10 @@ static const SwfdecAmfParseFunc parse_funcs[] = {
   [SWFDEC_AMF_DENSE_ARRAY] = swfdec_amf_decode_dense_array,
   [SWFDEC_AMF_DATE] = swfdec_amf_decode_date,
   [SWFDEC_AMF_BIG_STRING] = swfdec_amf_decode_big_string,
-#if 0
   [SWFDEC_AMF_UNSUPPORTED] = NULL,
   [SWFDEC_AMF_RECORDSET] = NULL,
-  [SWFDEC_AMF_XML] = NULL,
+  [SWFDEC_AMF_XML] = swfdec_amf_decode_xml,
+#if 0
   [SWFDEC_AMF_CLASS] = NULL,
   [SWFDEC_AMF_FLASH9] = NULL,
 #endif
@@ -381,12 +400,27 @@ swfdec_amf_encode (SwfdecAmfContext *context, SwfdecBots *bots,
 	  break;
 	}
 
-	if (SWFDEC_IS_AS_DATE (object->relay)) {
-	  SwfdecAsDate *date = SWFDEC_AS_DATE (object->relay);
-	  swfdec_bots_put_u8 (bots, SWFDEC_AMF_DATE);
-	  swfdec_bots_put_bdouble (bots, date->milliseconds);
-	  swfdec_bots_put_bu16 (bots, date->utc_offset);
-	  break;
+	if (object->relay) {
+	  if (SWFDEC_IS_AS_DATE (object->relay)) {
+	    SwfdecAsDate *date = SWFDEC_AS_DATE (object->relay);
+	    swfdec_bots_put_u8 (bots, SWFDEC_AMF_DATE);
+	    swfdec_bots_put_bdouble (bots, date->milliseconds);
+	    swfdec_bots_put_bu16 (bots, date->utc_offset);
+	    break;
+	  } else if (SWFDEC_IS_XML (object->relay)) {
+	    GString *string = g_string_new ("");
+	    swfdec_xml_node_to_string (SWFDEC_XML_NODE (object->relay), string);
+	    swfdec_bots_put_u8 (bots, SWFDEC_AMF_XML);
+	    if (string->len > G_MAXUINT32) {
+	      SWFDEC_ERROR ("XML too long, clamping");
+	      g_string_set_size (string, G_MAXUINT32);
+	    }
+	    swfdec_bots_put_bu32 (bots, string->len);
+	    swfdec_bots_put_data (bots, (guchar *) string->str, string->len);
+	    g_string_free (string, TRUE);
+	    swfdec_amf_context_add_object (context, object);
+	    break;
+	  }
 	}
 
 	swfdec_amf_context_add_object (context, object);
@@ -404,7 +438,8 @@ swfdec_amf_encode (SwfdecAmfContext *context, SwfdecBots *bots,
 		o = o->prototype;
 		g_assert (o);
 	      }
-	      return swfdec_amf_encode (context, bots, *tmp);
+	      if (!swfdec_amf_encode (context, bots, *tmp))
+		return FALSE;
 	    }
 	  } else {
 	    GSList *walk, *list;
@@ -412,7 +447,8 @@ swfdec_amf_encode (SwfdecAmfContext *context, SwfdecBots *bots,
 	    list = swfdec_as_object_enumerate (object);
 	    swfdec_bots_put_bu32 (bots, g_slist_length (list));
 	    for (walk = list; walk; walk = walk->next) {
-	      swfdec_amf_encode_property (context, bots, object, walk->data);
+	      if (!swfdec_amf_encode_property (context, bots, object, walk->data))
+		return FALSE;
 	    }
 	    g_slist_free (list);
 	    swfdec_bots_put_u16 (bots, 0); /* property name */
@@ -424,7 +460,8 @@ swfdec_amf_encode (SwfdecAmfContext *context, SwfdecBots *bots,
 	  swfdec_bots_put_u8 (bots, SWFDEC_AMF_OBJECT);
 	  list = swfdec_as_object_enumerate (object);
 	  for (walk = list; walk; walk = walk->next) {
-	    swfdec_amf_encode_property (context, bots, object, walk->data);
+	    if (!swfdec_amf_encode_property (context, bots, object, walk->data))
+	      return FALSE;
 	  }
 	  g_slist_free (list);
 	  swfdec_bots_put_u16 (bots, 0); /* property name */

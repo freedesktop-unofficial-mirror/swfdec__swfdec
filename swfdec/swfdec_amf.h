@@ -23,6 +23,7 @@
 #include <swfdec/swfdec_as_context.h>
 #include <swfdec/swfdec_bits.h>
 #include <swfdec/swfdec_bots.h>
+#include <swfdec/swfdec_xml.h>
 
 G_BEGIN_DECLS
 

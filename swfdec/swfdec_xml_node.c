@@ -900,14 +900,12 @@ swfdec_xml_node_foreach_string_append_attribute (SwfdecAsObject *object,
   return TRUE;
 }
 
-static const char *
-swfdec_xml_node_toString (SwfdecXmlNode *node)
+void
+swfdec_xml_node_to_string (SwfdecXmlNode *node, GString *string)
 {
-  GString *string;
+  g_return_if_fail (SWFDEC_IS_XML_NODE (node));
+  g_return_if_fail (SWFDEC_IS_VALID_XML_NODE (node));
 
-  g_assert (SWFDEC_IS_VALID_XML_NODE (node));
-
-  string = g_string_new ("");
   if (SWFDEC_IS_XML (node)) {
     if (SWFDEC_XML (node)->xml_decl != NULL)
       string = g_string_append (string, SWFDEC_XML (node)->xml_decl);
@@ -945,7 +943,7 @@ swfdec_xml_node_toString (SwfdecXmlNode *node)
 	  for (i = 0; i < num; i++) {
 	    child = swfdec_xml_node_get_child (node, i);
 	    g_assert (child != NULL);
-	    string = g_string_append (string, swfdec_xml_node_toString (child));
+	    swfdec_xml_node_to_string (child, string);
 	  }
 
 	  if (visible) {
@@ -969,24 +967,25 @@ swfdec_xml_node_toString (SwfdecXmlNode *node)
 	break;
       }
   }
-
-  return swfdec_as_context_give_string (swfdec_gc_object_get_context (node),
-      g_string_free (string, FALSE));
 }
 
-SWFDEC_AS_NATIVE (253, 6, swfdec_xml_node_do_toString)
+SWFDEC_AS_NATIVE (253, 6, swfdec_xml_node_toString)
 void
-swfdec_xml_node_do_toString (SwfdecAsContext *cx, SwfdecAsObject *object,
+swfdec_xml_node_toString (SwfdecAsContext *cx, SwfdecAsObject *object,
     guint argc, SwfdecAsValue *argv, SwfdecAsValue *ret)
 {
   SwfdecXmlNode *node;
+  GString *str;
 
   SWFDEC_AS_CHECK (SWFDEC_TYPE_XML_NODE, &node, "");
 
   if (!SWFDEC_IS_VALID_XML_NODE (node))
     return;
 
-  SWFDEC_AS_VALUE_SET_STRING (ret, swfdec_xml_node_toString (node));
+  str = g_string_new ("");
+  swfdec_xml_node_to_string (node, str);
+  SWFDEC_AS_VALUE_SET_STRING (ret, swfdec_as_context_give_string (cx, 
+	g_string_free (str, FALSE)));
 }
 
 void

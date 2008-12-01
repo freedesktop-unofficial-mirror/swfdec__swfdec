@@ -100,6 +100,8 @@ SwfdecXmlNode *	swfdec_xml_node_get_child	(SwfdecXmlNode *	node,
 						 gint32			index_);
 const char *	swfdec_xml_node_get_attribute	(SwfdecXmlNode *	node,
 						 const char *		name);
+void		swfdec_xml_node_to_string	(SwfdecXmlNode *	node,
+						 GString *		string);
 
 G_END_DECLS
 #endif
