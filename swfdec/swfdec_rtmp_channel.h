@@ -40,7 +40,7 @@ struct _SwfdecRtmpChannel {
 
   SwfdecRtmpConnection *	conn;		/* Connection this channel belongs to (holds reference) */
   guint				id;		/* id (0-63) inside connection */
-  GTimeVal			start_time;	/* context time when starting this channel */
+  GTimeVal			timestamp;	/* timestamp for various uses - set when constructing */
   SwfdecRtmpHeader		recv_cache;	/* cached header info for receiving data */
   SwfdecBufferQueue *		recv_queue;	/* Queue of semi-assembled packages when receiving */
   SwfdecRtmpHeader		send_cache;	/* cached header info for sending data */
@@ -66,6 +66,7 @@ gboolean		swfdec_rtmp_channel_receive		(SwfdecRtmpChannel *	channel,
 								 SwfdecBufferQueue *	queue,
 								 SwfdecRtmpHeaderSize	header_size);
 
+#define swfdec_rtmp_channel_get_time(channel, tv) (swfdec_as_context_get_time (swfdec_gc_object_get_context ((channel)->conn), tv))
 guint			swfdec_rtmp_channel_get_lifetime	(SwfdecRtmpChannel *	channel);
 
 

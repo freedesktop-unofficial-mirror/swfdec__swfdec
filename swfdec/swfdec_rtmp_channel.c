@@ -76,9 +76,9 @@ swfdec_rtmp_channel_get_lifetime (SwfdecRtmpChannel *channel)
   swfdec_as_context_get_time (swfdec_gc_object_get_context (channel->conn), &tv);
 
   /* we just assume here that swfdec_as_context_get_time always returns a tv > start_time */
-  lifetime = tv.tv_sec - channel->start_time.tv_sec;
+  lifetime = tv.tv_sec - channel->timestamp.tv_sec;
   lifetime *= 1000;
-  lifetime += (tv.tv_usec - channel->start_time.tv_usec) / 1000;
+  lifetime += (tv.tv_usec - channel->timestamp.tv_usec) / 1000;
 
   return lifetime;
 }

@@ -37,6 +37,9 @@ int		swfdec_strncmp			(guint			version,
 						 const char *		s2,
 						 guint			n);
 
+long		swfdec_time_val_diff		(const GTimeVal *	from,
+						 const GTimeVal *	to);
+
 gboolean	swfdec_matrix_from_as_object	(cairo_matrix_t *	matrix,
 						 SwfdecAsObject *	object);
 

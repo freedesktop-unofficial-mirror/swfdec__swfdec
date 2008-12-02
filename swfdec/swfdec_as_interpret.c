@@ -47,6 +47,7 @@
 #include "swfdec_sprite_movie.h"
 #include "swfdec_resource.h"
 #include "swfdec_text_field_movie.h" // for typeof
+#include "swfdec_utils.h"
 
 /* Define this to get SWFDEC_WARN'd about missing properties of objects.
  * This can be useful to find out about unimplemented native properties,
@@ -2200,8 +2201,13 @@ swfdec_action_type_of (SwfdecAsContext *cx, guint action, const guint8 *data, gu
 static void
 swfdec_action_get_time (SwfdecAsContext *cx, guint action, const guint8 *data, guint len)
 {
-  *swfdec_as_stack_push (cx) = swfdec_as_value_from_integer (cx, 
-      swfdec_as_context_get_lifetime (cx));
+  GTimeVal tv;
+  long elapsed;
+
+  swfdec_as_context_get_time (cx, &tv);
+  elapsed = swfdec_time_val_diff (&cx->start_time, &tv);
+  /* FIXME: cast to double? */
+  *swfdec_as_stack_push (cx) = swfdec_as_value_from_integer (cx, elapsed);
 }
 
 static gboolean

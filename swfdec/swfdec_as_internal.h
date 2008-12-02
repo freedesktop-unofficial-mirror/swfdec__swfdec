@@ -66,7 +66,6 @@ G_BEGIN_DECLS
 } G_STMT_END
 
 /* swfdec_as_context.c */
-guint		swfdec_as_context_get_lifetime	(SwfdecAsContext *	context);
 gboolean	swfdec_as_context_check_continue (SwfdecAsContext *	context);
 void		swfdec_as_context_return	(SwfdecAsContext *	context,
 						 SwfdecAsValue *	return_value);

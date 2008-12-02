@@ -77,6 +77,31 @@ swfdec_strncmp (guint version, const char *s1, const char *s2, guint n)
   }
 }
 
+/**
+ * swfdec_time_val_diff:
+ * @from: a timeval
+ * @to: another timeval
+ *
+ * Computes the amount of milliseconds that elapsed between @from and @to.
+ * If @to is before @from, the return value will be negative.
+ *
+ * Returns: milliseconds elapsed between @from and @to
+ **/
+long
+swfdec_time_val_diff (const GTimeVal *from, const GTimeVal *to)
+{
+  long result;
+
+  g_return_val_if_fail (from != NULL, 0);
+  g_return_val_if_fail (to != NULL, 0);
+
+  result = to->tv_sec - from->tv_sec;
+  result *= 1000;
+  result += (to->tv_usec - from->tv_usec) / 1000;
+
+  return result;
+}
+
 gboolean
 swfdec_matrix_from_as_object (cairo_matrix_t *matrix, SwfdecAsObject *object)
 {

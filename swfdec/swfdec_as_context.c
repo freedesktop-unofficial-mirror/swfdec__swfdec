@@ -794,33 +794,6 @@ swfdec_as_context_get_time (SwfdecAsContext *context, GTimeVal *tv)
 }
 
 /**
- * swfdec_as_context_get_lifetime:
- * @context: the context to query
- *
- * Determine how long ago this context was constructed.
- *
- * Returns: the time in milliseconds since this context has been constructed
- **/
-/* FIXME: Should this return a double? */
-guint
-swfdec_as_context_get_lifetime (SwfdecAsContext *context)
-{
-  GTimeVal tv;
-  guint lifetime;
-
-  g_return_val_if_fail (SWFDEC_IS_AS_CONTEXT (context), 0);
-
-  swfdec_as_context_get_time (context, &tv);
-
-  /* we just assume here that swfdec_as_context_get_time always returns a tv > start_time */
-  lifetime = tv.tv_sec - context->start_time.tv_sec;
-  lifetime *= 1000;
-  lifetime += (tv.tv_usec - context->start_time.tv_usec) / 1000;
-
-  return lifetime;
-}
-
-/**
  * swfdec_as_context_return:
  * @context: the context to return the topmost frame in
  * @return_value: return value of the function or %NULL for none. An undefined

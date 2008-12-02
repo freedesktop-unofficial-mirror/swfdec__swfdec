@@ -29,10 +29,23 @@
 #include "swfdec_rtmp_handshake_channel.h"
 #include "swfdec_rtmp_socket.h"
 #include "swfdec_sandbox.h"
+#include "swfdec_utils.h"
 
 /*** SwfdecRtmpRpcChannel ***/
 
 G_DEFINE_TYPE (SwfdecRtmpRpcChannel, swfdec_rtmp_rpc_channel, SWFDEC_TYPE_RTMP_CHANNEL)
+
+static guint
+swfdec_rtmp_rpc_channel_update_last_send (SwfdecRtmpChannel *channel)
+{
+  GTimeVal tv;
+  long diff;
+
+  swfdec_rtmp_channel_get_time (channel, &tv);
+  diff = swfdec_time_val_diff (&channel->timestamp, &tv);
+  channel->timestamp = tv;
+  return diff;
+}
 
 static void
 swfdec_rtmp_rpc_channel_do_send (SwfdecRtmpRpcChannel *rpc, SwfdecAsValue name, 
@@ -62,7 +75,7 @@ swfdec_rtmp_rpc_channel_do_send (SwfdecRtmpRpcChannel *rpc, SwfdecAsValue name,
   swfdec_amf_context_free (cx);
 
   header.channel = channel->id;
-  header.timestamp = 0;
+  header.timestamp = swfdec_rtmp_rpc_channel_update_last_send (channel);
   header.size = buffer->length;
   header.type = SWFDEC_RTMP_PACKET_INVOKE;
   header.stream = 0;
