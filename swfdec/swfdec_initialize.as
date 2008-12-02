@@ -128,16 +128,60 @@ ASSetPropFlags (NetConnection.prototype, null, 3);
 
 /*** NetStream ***/
 
-NetStream.prototype.publish = function () {
-  var o = {}; o["Implement NetStream.publish"] ();
+function NetStream (conn) {
+  var f = ASnative(2101, 200);
+  f (this, conn);
+  conn.call ("createStream", { onResult: function (id) {
+      var f = ASnative(2101, 201);
+      f (this.stream, id);
+  }, stream: this });
+};
+
+NetStream.prototype.publish = function (name, type) {
+  var f = ASnative(2101, 202);
+  if (arguments.length == 1) {
+    f (this, "publish", null, name);
+  } else {
+    f (this, "publish", null, name, type);
+  }
+};
+
+NetStream.prototype.pause = function (flag) {
+  var f = ASnative(2101, 202);
+  f (this, "pause", null, flag, this.time * 1000);
+};
+
+NetStream.prototype.play = function (name, start, len, reset) {
+  f = ASnative(2101, 202);
+  switch (arguments.length) {
+    case 1:
+      f (this, "play", null, name);
+      break;
+    case 2:
+      f (this, "play", null, name, start * 1000);
+      break;
+    case 3:
+      f (this, "play", null, name, start * 1000, len * 1000);
+      break;
+    default:
+      f (this, "play", null, name, start * 1000, len * 1000, reset);
+      break;
+  }
 };
 
 NetStream.prototype.receiveAudio = function (flag) {
-  var o = {}; o["Implement NetStream.receiveAudio"] ();
+  var f = ASnative(2101, 202);
+  f (this, "receiveAudio", null, flag);
 };
 
 NetStream.prototype.receiveVideo = function (flag) {
-  var o = {}; o["Implement NetStream.receiveVideo"] ();
+  var f = ASnative(2101, 202);
+  f (this, "receiveVideo", null, flag);
+};
+
+NetStream.prototype.seek = function (offset) {
+  var f = ASnative(2101, 202);
+  f (this, "seek", null, offset * 1000);
 };
 
 ASSetNative (NetStream.prototype, 2101, "6close,6attachAudio,6attachVideo,6send,6setBufferTime");
