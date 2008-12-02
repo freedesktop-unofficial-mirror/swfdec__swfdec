@@ -46,7 +46,7 @@ vivi_code_asm_if_resolve (ViviCodeEmitter *emitter, SwfdecBuffer *buffer,
   diff = label_offset - offset;
   if (diff > G_MAXINT16 || diff < G_MININT16) {
     g_set_error (error, VIVI_CODE_ERROR, VIVI_CODE_ERROR_SIZE,
-	"branch target too far away");
+	"branch target too far away (%ld bytes)", (long) diff);
     return FALSE;
   }
   buffer->data[offset - 1] = diff >> 8;
