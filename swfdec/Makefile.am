@@ -118,6 +118,7 @@ libswfdec_source_files = \
 	swfdec_movie_asprops.c \
 	swfdec_movie_clip_loader.c \
 	swfdec_net_connection.c \
+	swfdec_net_stream.c \
 	swfdec_path.c \
 	swfdec_pattern.c \
 	swfdec_player.c \
