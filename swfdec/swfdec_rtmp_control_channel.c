@@ -25,6 +25,7 @@
 
 #include "swfdec_debug.h"
 #include "swfdec_rtmp_socket.h"
+#include "swfdec_utils.h"
 
 /*** SwfdecRtmpControlChannel ***/
 
@@ -51,6 +52,8 @@ swfdec_rtmp_control_channel_handle_server_bandwidth (SwfdecRtmpChannel *channel,
   SwfdecBots *bots;
   guint new_bandwidth;
   SwfdecRtmpHeader header;
+  GTimeVal tv;
+  long diff;
 
   swfdec_bits_init (&bits, buffer);
   new_bandwidth = swfdec_bits_get_bu32 (&bits);
@@ -63,8 +66,11 @@ swfdec_rtmp_control_channel_handle_server_bandwidth (SwfdecRtmpChannel *channel,
   swfdec_bots_put_bu32 (bots, new_bandwidth);
   buffer = swfdec_bots_close (bots);
   header.channel = channel->id;
-  /* FIXME: This also sends some negative timestamp, no clue what that timestamp means though */
-  header.timestamp = org_header->timestamp - swfdec_rtmp_channel_get_lifetime (channel);
+  /* send diff between the timestamp that the server sent and our current time.
+   * FIXME: Is that correct? */
+  swfdec_rtmp_channel_get_time (channel, &tv);
+  diff = swfdec_time_val_diff (&channel->timestamp, &tv);
+  header.timestamp = org_header->timestamp - diff;
   header.size = buffer->length;
   header.type = SWFDEC_RTMP_PACKET_SERVER_BANDWIDTH;
   header.stream = 0;

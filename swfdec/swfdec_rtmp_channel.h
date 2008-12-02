@@ -67,7 +67,6 @@ gboolean		swfdec_rtmp_channel_receive		(SwfdecRtmpChannel *	channel,
 								 SwfdecRtmpHeaderSize	header_size);
 
 #define swfdec_rtmp_channel_get_time(channel, tv) (swfdec_as_context_get_time (swfdec_gc_object_get_context ((channel)->conn), tv))
-guint			swfdec_rtmp_channel_get_lifetime	(SwfdecRtmpChannel *	channel);
 
 
 

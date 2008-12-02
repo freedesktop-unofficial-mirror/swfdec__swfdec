@@ -65,24 +65,6 @@ swfdec_rtmp_channel_init (SwfdecRtmpChannel *channel)
   channel->block_size = 128;
 }
 
-guint
-swfdec_rtmp_channel_get_lifetime (SwfdecRtmpChannel *channel)
-{
-  GTimeVal tv;
-  guint lifetime;
-
-  g_return_val_if_fail (SWFDEC_IS_RTMP_CHANNEL (channel), 0);
-
-  swfdec_as_context_get_time (swfdec_gc_object_get_context (channel->conn), &tv);
-
-  /* we just assume here that swfdec_as_context_get_time always returns a tv > start_time */
-  lifetime = tv.tv_sec - channel->timestamp.tv_sec;
-  lifetime *= 1000;
-  lifetime += (tv.tv_usec - channel->timestamp.tv_usec) / 1000;
-
-  return lifetime;
-}
-
 void
 swfdec_rtmp_channel_send (SwfdecRtmpChannel *channel,
     const SwfdecRtmpHeader *header, SwfdecBuffer *data)
