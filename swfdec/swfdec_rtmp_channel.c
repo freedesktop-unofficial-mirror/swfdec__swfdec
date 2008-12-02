@@ -84,7 +84,7 @@ swfdec_rtmp_channel_get_lifetime (SwfdecRtmpChannel *channel)
 }
 
 void
-swfdec_rtmp_channel_send_full (SwfdecRtmpChannel *channel,
+swfdec_rtmp_channel_send (SwfdecRtmpChannel *channel,
     const SwfdecRtmpHeader *header, SwfdecBuffer *data)
 {
   SwfdecBots *bots;
@@ -110,24 +110,6 @@ swfdec_rtmp_channel_send_full (SwfdecRtmpChannel *channel,
   }
   
   swfdec_rtmp_socket_send (channel->conn->socket);
-}
-
-void
-swfdec_rtmp_channel_send (SwfdecRtmpChannel *channel,
-    SwfdecRtmpPacketType type, SwfdecBuffer *data)
-{
-  SwfdecRtmpHeader header;
-
-  g_return_if_fail (SWFDEC_IS_RTMP_CHANNEL (channel));
-  g_return_if_fail (data != NULL);
-
-  header.channel = channel->id;
-  header.timestamp = swfdec_rtmp_channel_get_lifetime (channel);
-  header.size = data->length;
-  header.type = type;
-  header.stream = 0;
-
-  swfdec_rtmp_channel_send_full (channel, &header, data);
 }
 
 gboolean

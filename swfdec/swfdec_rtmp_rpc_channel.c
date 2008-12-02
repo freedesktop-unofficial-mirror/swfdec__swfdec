@@ -40,9 +40,10 @@ swfdec_rtmp_rpc_channel_do_send (SwfdecRtmpRpcChannel *rpc, SwfdecAsValue name,
 {
   SwfdecRtmpChannel *channel;
   SwfdecAsContext *context;
+  SwfdecRtmpHeader header;
   SwfdecAmfContext *cx;
-  SwfdecBots *bots;
   SwfdecBuffer *buffer;
+  SwfdecBots *bots;
   guint i;
 
   channel = SWFDEC_RTMP_CHANNEL (rpc);
@@ -60,7 +61,13 @@ swfdec_rtmp_rpc_channel_do_send (SwfdecRtmpRpcChannel *rpc, SwfdecAsValue name,
   buffer = swfdec_bots_close (bots);
   swfdec_amf_context_free (cx);
 
-  swfdec_rtmp_channel_send (channel, SWFDEC_RTMP_PACKET_INVOKE, buffer);
+  header.channel = channel->id;
+  header.timestamp = 0;
+  header.size = buffer->length;
+  header.type = SWFDEC_RTMP_PACKET_INVOKE;
+  header.stream = 0;
+
+  swfdec_rtmp_channel_send (channel, &header, buffer);
 }
 
 static void

@@ -69,7 +69,7 @@ swfdec_rtmp_control_channel_handle_server_bandwidth (SwfdecRtmpChannel *channel,
   header.type = SWFDEC_RTMP_PACKET_SERVER_BANDWIDTH;
   header.stream = 0;
 
-  swfdec_rtmp_channel_send_full (channel, &header, buffer);
+  swfdec_rtmp_channel_send (channel, &header, buffer);
   swfdec_buffer_unref (buffer);
 }
 

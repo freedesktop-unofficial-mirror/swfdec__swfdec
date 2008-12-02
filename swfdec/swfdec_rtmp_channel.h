@@ -60,9 +60,6 @@ struct _SwfdecRtmpChannelClass {
 GType			swfdec_rtmp_channel_get_type		(void);
 
 void			swfdec_rtmp_channel_send		(SwfdecRtmpChannel *	channel,
-								 SwfdecRtmpPacketType	type,
-								 SwfdecBuffer *		data);
-void			swfdec_rtmp_channel_send_full		(SwfdecRtmpChannel *	channel,
 								 const SwfdecRtmpHeader *header,
 								 SwfdecBuffer *		data);
 gboolean		swfdec_rtmp_channel_receive		(SwfdecRtmpChannel *	channel,
