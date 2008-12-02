@@ -914,6 +914,7 @@ swfdec_xml_new_no_properties (SwfdecAsContext *context, const char *str,
   xml->ignore_white = ignore_white;
   swfdec_xml_node_init_values (SWFDEC_XML_NODE (xml),
       SWFDEC_XML_NODE_ELEMENT, SWFDEC_AS_STR_EMPTY);
+  SWFDEC_XML_NODE (xml)->name = NULL;
 
   object = swfdec_as_object_new (context, NULL);
   swfdec_as_object_set_constructor_by_name (object, SWFDEC_AS_STR_XML, NULL);
