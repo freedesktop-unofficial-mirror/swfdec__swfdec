@@ -128,17 +128,17 @@ ASSetPropFlags (NetConnection.prototype, null, 3);
 
 /*** NetStream ***/
 
-function NetStream (conn) {
-  var f = ASnative(2101, 200);
+NetStream = function (conn) {
+  var f = ASnative (2101, 200);
   f (this, conn);
   conn.call ("createStream", { onResult: function (id) {
-      var f = ASnative(2101, 201);
+      var f = ASnative (2101, 201);
       f (this.stream, id);
   }, stream: this });
 };
 
 NetStream.prototype.publish = function (name, type) {
-  var f = ASnative(2101, 202);
+  var f = ASnative (2101, 202);
   if (arguments.length == 1) {
     f (this, "publish", null, name);
   } else {
@@ -147,12 +147,12 @@ NetStream.prototype.publish = function (name, type) {
 };
 
 NetStream.prototype.pause = function (flag) {
-  var f = ASnative(2101, 202);
+  var f = ASnative (2101, 202);
   f (this, "pause", null, flag, this.time * 1000);
 };
 
 NetStream.prototype.play = function (name, start, len, reset) {
-  f = ASnative(2101, 202);
+  f = ASnative (2101, 202);
   switch (arguments.length) {
     case 1:
       f (this, "play", null, name);
@@ -170,17 +170,17 @@ NetStream.prototype.play = function (name, start, len, reset) {
 };
 
 NetStream.prototype.receiveAudio = function (flag) {
-  var f = ASnative(2101, 202);
+  var f = ASnative (2101, 202);
   f (this, "receiveAudio", null, flag);
 };
 
 NetStream.prototype.receiveVideo = function (flag) {
-  var f = ASnative(2101, 202);
+  var f = ASnative (2101, 202);
   f (this, "receiveVideo", null, flag);
 };
 
 NetStream.prototype.seek = function (offset) {
-  var f = ASnative(2101, 202);
+  var f = ASnative (2101, 202);
   f (this, "seek", null, offset * 1000);
 };
 
