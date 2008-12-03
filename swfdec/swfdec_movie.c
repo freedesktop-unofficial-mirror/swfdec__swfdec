@@ -1319,8 +1319,8 @@ swfdec_movie_constructor (GType type, guint n_construct_properties,
 
   /* create AsObject */
   o = swfdec_as_object_new_empty (cx);
-  o->movie = TRUE;
   swfdec_as_object_set_relay (o, SWFDEC_AS_RELAY (movie));
+  o->movie = TRUE;
 
   /* set $version variable */
   if (movie->parent == NULL) {

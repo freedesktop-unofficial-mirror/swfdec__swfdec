@@ -1879,6 +1879,7 @@ void
 swfdec_as_object_set_relay (SwfdecAsObject *object, SwfdecAsRelay *relay)
 {
   g_return_if_fail (object != NULL);
+  g_return_if_fail (!object->movie);
 
   if (relay) {
     g_return_if_fail (SWFDEC_IS_AS_RELAY (relay));
