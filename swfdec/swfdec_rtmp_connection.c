@@ -98,6 +98,9 @@ swfdec_rtmp_connection_connect (SwfdecRtmpConnection *conn, const SwfdecURL *url
     SWFDEC_FIXME ("handle NULL urls in connect()");
   }
 
+  if (conn->error)
+    return;
+
   swfdec_rtmp_connection_register_channel (conn, 0, SWFDEC_TYPE_RTMP_HANDSHAKE_CHANNEL);
   swfdec_rtmp_connection_register_channel (conn, 2, SWFDEC_TYPE_RTMP_CONTROL_CHANNEL);
   swfdec_rtmp_connection_register_channel (conn, 3, SWFDEC_TYPE_RTMP_RPC_CHANNEL);
