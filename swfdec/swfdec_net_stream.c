@@ -21,8 +21,50 @@
 #include "config.h"
 #endif
 
+#include "swfdec_net_stream.h"
+
+#include "swfdec_as_frame_internal.h"
 #include "swfdec_as_internal.h"
 #include "swfdec_debug.h"
+
+/*** NET STREAM ***/
+
+G_DEFINE_TYPE (SwfdecNetStream, swfdec_net_stream, SWFDEC_TYPE_AS_RELAY)
+
+static void
+swfdec_net_stream_mark (SwfdecGcObject *object)
+{
+  SwfdecNetStream *stream = SWFDEC_NET_STREAM (object);
+
+  swfdec_gc_object_mark (stream->conn);
+  /* no need to handle the channels, the connection manages them */
+
+  SWFDEC_GC_OBJECT_CLASS (swfdec_net_stream_parent_class)->mark (object);
+}
+
+static void
+swfdec_net_stream_dispose (GObject *object)
+{
+  //SwfdecNetStream *conn = SWFDEC_NET_STREAM (object);
+
+  G_OBJECT_CLASS (swfdec_net_stream_parent_class)->dispose (object);
+}
+
+static void
+swfdec_net_stream_class_init (SwfdecNetStreamClass *klass)
+{
+  GObjectClass *object_class = G_OBJECT_CLASS (klass);
+  SwfdecGcObjectClass *gc_class = SWFDEC_GC_OBJECT_CLASS (klass);
+
+  object_class->dispose = swfdec_net_stream_dispose;
+
+  gc_class->mark = swfdec_net_stream_mark;
+}
+
+static void
+swfdec_net_stream_init (SwfdecNetStream *net_stream)
+{
+}
 
 /*** AS CODE ***/
 
@@ -87,7 +129,23 @@ void
 swfdec_net_stream_construct (SwfdecAsContext *cx, SwfdecAsObject *object,
     guint argc, SwfdecAsValue *argv, SwfdecAsValue *rval)
 {
-  SWFDEC_STUB ("NetStream.construct (internal)");
+  SwfdecNetStream *stream;
+  SwfdecAsObject *o, *conn;
+
+  SWFDEC_AS_CHECK (0, NULL, "oo", &o, &conn);
+
+  if (!cx->frame->next || !cx->frame->next->construct)
+    return;
+  if (!SWFDEC_IS_RTMP_CONNECTION (conn->relay))
+    return;
+  if (o->movie) {
+    SWFDEC_FIXME ("you managed to call SwfdecNetStream's constructor from a movie. Congrats, but what now?");
+    return;
+  }
+
+  stream = g_object_new (SWFDEC_TYPE_NET_STREAM, "context", cx, NULL);
+  stream->conn = SWFDEC_RTMP_CONNECTION (conn->relay);
+  swfdec_as_object_set_relay (o, SWFDEC_AS_RELAY (stream));
 }
 
 SWFDEC_AS_NATIVE (2101, 201, swfdec_net_stream_onCreate)

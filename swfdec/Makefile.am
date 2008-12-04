@@ -321,6 +321,7 @@ noinst_HEADERS = \
 	swfdec_morphshape.h \
 	swfdec_movie.h \
 	swfdec_movie_clip_loader.h \
+	swfdec_net_stream.h \
 	swfdec_path.h \
 	swfdec_pattern.h \
 	swfdec_player_internal.h \
