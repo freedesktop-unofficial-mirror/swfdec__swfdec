@@ -36,10 +36,7 @@ G_DEFINE_TYPE (SwfdecRtmpSocket, swfdec_rtmp_socket, G_TYPE_OBJECT)
 static void
 swfdec_rtmp_socket_dispose (GObject *object)
 {
-  SwfdecRtmpSocket *sock = SWFDEC_RTMP_SOCKET (object);
-
-  g_free (sock->error);
-  sock->error = NULL;
+  //SwfdecRtmpSocket *sock = SWFDEC_RTMP_SOCKET (object);
 
   G_OBJECT_CLASS (swfdec_rtmp_socket_parent_class)->dispose (object);
 }

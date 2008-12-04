@@ -39,7 +39,6 @@ struct _SwfdecRtmpSocket {
   GObject       	object;
 
   SwfdecRtmpConnection *conn;		/* the connection that spawned and refs us */
-  char *		error;		/* NULL or description of error socket is in */
 };
 
 struct _SwfdecRtmpSocketClass {
