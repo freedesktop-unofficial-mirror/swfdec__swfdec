@@ -285,7 +285,14 @@ swfdec_rtmp_handshake_channel_connected (SwfdecRtmpHandshakeChannel *shake,
     SWFDEC_ERROR ("no 2nd argument in connect reply");
   }
 
-  g_object_unref (conn->channels[0]);
-  conn->channels[0] = NULL;
+  swfdec_rtmp_channel_unregister (SWFDEC_RTMP_CHANNEL (shake));
   swfdec_rtmp_socket_send (conn->socket);
+}
+
+SwfdecRtmpChannel *
+swfdec_rtmp_handshake_channel_new (SwfdecRtmpConnection *conn)
+{
+  g_return_val_if_fail (SWFDEC_IS_RTMP_CONNECTION (conn), NULL);
+
+  return g_object_new (SWFDEC_TYPE_RTMP_HANDSHAKE_CHANNEL, "connection", conn, NULL);
 }

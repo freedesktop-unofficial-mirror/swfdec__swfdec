@@ -87,6 +87,8 @@ swfdec_rtmp_connection_init (SwfdecRtmpConnection *rtmp_connection)
 void
 swfdec_rtmp_connection_connect (SwfdecRtmpConnection *conn, const SwfdecURL *url)
 {
+  SwfdecRtmpChannel *channel;
+
   g_return_if_fail (SWFDEC_IS_RTMP_CONNECTION (conn));
 
   swfdec_rtmp_connection_close (conn);
@@ -101,9 +103,15 @@ swfdec_rtmp_connection_connect (SwfdecRtmpConnection *conn, const SwfdecURL *url
   if (conn->error)
     return;
 
-  swfdec_rtmp_connection_register_channel (conn, 0, SWFDEC_TYPE_RTMP_HANDSHAKE_CHANNEL);
-  swfdec_rtmp_connection_register_channel (conn, 2, SWFDEC_TYPE_RTMP_CONTROL_CHANNEL);
-  swfdec_rtmp_connection_register_channel (conn, 3, SWFDEC_TYPE_RTMP_RPC_CHANNEL);
+  channel = swfdec_rtmp_handshake_channel_new (conn);
+  swfdec_rtmp_channel_register (channel, 0);
+  g_object_unref (channel);
+  channel = swfdec_rtmp_control_channel_new (conn);
+  swfdec_rtmp_channel_register (channel, 2);
+  g_object_unref (channel);
+  channel = swfdec_rtmp_rpc_channel_new (conn);
+  swfdec_rtmp_channel_register (channel, 3);
+  g_object_unref (channel);
   swfdec_rtmp_handshake_channel_start (SWFDEC_RTMP_HANDSHAKE_CHANNEL (conn->channels[0]));
 }
 
@@ -117,8 +125,8 @@ swfdec_rtmp_connection_close (SwfdecRtmpConnection *conn)
   for (i = 0; i < 64; i++) {
     if (conn->channels[i] == NULL)
       continue;
-    g_object_unref (conn->channels[i]);
-    conn->channels[i] = NULL;
+    swfdec_rtmp_channel_unregister (conn->channels[i]);
+    g_assert (conn->channels[i] == NULL);
   }
 
   if (conn->socket) {
@@ -129,36 +137,6 @@ swfdec_rtmp_connection_close (SwfdecRtmpConnection *conn)
     swfdec_url_free (conn->url);
     conn->url = NULL;
   }
-}
-
-SwfdecRtmpChannel *
-swfdec_rtmp_connection_register_channel	(SwfdecRtmpConnection *conn, int id,
-    GType channel_type)
-{
-  g_return_val_if_fail (SWFDEC_IS_RTMP_CONNECTION (conn), NULL);
-  g_return_val_if_fail (id >= -1 && id < 64, NULL);
-  g_return_val_if_fail (g_type_is_a (channel_type, SWFDEC_TYPE_RTMP_CHANNEL), NULL);
-
-  if (id < 0) {
-    /* FIXME: do we give out channels 0 and 1? */
-    /* we can start at 4, because 2 and 3 are reserved */
-    for (id = 4; id < 64; id++) {
-      if (conn->channels[id] == NULL)
-	break;
-    }
-    if (id == 64) {
-      SWFDEC_ERROR ("all channels in use, what now?");
-      return NULL;
-    }
-  }
-
-  conn->channels[id] = g_object_new (channel_type, NULL);
-  conn->channels[id]->conn = conn;
-  conn->channels[id]->id = id;
-  swfdec_as_context_get_time (swfdec_gc_object_get_context (conn), 
-      &conn->channels[id]->timestamp);
-
-  return conn->channels[id];
 }
 
 void

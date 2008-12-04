@@ -78,9 +78,6 @@ void			swfdec_rtmp_connection_on_status	(SwfdecRtmpConnection *	conn,
 
 #define swfdec_rtmp_connection_get_command_channel(conn) ((conn)->channels[2])
 #define swfdec_rtmp_connection_get_rpc_channel(conn) ((conn)->channels[3])
-SwfdecRtmpChannel *	swfdec_rtmp_connection_register_channel	(SwfdecRtmpConnection *	conn,
-								 int			id,
-								 GType			channel_type);
 
 
 G_END_DECLS

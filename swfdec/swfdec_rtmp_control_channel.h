@@ -48,6 +48,8 @@ struct _SwfdecRtmpControlChannelClass {
 
 GType			swfdec_rtmp_control_channel_get_type	(void);
 
+SwfdecRtmpChannel *	swfdec_rtmp_control_channel_new		(SwfdecRtmpConnection *	conn);
+
 
 G_END_DECLS
 #endif

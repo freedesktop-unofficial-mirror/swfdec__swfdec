@@ -28,7 +28,46 @@
 
 /*** SwfdecRtmpChannel ***/
 
+enum {
+  PROP_0,
+  PROP_CONNECTION
+};
+
 G_DEFINE_ABSTRACT_TYPE (SwfdecRtmpChannel, swfdec_rtmp_channel, G_TYPE_OBJECT)
+
+static void
+swfdec_rtmp_channel_get_property (GObject *object, guint param_id, GValue *value, 
+    GParamSpec * pspec)
+{
+  SwfdecRtmpChannel *channel = SWFDEC_RTMP_CHANNEL (object);
+
+  switch (param_id) {
+    case PROP_CONNECTION:
+      g_value_set_object (value, channel->conn);
+      break;
+    default:
+      G_OBJECT_WARN_INVALID_PROPERTY_ID (object, param_id, pspec);
+      break;
+  }
+}
+
+static void
+swfdec_rtmp_channel_set_property (GObject *object, guint param_id, const GValue *value, 
+    GParamSpec * pspec)
+{
+  SwfdecRtmpChannel *channel = SWFDEC_RTMP_CHANNEL (object);
+
+  switch (param_id) {
+    case PROP_CONNECTION:
+      channel->conn = g_value_get_object (value);
+      g_assert (channel->conn != NULL);
+      swfdec_rtmp_channel_get_time (channel, &channel->timestamp);
+      break;
+    default:
+      G_OBJECT_WARN_INVALID_PROPERTY_ID (object, param_id, pspec);
+      break;
+  }
+}
 
 static void
 swfdec_rtmp_channel_dispose (GObject *object)
@@ -53,6 +92,12 @@ swfdec_rtmp_channel_class_init (SwfdecRtmpChannelClass *klass)
   GObjectClass *object_class = G_OBJECT_CLASS (klass);
 
   object_class->dispose = swfdec_rtmp_channel_dispose;
+  object_class->get_property = swfdec_rtmp_channel_get_property;
+  object_class->set_property = swfdec_rtmp_channel_set_property;
+
+  g_object_class_install_property (object_class, PROP_CONNECTION,
+      g_param_spec_object ("connection", "connection", "RTMP connection this channel belongs to",
+	  SWFDEC_TYPE_RTMP_CONNECTION, G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 }
 
 static void
@@ -91,7 +136,8 @@ swfdec_rtmp_channel_send (SwfdecRtmpChannel *channel,
     swfdec_buffer_queue_push (channel->send_queue, swfdec_bots_close (bots));
   }
   
-  swfdec_rtmp_socket_send (channel->conn->socket);
+  if (channel->conn)
+    swfdec_rtmp_socket_send (channel->conn->socket);
 }
 
 gboolean
@@ -136,5 +182,37 @@ swfdec_rtmp_channel_receive (SwfdecRtmpChannel *channel, SwfdecBufferQueue *queu
     klass->receive (channel, &header, buffer);
   }
   return TRUE;
+}
+
+void
+swfdec_rtmp_channel_register (SwfdecRtmpChannel *channel, guint id)
+{
+  g_return_if_fail (SWFDEC_IS_RTMP_CHANNEL (channel));
+  g_return_if_fail (channel->id == 0);
+  g_return_if_fail (id < 64);
+
+  channel->id = id;
+  if (channel->conn->channels[id] != NULL) {
+    SWFDEC_ERROR ("channel %u is already in use", id);
+    return;
+  }
+  g_object_ref (channel);
+  channel->conn->channels[id] = channel;
+}
+
+void
+swfdec_rtmp_channel_unregister (SwfdecRtmpChannel *channel)
+{
+  guint id;
+
+  g_return_if_fail (SWFDEC_IS_RTMP_CHANNEL (channel));
+
+  id = channel->id;
+  channel->id = 0;
+
+  if (channel->conn->channels[id] == channel) {
+    channel->conn->channels[id] = NULL;
+    g_object_unref (channel);
+  }
 }
 

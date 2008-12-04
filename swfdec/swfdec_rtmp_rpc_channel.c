@@ -272,3 +272,10 @@ swfdec_rtmp_rpc_channel_send (SwfdecRtmpRpcChannel *rpc,
   swfdec_rtmp_rpc_channel_do_send (rpc, name, id, SWFDEC_AS_VALUE_NULL, argc, argv);
 }
 
+SwfdecRtmpChannel *
+swfdec_rtmp_rpc_channel_new (SwfdecRtmpConnection *conn)
+{
+  g_return_val_if_fail (SWFDEC_IS_RTMP_CONNECTION (conn), NULL);
+
+  return g_object_new (SWFDEC_TYPE_RTMP_RPC_CHANNEL, "connection", conn, NULL);
+}

@@ -38,7 +38,7 @@ typedef struct _SwfdecRtmpChannelClass SwfdecRtmpChannelClass;
 struct _SwfdecRtmpChannel {
   GObject			object;
 
-  SwfdecRtmpConnection *	conn;		/* Connection this channel belongs to (holds reference) */
+  SwfdecRtmpConnection *	conn;		/* Connection this channel belongs to or NULL if not registered */
   guint				id;		/* id (0-63) inside connection */
   GTimeVal			timestamp;	/* timestamp for various uses - set when constructing */
   SwfdecRtmpHeader		recv_cache;	/* cached header info for receiving data */
@@ -67,6 +67,9 @@ gboolean		swfdec_rtmp_channel_receive		(SwfdecRtmpChannel *	channel,
 								 SwfdecRtmpHeaderSize	header_size);
 
 #define swfdec_rtmp_channel_get_time(channel, tv) (swfdec_as_context_get_time (swfdec_gc_object_get_context ((channel)->conn), tv))
+void			swfdec_rtmp_channel_register		(SwfdecRtmpChannel *	channel,
+								 guint			id);
+void			swfdec_rtmp_channel_unregister		(SwfdecRtmpChannel *	channel);
 
 
 

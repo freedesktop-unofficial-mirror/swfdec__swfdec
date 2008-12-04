@@ -138,3 +138,10 @@ swfdec_rtmp_control_channel_init (SwfdecRtmpControlChannel *command)
 {
 }
 
+SwfdecRtmpChannel *
+swfdec_rtmp_control_channel_new (SwfdecRtmpConnection *conn)
+{
+  g_return_val_if_fail (SWFDEC_IS_RTMP_CONNECTION (conn), NULL);
+
+  return g_object_new (SWFDEC_TYPE_RTMP_CONTROL_CHANNEL, "connection", conn, NULL);
+}
