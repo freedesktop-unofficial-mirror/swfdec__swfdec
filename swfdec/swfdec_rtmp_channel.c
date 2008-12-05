@@ -107,7 +107,6 @@ swfdec_rtmp_channel_init (SwfdecRtmpChannel *channel)
   channel->recv_queue = swfdec_buffer_queue_new ();
   swfdec_rtmp_header_invalidate (&channel->send_cache);
   channel->send_queue = swfdec_buffer_queue_new ();
-  channel->block_size = 128;
 }
 
 void
@@ -127,13 +126,13 @@ swfdec_rtmp_channel_send (SwfdecRtmpChannel *channel,
       swfdec_rtmp_header_diff (header, &channel->send_cache));
   swfdec_rtmp_header_copy (&channel->send_cache, header);
 
-  for (i = 0; i < data->length; i += channel->block_size) {
+  for (i = 0; i < data->length; i += SWFDEC_RTMP_BLOCK_SIZE) {
     if (i != 0) {
       /* write a continuation header */
       bots = swfdec_bots_new ();
       swfdec_rtmp_header_write (header, bots, SWFDEC_RTMP_HEADER_1_BYTE);
     }
-    swfdec_bots_put_data (bots, data->data + i, MIN (channel->block_size, data->length - i));
+    swfdec_bots_put_data (bots, data->data + i, MIN (SWFDEC_RTMP_BLOCK_SIZE, data->length - i));
     swfdec_buffer_queue_push (channel->send_queue, swfdec_bots_close (bots));
   }
   
@@ -163,6 +162,9 @@ swfdec_rtmp_channel_register (SwfdecRtmpChannel *channel, guint id)
       swfdec_rtmp_channel_compare);
   channel->id = id;
   g_object_ref (channel);
+
+  if (swfdec_buffer_queue_get_depth (channel->send_queue) > 0)
+    swfdec_rtmp_socket_send (channel->conn->socket);
 }
 
 void
