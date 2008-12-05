@@ -117,8 +117,9 @@ SwfdecBuffer *
 swfdec_rtmp_socket_next_buffer (SwfdecRtmpSocket *socket)
 {
   SwfdecRtmpConnection *conn;
+  SwfdecRtmpChannel *channel;
   SwfdecBuffer *buffer;
-  guint i;
+  GList *walk;
 
   g_return_val_if_fail (SWFDEC_IS_RTMP_SOCKET (socket), NULL);
 
@@ -128,17 +129,17 @@ swfdec_rtmp_socket_next_buffer (SwfdecRtmpSocket *socket)
     return swfdec_buffer_queue_pull_buffer (swfdec_rtmp_connection_get_handshake_channel (conn)->send_queue);
   }
 
-  i = conn->send_channel;
+  walk = conn->last_send;
+  g_assert (walk);
   do {
-    i = (i + 1) % 64;
-    if (conn->channels[i] == NULL)
-      continue;
-    buffer = swfdec_buffer_queue_pull_buffer (conn->channels[i]->send_queue);
+    walk = walk->next ? walk->next : conn->channels;
+    channel = walk->data;
+    buffer = swfdec_buffer_queue_pull_buffer (channel->send_queue);
     if (buffer) {
-      conn->send_channel = i;
+      conn->last_send = walk;
       return buffer;
     }
-  } while (i != conn->send_channel);
+  } while (walk != conn->last_send);
   return NULL;
 }
 

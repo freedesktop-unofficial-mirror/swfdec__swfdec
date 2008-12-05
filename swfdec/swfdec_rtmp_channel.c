@@ -140,35 +140,45 @@ swfdec_rtmp_channel_send (SwfdecRtmpChannel *channel,
   swfdec_rtmp_socket_send (channel->conn->socket);
 }
 
+static int
+swfdec_rtmp_channel_compare (gconstpointer a, gconstpointer b)
+{
+  SwfdecRtmpChannel *ca = (SwfdecRtmpChannel *) a;
+  SwfdecRtmpChannel *cb = (SwfdecRtmpChannel *) b;
+
+  return cb->id - ca->id;
+}
+
 void
 swfdec_rtmp_channel_register (SwfdecRtmpChannel *channel, guint id)
 {
-  g_return_if_fail (SWFDEC_IS_RTMP_CHANNEL (channel));
-  g_return_if_fail (channel->id == 0);
-  g_return_if_fail (id < 64);
+  SwfdecRtmpConnection *conn;
 
+  g_return_if_fail (SWFDEC_IS_RTMP_CHANNEL (channel));
+  g_return_if_fail (!swfdec_rtmp_channel_is_registered (channel));
+  g_return_if_fail (id > 1);
+
+  conn = channel->conn;
+  conn->channels = g_list_insert_sorted (conn->channels, channel,
+      swfdec_rtmp_channel_compare);
   channel->id = id;
-  if (channel->conn->channels[id] != NULL) {
-    SWFDEC_ERROR ("channel %u is already in use", id);
-    return;
-  }
   g_object_ref (channel);
-  channel->conn->channels[id] = channel;
 }
 
 void
 swfdec_rtmp_channel_unregister (SwfdecRtmpChannel *channel)
 {
-  guint id;
-
   g_return_if_fail (SWFDEC_IS_RTMP_CHANNEL (channel));
 
-  id = channel->id;
-  channel->id = 0;
+  if (!swfdec_rtmp_channel_is_registered (channel))
+    return;
 
-  if (channel->conn->channels[id] == channel) {
-    channel->conn->channels[id] = NULL;
-    g_object_unref (channel);
+  if (channel->conn->last_send->data == channel) {
+    channel->conn->last_send = channel->conn->last_send->next ?
+      channel->conn->last_send->next : channel->conn->last_send->prev;
   }
+  channel->conn->channels = g_list_remove (channel->conn->channels, channel);
+  channel->id = 0;
+  g_object_unref (channel);
 }
 

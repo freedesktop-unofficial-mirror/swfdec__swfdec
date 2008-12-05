@@ -41,14 +41,13 @@ static void
 swfdec_rtmp_connection_mark (SwfdecGcObject *object)
 {
   SwfdecRtmpConnection *conn = SWFDEC_RTMP_CONNECTION (object);
-  guint i;
+  GList *walk;
 
-  for (i = 0; i < 64; i++) {
-    if (conn->channels[i]) {
-      SwfdecRtmpChannelClass *klass = SWFDEC_RTMP_CHANNEL_GET_CLASS (conn->channels[i]);
-      if (klass->mark)
-	klass->mark (conn->channels[i]);
-    }
+  for (walk = conn->channels; walk; walk = walk->next) {
+    SwfdecRtmpChannel *channel = walk->data;
+    SwfdecRtmpChannelClass *klass = SWFDEC_RTMP_CHANNEL_GET_CLASS (channel);
+    if (klass->mark)
+      klass->mark (channel);
   }
 
   SWFDEC_GC_OBJECT_CLASS (swfdec_rtmp_connection_parent_class)->mark (object);
@@ -103,15 +102,15 @@ swfdec_rtmp_connection_connect (SwfdecRtmpConnection *conn, const SwfdecURL *url
   if (conn->error)
     return;
 
-  channel = swfdec_rtmp_handshake_channel_new (conn);
-  swfdec_rtmp_channel_register (channel, 0);
-  g_object_unref (channel);
+  conn->handshake = swfdec_rtmp_handshake_channel_new (conn);
   channel = swfdec_rtmp_control_channel_new (conn);
   swfdec_rtmp_channel_register (channel, 2);
   g_object_unref (channel);
   channel = swfdec_rtmp_rpc_channel_new (conn);
   swfdec_rtmp_channel_register (channel, 3);
   g_object_unref (channel);
+  conn->last_send = conn->channels;
+
   swfdec_rtmp_handshake_channel_start (SWFDEC_RTMP_HANDSHAKE_CHANNEL (
 	swfdec_rtmp_connection_get_handshake_channel (conn)));
 }
@@ -119,16 +118,10 @@ swfdec_rtmp_connection_connect (SwfdecRtmpConnection *conn, const SwfdecURL *url
 void
 swfdec_rtmp_connection_close (SwfdecRtmpConnection *conn)
 {
-  guint i;
-
   g_return_if_fail (SWFDEC_IS_RTMP_CONNECTION (conn));
 
-  for (i = 0; i < 64; i++) {
-    if (conn->channels[i] == NULL)
-      continue;
-    swfdec_rtmp_channel_unregister (conn->channels[i]);
-    g_assert (conn->channels[i] == NULL);
-  }
+  while (conn->channels)
+    swfdec_rtmp_channel_unregister (conn->channels->data);
 
   if (conn->socket) {
     g_object_unref (conn->socket);
@@ -184,8 +177,21 @@ swfdec_rtmp_connection_on_status (SwfdecRtmpConnection *conn, SwfdecAsValue valu
 SwfdecRtmpChannel *
 swfdec_rtmp_connection_get_channel (SwfdecRtmpConnection *conn, guint id)
 {
-  g_return_val_if_fail (SWFDEC_IS_RTMP_CONNECTION (conn), NULL);
+  SwfdecRtmpChannel *channel;
+  GList *walk;
 
-  return conn->channels[id];
+  g_return_val_if_fail (SWFDEC_IS_RTMP_CONNECTION (conn), NULL);
+  g_return_val_if_fail (conn->channels != NULL, NULL);
+
+  for (walk = conn->channels; walk; walk = walk->next) {
+    channel = walk->data;
+    if (channel->id < id)
+      continue;
+    if (channel->id == id)
+      return channel;
+    return NULL;
+  }
+
+  return NULL;
 }
 

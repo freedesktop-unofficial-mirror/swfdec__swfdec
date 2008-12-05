@@ -52,8 +52,9 @@ struct _SwfdecRtmpConnection {
   SwfdecURL *			url;		/* URL in use by this connection */
   SwfdecSandbox *		sandbox;	/* sandbox we execute functions in or NULL */
   SwfdecRtmpSocket *		socket;		/* socket we're using for read/write */
-  SwfdecRtmpChannel *		channels[64];	/* the channels in use by this connection */
-  guint				send_channel;	/* last channel data was sent from (ensures round-robin) */
+  GList *	  		channels;	/* list of channels in use by this connection (ordered by channel) */
+  GList *			last_send;	/* list entry of last channel sent to */
+  SwfdecRtmpChannel *		handshake;	/* channel used for doing initial handshake or NULL */
   char *			error;		/* NULL or debug string for error message */
 };
 
@@ -81,9 +82,9 @@ void			swfdec_rtmp_connection_errorv		(SwfdecRtmpConnection *	conn,
 void			swfdec_rtmp_connection_on_status	(SwfdecRtmpConnection *	conn,
 								 SwfdecAsValue		value);
 
-#define swfdec_rtmp_connection_get_handshake_channel(conn) ((conn)->channels[0])
-#define swfdec_rtmp_connection_get_command_channel(conn) ((conn)->channels[2])
-#define swfdec_rtmp_connection_get_rpc_channel(conn) ((conn)->channels[3])
+#define swfdec_rtmp_connection_get_handshake_channel(conn) ((conn)->handshake)
+#define swfdec_rtmp_connection_get_command_channel(conn) (swfdec_rtmp_connection_get_channel (conn, 2))
+#define swfdec_rtmp_connection_get_rpc_channel(conn) (swfdec_rtmp_connection_get_channel (conn, 3))
 
 
 G_END_DECLS
