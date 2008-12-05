@@ -63,13 +63,15 @@ struct _SwfdecRtmpHeader {
 
 #define SWFDEC_RTMP_HEADER_INVALID { (guint) -1, 0, 0, 0, 0 }
 
-gsize			swfdec_rtmp_header_size_get	(SwfdecRtmpHeaderSize		size);
+gsize			swfdec_rtmp_header_peek_size	(guint				first_byte);
+guint			swfdec_rtmp_header_peek_channel	(SwfdecBits *			bits);
 
 void			swfdec_rtmp_header_invalidate	(SwfdecRtmpHeader *	  	header);
 #define swfdec_rtmp_header_copy(dest, src) *(dest) = *(src)
 
 void			swfdec_rtmp_header_read		(SwfdecRtmpHeader *		header,
 							 SwfdecBits *			bits);
+
 void			swfdec_rtmp_header_write      	(const SwfdecRtmpHeader *     	header,
 							 SwfdecBots *			bots,
 							 SwfdecRtmpHeaderSize 		size);

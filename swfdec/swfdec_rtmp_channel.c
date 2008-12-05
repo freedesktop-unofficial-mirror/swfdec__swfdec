@@ -118,6 +118,7 @@ swfdec_rtmp_channel_send (SwfdecRtmpChannel *channel,
   gsize i;
 
   g_return_if_fail (SWFDEC_IS_RTMP_CHANNEL (channel));
+  g_return_if_fail (channel->id > 0);
   g_return_if_fail (header != NULL);
   g_return_if_fail (data != NULL);
 
@@ -136,52 +137,8 @@ swfdec_rtmp_channel_send (SwfdecRtmpChannel *channel,
     swfdec_buffer_queue_push (channel->send_queue, swfdec_bots_close (bots));
   }
   
-  if (channel->conn)
+  if (channel->conn->channels[0] == NULL)
     swfdec_rtmp_socket_send (channel->conn->socket);
-}
-
-gboolean
-swfdec_rtmp_channel_receive (SwfdecRtmpChannel *channel, SwfdecBufferQueue *queue,
-    SwfdecRtmpHeaderSize header_size)
-{
-  SwfdecRtmpHeader header;
-  SwfdecBuffer *buffer;
-  SwfdecBits bits;
-  gsize size, remaining_size;
-
-  size = swfdec_rtmp_header_size_get (header_size);
-  if (size > 4 && swfdec_buffer_queue_get_depth (channel->recv_queue)) {
-    SWFDEC_ERROR ("received new command, but old command not processed yet, dropping old command");
-    swfdec_buffer_queue_flush (channel->recv_queue, swfdec_buffer_queue_get_depth (channel->recv_queue));
-  }
-
-  buffer = swfdec_buffer_queue_peek (queue, size);
-  if (buffer == NULL)
-    return FALSE;
-
-  swfdec_bits_init (&bits, buffer);
-  swfdec_rtmp_header_copy (&header, &channel->recv_cache);
-  swfdec_rtmp_header_read (&header, &bits);
-  swfdec_buffer_unref (buffer);
-  remaining_size = header.size - swfdec_buffer_queue_get_depth (channel->recv_queue);
-  remaining_size = MIN (remaining_size, channel->block_size);
-  if (swfdec_buffer_queue_get_depth (queue) < size + remaining_size)
-    return FALSE;
-
-  swfdec_rtmp_header_copy (&channel->recv_cache, &header);
-  swfdec_buffer_queue_flush (queue, size);
-  buffer = swfdec_buffer_queue_pull (queue, remaining_size);
-  swfdec_buffer_queue_push (channel->recv_queue, buffer);
-
-  size = swfdec_buffer_queue_get_depth (channel->recv_queue);
-  g_assert (header.size >= size);
-  if (header.size == size) {
-    SwfdecRtmpChannelClass *klass;
-    buffer = swfdec_buffer_queue_pull (channel->recv_queue, size);
-    klass = SWFDEC_RTMP_CHANNEL_GET_CLASS (channel);
-    klass->receive (channel, &header, buffer);
-  }
-  return TRUE;
 }
 
 void

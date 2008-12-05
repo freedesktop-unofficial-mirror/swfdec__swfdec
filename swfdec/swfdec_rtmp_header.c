@@ -24,11 +24,26 @@
 #include "swfdec_rtmp_header.h"
 
 gsize
-swfdec_rtmp_header_size_get (SwfdecRtmpHeaderSize size)
+swfdec_rtmp_header_peek_size (guint first_byte)
 {
   static const gsize sizes[] = { 12, 8, 4, 1 };
+  gsize result;
+  
+  g_return_val_if_fail (first_byte < 256, 0);
 
-  return sizes[size];
+  result = sizes[first_byte >> 6];
+  switch (first_byte & 63) {
+    case 0:
+      result++;
+      break;
+    case 1:
+      result += 2;
+      break;
+    default:
+      break;
+  }
+
+  return result;
 }
 
 void
@@ -49,6 +64,16 @@ swfdec_rtmp_header_read (SwfdecRtmpHeader *header, SwfdecBits *bits)
 
   size = swfdec_bits_getbits (bits, 2);
   header->channel = swfdec_bits_getbits (bits, 6);
+  switch (header->channel) {
+    case 0:
+      header->channel = swfdec_bits_get_u8 (bits) + 64;
+      break;
+    case 1:
+      header->channel = swfdec_bits_get_u16 (bits) + 64;
+      break;
+    default:
+      break;
+  }
   if (size == SWFDEC_RTMP_HEADER_1_BYTE)
     return;
   header->timestamp = swfdec_bits_get_bu24 (bits);
@@ -61,6 +86,31 @@ swfdec_rtmp_header_read (SwfdecRtmpHeader *header, SwfdecBits *bits)
   header->stream = swfdec_bits_get_u32 (bits);
 }
 
+guint
+swfdec_rtmp_header_peek_channel	(SwfdecBits *bits)
+{
+  SwfdecBits real;
+  guint channel;
+
+  g_return_val_if_fail (bits != NULL, 0);
+
+  real = *bits;
+  swfdec_bits_getbits (&real, 2);
+  channel = swfdec_bits_getbits (&real, 6);
+  switch (channel) {
+    case 0:
+      channel = swfdec_bits_get_u8 (&real) + 64;
+      break;
+    case 1:
+      channel = swfdec_bits_get_u16 (&real) + 64;
+      break;
+    default:
+      break;
+  }
+
+  return channel;
+}
+
 void
 swfdec_rtmp_header_write (const SwfdecRtmpHeader *header, SwfdecBots *bots,
     SwfdecRtmpHeaderSize size)
@@ -69,7 +119,15 @@ swfdec_rtmp_header_write (const SwfdecRtmpHeader *header, SwfdecBots *bots,
   g_return_if_fail (bots != NULL);
 
   swfdec_bots_put_bits (bots, size, 2);
-  swfdec_bots_put_bits (bots, header->channel, 6);
+  if (header->channel >= 320) {
+    swfdec_bots_put_bits (bots, header->channel, 1);
+    swfdec_bots_put_u16 (bots, header->channel - 64);
+  } else if (header->channel >= 64) {
+    swfdec_bots_put_bits (bots, header->channel, 0);
+    swfdec_bots_put_u8 (bots, header->channel - 64);
+  } else {
+    swfdec_bots_put_bits (bots, header->channel, 6);
+  }
   if (size == SWFDEC_RTMP_HEADER_1_BYTE)
     return;
   swfdec_bots_put_bu24 (bots, header->timestamp);

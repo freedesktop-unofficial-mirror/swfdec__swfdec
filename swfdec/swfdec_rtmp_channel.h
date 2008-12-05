@@ -62,9 +62,6 @@ GType			swfdec_rtmp_channel_get_type		(void);
 void			swfdec_rtmp_channel_send		(SwfdecRtmpChannel *	channel,
 								 const SwfdecRtmpHeader *header,
 								 SwfdecBuffer *		data);
-gboolean		swfdec_rtmp_channel_receive		(SwfdecRtmpChannel *	channel,
-								 SwfdecBufferQueue *	queue,
-								 SwfdecRtmpHeaderSize	header_size);
 
 #define swfdec_rtmp_channel_get_time(channel, tv) (swfdec_as_context_get_time (swfdec_gc_object_get_context ((channel)->conn), tv))
 void			swfdec_rtmp_channel_register		(SwfdecRtmpChannel *	channel,

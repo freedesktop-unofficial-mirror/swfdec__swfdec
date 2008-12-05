@@ -198,7 +198,6 @@ swfdec_rtmp_rpc_channel_receive (SwfdecRtmpChannel *channel,
   }
   swfdec_sandbox_unuse (channel->conn->sandbox);
   swfdec_amf_context_free (cx);
-  swfdec_buffer_unref (buffer);
 }
 
 static void

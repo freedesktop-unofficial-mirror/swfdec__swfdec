@@ -111,7 +111,6 @@ swfdec_rtmp_control_channel_receive (SwfdecRtmpChannel *channel,
       SWFDEC_FIXME ("what to do with header type %u?", header->type);
       break;
   }
-  swfdec_buffer_unref (buffer);
 }
 
 static void

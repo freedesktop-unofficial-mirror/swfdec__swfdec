@@ -28,6 +28,9 @@
 G_BEGIN_DECLS
 
 
+/* size of a packet block */
+#define SWFDEC_RTMP_BLOCK_SIZE 128
+
 /* forward declarations */
 typedef struct _SwfdecRtmpChannel SwfdecRtmpChannel;
 typedef struct _SwfdecRtmpSocket SwfdecRtmpSocket;

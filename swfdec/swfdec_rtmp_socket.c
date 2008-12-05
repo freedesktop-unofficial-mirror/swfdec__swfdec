@@ -146,11 +146,12 @@ swfdec_rtmp_socket_next_buffer (SwfdecRtmpSocket *socket)
 void
 swfdec_rtmp_socket_receive (SwfdecRtmpSocket *sock, SwfdecBufferQueue *queue)
 {
+  SwfdecRtmpConnection *conn;
+  SwfdecRtmpChannel *channel;
+  SwfdecRtmpHeader header;
   SwfdecBuffer *buffer;
   SwfdecBits bits;
-  SwfdecRtmpHeaderSize header_size;
-  SwfdecRtmpConnection *conn;
-  guint channel;
+  guint i, remaining, header_size;
 
   g_return_if_fail (SWFDEC_IS_RTMP_SOCKET (sock));
   g_return_if_fail (queue != NULL);
@@ -167,17 +168,53 @@ swfdec_rtmp_socket_receive (SwfdecRtmpSocket *sock, SwfdecBufferQueue *queue)
   }
 
   do {
+    /* determine size of header */
     buffer = swfdec_buffer_queue_peek (queue, 1);
     if (buffer == NULL)
       break;
-    swfdec_bits_init (&bits, buffer);
-    header_size = swfdec_bits_getbits (&bits, 2);
-    channel = swfdec_bits_getbits (&bits, 6);
+    header_size = swfdec_rtmp_header_peek_size (buffer->data[0]);
     swfdec_buffer_unref (buffer);
-    if (conn->channels[channel] == NULL) {
-      SWFDEC_FIXME ("message on unknown channel %u, what now?", channel);
+
+    /* read header */
+    buffer = swfdec_buffer_queue_peek (queue, header_size);
+    if (buffer == NULL)
       break;
+    swfdec_bits_init (&bits, buffer);
+    i = swfdec_rtmp_header_peek_channel (&bits);
+    channel = conn->channels[i];
+    if (channel == NULL) {
+      swfdec_rtmp_connection_error (conn,
+	  "message on unknown channel %u, what now?", i);
+      return;
     }
-  } while (swfdec_rtmp_channel_receive (conn->channels[channel], queue, header_size));
+    if (header_size >= 4 && swfdec_buffer_queue_get_depth (channel->recv_queue)) {
+      SWFDEC_ERROR ("not a continuation header, but old command not finished yet, dropping old command");
+      swfdec_buffer_queue_flush (channel->recv_queue, swfdec_buffer_queue_get_depth (channel->recv_queue));
+    }
+    swfdec_rtmp_header_copy (&header, &channel->recv_cache);
+    swfdec_rtmp_header_read (&header, &bits);
+    swfdec_buffer_unref (buffer);
+
+    /* read the data chunk */
+    remaining = header.size - swfdec_buffer_queue_get_depth (channel->recv_queue);
+    remaining = MIN (remaining, SWFDEC_RTMP_BLOCK_SIZE);
+    if (header_size + remaining > swfdec_buffer_queue_get_depth (queue))
+      return;
+    swfdec_buffer_queue_flush (queue, header_size);
+    buffer = swfdec_buffer_queue_pull (queue, remaining);
+    g_assert (buffer);
+    swfdec_buffer_queue_push (channel->recv_queue, buffer);
+    swfdec_rtmp_header_copy (&channel->recv_cache, &header);
+
+    /* process the buffer if it's received completely */
+    buffer = swfdec_buffer_queue_pull (channel->recv_queue, header.size);
+    if (buffer) {
+      SwfdecRtmpChannelClass *klass = SWFDEC_RTMP_CHANNEL_GET_CLASS (channel);
+
+      g_assert (swfdec_buffer_queue_get_depth (channel->recv_queue) == 0);
+      klass->receive (channel, &header, buffer);
+      swfdec_buffer_unref (buffer);
+    }
+  } while (TRUE);
 }
 
