@@ -156,6 +156,11 @@ swfdec_rtmp_channel_register (SwfdecRtmpChannel *channel, guint id)
   g_return_if_fail (SWFDEC_IS_RTMP_CHANNEL (channel));
   g_return_if_fail (!swfdec_rtmp_channel_is_registered (channel));
   g_return_if_fail (id > 1);
+  
+  if (id >= 65536 + 64) {
+    SWFDEC_FIXME ("figure out how huge ids (like %u) are handled. Channel registration failed", id);
+    return;
+  }
 
   conn = channel->conn;
   conn->channels = g_list_insert_sorted (conn->channels, channel,
