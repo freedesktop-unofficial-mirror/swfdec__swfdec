@@ -137,8 +137,7 @@ swfdec_rtmp_channel_send (SwfdecRtmpChannel *channel,
     swfdec_buffer_queue_push (channel->send_queue, swfdec_bots_close (bots));
   }
   
-  if (channel->conn->channels[0] == NULL)
-    swfdec_rtmp_socket_send (channel->conn->socket);
+  swfdec_rtmp_socket_send (channel->conn->socket);
 }
 
 void

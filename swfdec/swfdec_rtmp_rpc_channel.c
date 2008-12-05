@@ -108,8 +108,9 @@ swfdec_rtmp_rpc_channel_receive_reply (SwfdecRtmpChannel *channel,
     SWFDEC_FIXME ("more than 2 values in a reply?");
   }
 
-  if (id == 1 && SWFDEC_IS_RTMP_HANDSHAKE_CHANNEL (channel->conn->channels[0])) {
-    swfdec_rtmp_handshake_channel_connected (SWFDEC_RTMP_HANDSHAKE_CHANNEL (channel->conn->channels[0]),
+  if (id == 1 && swfdec_rtmp_connection_get_channel (channel->conn, 0)) {
+    swfdec_rtmp_handshake_channel_connected (SWFDEC_RTMP_HANDSHAKE_CHANNEL (
+	  swfdec_rtmp_connection_get_channel (channel->conn, 0)),
 	  i, val);
   } else {
     if (!SWFDEC_AS_VALUE_IS_NULL (val[0])) {

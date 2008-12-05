@@ -124,9 +124,8 @@ swfdec_rtmp_socket_next_buffer (SwfdecRtmpSocket *socket)
 
   conn = socket->conn;
 
-  if (G_UNLIKELY (conn->channels[0] &&
-	SWFDEC_IS_RTMP_HANDSHAKE_CHANNEL (conn->channels[0]))) {
-    return swfdec_buffer_queue_pull_buffer (conn->channels[0]->send_queue);
+  if (G_UNLIKELY (swfdec_rtmp_connection_get_channel (conn, 0))) {
+    return swfdec_buffer_queue_pull_buffer (swfdec_rtmp_connection_get_channel (conn, 0)->send_queue);
   }
 
   i = conn->send_channel;
@@ -158,11 +157,10 @@ swfdec_rtmp_socket_receive (SwfdecRtmpSocket *sock, SwfdecBufferQueue *queue)
 
   conn = sock->conn;
 
-  if (G_UNLIKELY (conn->channels[0] && 
-	SWFDEC_IS_RTMP_HANDSHAKE_CHANNEL (conn->channels[0]))) {
-    SwfdecRtmpHandshakeChannel *shake = SWFDEC_RTMP_HANDSHAKE_CHANNEL (conn->channels[0]);
+  if (G_UNLIKELY (swfdec_rtmp_connection_get_channel (conn, 0))) {
+    SwfdecRtmpHandshakeChannel *shake = SWFDEC_RTMP_HANDSHAKE_CHANNEL (swfdec_rtmp_connection_get_channel (conn, 0));
     if (shake->reply == NULL) {
-      while (swfdec_rtmp_handshake_channel_receive (SWFDEC_RTMP_HANDSHAKE_CHANNEL (conn->channels[0]), queue));
+      while (swfdec_rtmp_handshake_channel_receive (shake, queue));
       return;
     }
   }
@@ -181,7 +179,7 @@ swfdec_rtmp_socket_receive (SwfdecRtmpSocket *sock, SwfdecBufferQueue *queue)
       break;
     swfdec_bits_init (&bits, buffer);
     i = swfdec_rtmp_header_peek_channel (&bits);
-    channel = conn->channels[i];
+    channel = swfdec_rtmp_connection_get_channel (conn, i);
     if (channel == NULL) {
       swfdec_rtmp_connection_error (conn,
 	  "message on unknown channel %u, what now?", i);

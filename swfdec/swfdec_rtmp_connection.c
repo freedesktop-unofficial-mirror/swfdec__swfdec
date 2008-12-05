@@ -112,7 +112,8 @@ swfdec_rtmp_connection_connect (SwfdecRtmpConnection *conn, const SwfdecURL *url
   channel = swfdec_rtmp_rpc_channel_new (conn);
   swfdec_rtmp_channel_register (channel, 3);
   g_object_unref (channel);
-  swfdec_rtmp_handshake_channel_start (SWFDEC_RTMP_HANDSHAKE_CHANNEL (conn->channels[0]));
+  swfdec_rtmp_handshake_channel_start (SWFDEC_RTMP_HANDSHAKE_CHANNEL (
+	swfdec_rtmp_connection_get_channel (conn, 0)));
 }
 
 void
@@ -179,3 +180,12 @@ swfdec_rtmp_connection_on_status (SwfdecRtmpConnection *conn, SwfdecAsValue valu
 
   swfdec_as_relay_call (SWFDEC_AS_RELAY (conn), SWFDEC_AS_STR_onStatus, 1, &value, NULL);
 }
+
+SwfdecRtmpChannel *
+swfdec_rtmp_connection_get_channel (SwfdecRtmpConnection *conn, guint id)
+{
+  g_return_val_if_fail (SWFDEC_IS_RTMP_CONNECTION (conn), NULL);
+
+  return conn->channels[id];
+}
+

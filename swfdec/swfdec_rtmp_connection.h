@@ -70,6 +70,8 @@ void			swfdec_rtmp_connection_close		(SwfdecRtmpConnection *	conn);
 void			swfdec_rtmp_connection_receive		(SwfdecRtmpConnection *	conn,
 								 SwfdecBufferQueue *	queue);
 void			swfdec_rtmp_connection_send		(SwfdecRtmpConnection *	conn);
+SwfdecRtmpChannel *	swfdec_rtmp_connection_get_channel	(SwfdecRtmpConnection *	conn,
+								 guint			id);
 void			swfdec_rtmp_connection_error		(SwfdecRtmpConnection *	conn,
 								 const char *		error,
 								 ...) G_GNUC_PRINTF (2, 3);
