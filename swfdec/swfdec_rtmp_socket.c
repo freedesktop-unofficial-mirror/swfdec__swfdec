@@ -124,8 +124,8 @@ swfdec_rtmp_socket_next_buffer (SwfdecRtmpSocket *socket)
 
   conn = socket->conn;
 
-  if (G_UNLIKELY (swfdec_rtmp_connection_get_channel (conn, 0))) {
-    return swfdec_buffer_queue_pull_buffer (swfdec_rtmp_connection_get_channel (conn, 0)->send_queue);
+  if (G_UNLIKELY (swfdec_rtmp_connection_get_handshake_channel (conn))) {
+    return swfdec_buffer_queue_pull_buffer (swfdec_rtmp_connection_get_handshake_channel (conn)->send_queue);
   }
 
   i = conn->send_channel;
@@ -157,8 +157,9 @@ swfdec_rtmp_socket_receive (SwfdecRtmpSocket *sock, SwfdecBufferQueue *queue)
 
   conn = sock->conn;
 
-  if (G_UNLIKELY (swfdec_rtmp_connection_get_channel (conn, 0))) {
-    SwfdecRtmpHandshakeChannel *shake = SWFDEC_RTMP_HANDSHAKE_CHANNEL (swfdec_rtmp_connection_get_channel (conn, 0));
+  if (G_UNLIKELY (swfdec_rtmp_connection_get_handshake_channel (conn))) {
+    SwfdecRtmpHandshakeChannel *shake = SWFDEC_RTMP_HANDSHAKE_CHANNEL (
+	swfdec_rtmp_connection_get_handshake_channel (conn));
     if (shake->reply == NULL) {
       while (swfdec_rtmp_handshake_channel_receive (shake, queue));
       return;

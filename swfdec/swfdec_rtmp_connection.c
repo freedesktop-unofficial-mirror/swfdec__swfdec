@@ -113,7 +113,7 @@ swfdec_rtmp_connection_connect (SwfdecRtmpConnection *conn, const SwfdecURL *url
   swfdec_rtmp_channel_register (channel, 3);
   g_object_unref (channel);
   swfdec_rtmp_handshake_channel_start (SWFDEC_RTMP_HANDSHAKE_CHANNEL (
-	swfdec_rtmp_connection_get_channel (conn, 0)));
+	swfdec_rtmp_connection_get_handshake_channel (conn)));
 }
 
 void

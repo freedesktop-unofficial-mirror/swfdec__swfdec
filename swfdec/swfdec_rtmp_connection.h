@@ -81,6 +81,7 @@ void			swfdec_rtmp_connection_errorv		(SwfdecRtmpConnection *	conn,
 void			swfdec_rtmp_connection_on_status	(SwfdecRtmpConnection *	conn,
 								 SwfdecAsValue		value);
 
+#define swfdec_rtmp_connection_get_handshake_channel(conn) ((conn)->channels[0])
 #define swfdec_rtmp_connection_get_command_channel(conn) ((conn)->channels[2])
 #define swfdec_rtmp_connection_get_rpc_channel(conn) ((conn)->channels[3])
 
