@@ -139,6 +139,7 @@ libswfdec_source_files = \
 	swfdec_rtmp_rpc_channel.c \
 	swfdec_rtmp_socket.c \
 	swfdec_rtmp_socket_rtmp.c \
+	swfdec_rtmp_video_channel.c \
 	swfdec_sandbox.c \
 	swfdec_script.c \
 	swfdec_selection.c \
@@ -337,6 +338,7 @@ noinst_HEADERS = \
 	swfdec_rtmp_rpc_channel.h \
 	swfdec_rtmp_socket.h \
 	swfdec_rtmp_socket_rtmp.h \
+	swfdec_rtmp_video_channel.h \
 	swfdec_sandbox.h \
 	swfdec_script_internal.h \
 	swfdec_shape.h \

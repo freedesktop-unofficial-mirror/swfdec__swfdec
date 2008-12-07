@@ -27,6 +27,7 @@
 #include "swfdec_as_internal.h"
 #include "swfdec_debug.h"
 #include "swfdec_rtmp_rpc_channel.h"
+#include "swfdec_rtmp_video_channel.h"
 
 /*** NET STREAM ***/
 
@@ -157,8 +158,8 @@ swfdec_net_stream_construct (SwfdecAsContext *cx, SwfdecAsObject *object,
   stream->conn = conn;
   swfdec_as_object_set_relay (o, SWFDEC_AS_RELAY (stream));
   stream->rpc_channel = swfdec_rtmp_rpc_channel_new (conn);
-  /* FIXME: new class for multimedia plz */
-  stream->video_channel = swfdec_rtmp_rpc_channel_new (conn);
+  stream->video_channel = swfdec_rtmp_video_channel_new (conn);
+  /* FIXME: new class for audio plz */
   stream->audio_channel = swfdec_rtmp_rpc_channel_new (conn);
 }
 

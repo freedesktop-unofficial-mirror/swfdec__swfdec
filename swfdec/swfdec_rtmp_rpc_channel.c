@@ -279,3 +279,4 @@ swfdec_rtmp_rpc_channel_new (SwfdecRtmpConnection *conn)
 
   return g_object_new (SWFDEC_TYPE_RTMP_RPC_CHANNEL, "connection", conn, NULL);
 }
+
