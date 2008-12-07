@@ -117,7 +117,6 @@ swfdec_rtmp_channel_send (SwfdecRtmpChannel *channel,
   gsize i;
 
   g_return_if_fail (SWFDEC_IS_RTMP_CHANNEL (channel));
-  g_return_if_fail (channel->id > 0);
   g_return_if_fail (header != NULL);
   g_return_if_fail (data != NULL);
 
@@ -136,7 +135,8 @@ swfdec_rtmp_channel_send (SwfdecRtmpChannel *channel,
     swfdec_buffer_queue_push (channel->send_queue, swfdec_bots_close (bots));
   }
   
-  swfdec_rtmp_socket_send (channel->conn->socket);
+  if (swfdec_rtmp_channel_is_registered (channel))
+    swfdec_rtmp_socket_send (channel->conn->socket);
 }
 
 static int
