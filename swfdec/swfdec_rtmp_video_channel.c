@@ -59,6 +59,12 @@ swfdec_rtmp_video_channel_receive (SwfdecRtmpChannel *channel,
 {
 }
 
+static SwfdecRtmpPacket *
+swfdec_rtmp_video_channel_send (SwfdecRtmpChannel *channel)
+{
+  return NULL;
+}
+
 static void
 swfdec_rtmp_video_channel_dispose (GObject *object)
 {
@@ -76,6 +82,7 @@ swfdec_rtmp_video_channel_class_init (SwfdecRtmpVideoChannelClass *klass)
   object_class->dispose = swfdec_rtmp_video_channel_dispose;
 
   channel_class->receive = swfdec_rtmp_video_channel_receive;
+  channel_class->send = swfdec_rtmp_video_channel_send;
 }
 
 static void

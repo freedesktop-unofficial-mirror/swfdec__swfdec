@@ -134,8 +134,8 @@ swfdec_rtmp_socket_next_buffer (SwfdecRtmpSocket *socket)
   do {
     walk = walk->next ? walk->next : conn->channels;
     channel = walk->data;
-    buffer = swfdec_buffer_queue_pull_buffer (channel->send_queue);
-    if (buffer) {
+    buffer = swfdec_rtmp_channel_next_buffer (channel);
+    if (buffer != NULL) {
       conn->last_send = walk;
       return buffer;
     }

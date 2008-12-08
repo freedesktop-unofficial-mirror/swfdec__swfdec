@@ -38,6 +38,7 @@ typedef struct _SwfdecRtmpControlChannelClass SwfdecRtmpControlChannelClass;
 struct _SwfdecRtmpControlChannel {
   SwfdecRtmpChannel		channel;
 
+  GQueue *			send_packets;		/* packets that still need to be sent */
   guint				server_bandwidth;
   guint				client_bandwidth;
 };

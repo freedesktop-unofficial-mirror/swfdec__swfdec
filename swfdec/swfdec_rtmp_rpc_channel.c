@@ -53,10 +53,11 @@ swfdec_rtmp_rpc_channel_do_send (SwfdecRtmpRpcChannel *rpc, SwfdecAsValue name,
 {
   SwfdecRtmpChannel *channel;
   SwfdecAsContext *context;
-  SwfdecRtmpHeader header;
+  SwfdecRtmpPacket *packet;
   SwfdecAmfContext *cx;
   SwfdecBuffer *buffer;
   SwfdecBots *bots;
+  gboolean empty;
   guint i;
 
   channel = SWFDEC_RTMP_CHANNEL (rpc);
@@ -74,13 +75,12 @@ swfdec_rtmp_rpc_channel_do_send (SwfdecRtmpRpcChannel *rpc, SwfdecAsValue name,
   buffer = swfdec_bots_close (bots);
   swfdec_amf_context_free (cx);
 
-  header.channel = channel->channel_id;
-  header.timestamp = swfdec_rtmp_rpc_channel_update_last_send (channel);
-  header.size = buffer->length;
-  header.type = SWFDEC_RTMP_PACKET_INVOKE;
-  header.stream = 0;
-
-  swfdec_rtmp_channel_send (channel, &header, buffer);
+  packet = swfdec_rtmp_packet_new (SWFDEC_RTMP_PACKET_INVOKE,
+      swfdec_rtmp_rpc_channel_update_last_send (channel), buffer);
+  empty = g_queue_is_empty (rpc->packets);
+  g_queue_push_tail (rpc->packets, packet);
+  if (empty)
+    swfdec_rtmp_channel_send (channel);
 }
 
 static void
@@ -201,6 +201,12 @@ swfdec_rtmp_rpc_channel_receive (SwfdecRtmpChannel *channel,
   swfdec_amf_context_free (cx);
 }
 
+static SwfdecRtmpPacket *
+swfdec_rtmp_rpc_channel_send_vfunc (SwfdecRtmpChannel *channel)
+{
+  return g_queue_pop_head (SWFDEC_RTMP_RPC_CHANNEL (channel)->packets);
+}
+
 static void
 swfdec_rtmp_rpc_channel_mark (SwfdecRtmpChannel *channel)
 {
@@ -223,6 +229,12 @@ swfdec_rtmp_rpc_channel_dispose (GObject *object)
     g_hash_table_destroy (rpc->pending);
     rpc->pending = NULL;
   }
+  if (rpc->packets) {
+    g_queue_foreach (rpc->packets, (GFunc) swfdec_rtmp_packet_free, NULL);
+    g_queue_free (rpc->packets);
+    rpc->packets = NULL;
+  }
+
 
   G_OBJECT_CLASS (swfdec_rtmp_rpc_channel_parent_class)->dispose (object);
 }
@@ -237,12 +249,14 @@ swfdec_rtmp_rpc_channel_class_init (SwfdecRtmpRpcChannelClass *klass)
 
   channel_class->mark = swfdec_rtmp_rpc_channel_mark;
   channel_class->receive = swfdec_rtmp_rpc_channel_receive;
+  channel_class->send = swfdec_rtmp_rpc_channel_send_vfunc;
 }
 
 static void
 swfdec_rtmp_rpc_channel_init (SwfdecRtmpRpcChannel *rpc)
 {
   rpc->pending = g_hash_table_new (g_direct_hash, g_direct_equal);
+  rpc->packets = g_queue_new ();
 }
 
 void

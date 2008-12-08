@@ -130,7 +130,6 @@ swfdec_rtmp_handshake_channel_push_connect (SwfdecRtmpHandshakeChannel *shake)
 
   swfdec_rtmp_rpc_channel_send_connect (SWFDEC_RTMP_RPC_CHANNEL (
 	swfdec_rtmp_connection_get_rpc_channel (conn)), SWFDEC_AS_VALUE_FROM_OBJECT (o));
-  swfdec_rtmp_header_invalidate (&swfdec_rtmp_connection_get_rpc_channel (conn)->send_cache);
 }
 
 void
@@ -161,21 +160,14 @@ swfdec_rtmp_handshake_channel_redirect_connect (SwfdecRtmpHandshakeChannel *shak
 {
   SwfdecRtmpConnection *conn = SWFDEC_RTMP_CHANNEL (shake)->conn;
   SwfdecRtmpChannel *rpc = swfdec_rtmp_connection_get_rpc_channel (conn);
-  SwfdecRtmpHeader header;
   SwfdecBuffer *buffer;
-  SwfdecBits bits;
 
-  buffer = swfdec_buffer_queue_pull_buffer (rpc->send_queue);
-  swfdec_bits_init (&bits, buffer);
-  swfdec_rtmp_header_read (&header, &bits);
-  header.size -= (buffer->length - 12);
+  buffer = swfdec_rtmp_channel_next_buffer (rpc);
   swfdec_buffer_queue_push (SWFDEC_RTMP_CHANNEL (shake)->send_queue, buffer);
-  while (header.size > 0) {
-    buffer = swfdec_buffer_queue_pull_buffer (rpc->send_queue);
-    g_assert (header.size >= buffer->length - 1);
-    header.size -= buffer->length - 1;
+  while ((buffer = swfdec_buffer_queue_pull_buffer (rpc->send_queue))) {
     swfdec_buffer_queue_push (SWFDEC_RTMP_CHANNEL (shake)->send_queue, buffer);
   }
+  swfdec_rtmp_header_invalidate (&rpc->send_cache);
 }
 
 gboolean

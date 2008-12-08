@@ -41,6 +41,7 @@ struct _SwfdecRtmpRpcChannel {
 
   guint				id;		/* last id used for RPC call */
   GHashTable *			pending;	/* int => SwfdecAsObject mapping of calls having pending replies */
+  GQueue *			packets;	/* outstanding packets */
   GTimeVal			last_send;	/* time the last call was sent */
 };
 

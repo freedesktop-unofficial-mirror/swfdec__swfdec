@@ -32,6 +32,18 @@
 G_DEFINE_TYPE (SwfdecRtmpControlChannel, swfdec_rtmp_control_channel, SWFDEC_TYPE_RTMP_CHANNEL)
 
 static void
+swfdec_rtmp_control_channel_push (SwfdecRtmpControlChannel *control, 
+    SwfdecRtmpPacket *packet)
+{
+  gboolean empty = g_queue_is_empty (control->send_packets);
+
+  g_queue_push_tail (control->send_packets, packet);
+
+  if (empty)
+    swfdec_rtmp_channel_send (SWFDEC_RTMP_CHANNEL (control));
+}
+
+static void
 swfdec_rtmp_control_channel_handle_ping (SwfdecRtmpChannel *channel, SwfdecBuffer *buffer)
 {
   SwfdecBits bits;
@@ -51,7 +63,7 @@ swfdec_rtmp_control_channel_handle_server_bandwidth (SwfdecRtmpChannel *channel,
   SwfdecBits bits;
   SwfdecBots *bots;
   guint new_bandwidth;
-  SwfdecRtmpHeader header;
+  SwfdecRtmpPacket *packet;
   GTimeVal tv;
   long diff;
 
@@ -65,18 +77,15 @@ swfdec_rtmp_control_channel_handle_server_bandwidth (SwfdecRtmpChannel *channel,
   bots = swfdec_bots_new ();
   swfdec_bots_put_bu32 (bots, new_bandwidth);
   buffer = swfdec_bots_close (bots);
-  header.channel = channel->channel_id;
   /* send diff between the timestamp that the server sent and our current time.
    * FIXME: Is that correct? */
   swfdec_rtmp_channel_get_time (channel, &tv);
   diff = swfdec_time_val_diff (&channel->timestamp, &tv);
-  header.timestamp = org_header->timestamp - diff;
-  header.size = buffer->length;
-  header.type = SWFDEC_RTMP_PACKET_SERVER_BANDWIDTH;
-  header.stream = 0;
-
-  swfdec_rtmp_channel_send (channel, &header, buffer);
+  packet = swfdec_rtmp_packet_new (SWFDEC_RTMP_PACKET_SERVER_BANDWIDTH,
+      org_header->timestamp - diff, buffer);
   swfdec_buffer_unref (buffer);
+
+  swfdec_rtmp_control_channel_push (control, packet);
 }
 
 static void
@@ -113,10 +122,24 @@ swfdec_rtmp_control_channel_receive (SwfdecRtmpChannel *channel,
   }
 }
 
+static SwfdecRtmpPacket *
+swfdec_rtmp_control_channel_send (SwfdecRtmpChannel *channel)
+{
+  SwfdecRtmpControlChannel *control = SWFDEC_RTMP_CONTROL_CHANNEL (channel);
+
+  return g_queue_pop_head (control->send_packets);
+}
+
 static void
 swfdec_rtmp_control_channel_dispose (GObject *object)
 {
-  //SwfdecRtmpControlChannel *conn = SWFDEC_RTMP_CONTROL_CHANNEL (object);
+  SwfdecRtmpControlChannel *control = SWFDEC_RTMP_CONTROL_CHANNEL (object);
+
+  if (control->send_packets) {
+    g_queue_foreach (control->send_packets, (GFunc) swfdec_rtmp_packet_free, NULL);
+    g_queue_free (control->send_packets);
+    control->send_packets = NULL;
+  }
 
   G_OBJECT_CLASS (swfdec_rtmp_control_channel_parent_class)->dispose (object);
 }
@@ -130,11 +153,13 @@ swfdec_rtmp_control_channel_class_init (SwfdecRtmpControlChannelClass *klass)
   object_class->dispose = swfdec_rtmp_control_channel_dispose;
 
   channel_class->receive = swfdec_rtmp_control_channel_receive;
+  channel_class->send = swfdec_rtmp_control_channel_send;
 }
 
 static void
-swfdec_rtmp_control_channel_init (SwfdecRtmpControlChannel *command)
+swfdec_rtmp_control_channel_init (SwfdecRtmpControlChannel *control)
 {
+  control->send_packets = g_queue_new ();
 }
 
 SwfdecRtmpChannel *

@@ -22,6 +22,7 @@
 
 #include <swfdec/swfdec_rtmp_connection.h>
 #include <swfdec/swfdec_rtmp_header.h>
+#include <swfdec/swfdec_rtmp_packet.h>
 
 G_BEGIN_DECLS
 
@@ -56,16 +57,19 @@ struct _SwfdecRtmpChannelClass {
   void				(* receive)			(SwfdecRtmpChannel *	channel,
 								 const SwfdecRtmpHeader *header,
 								 SwfdecBuffer *		buffer);
+  SwfdecRtmpPacket *		(* send)			(SwfdecRtmpChannel *	channel);
 };
 
 GType			swfdec_rtmp_channel_get_type		(void);
 
-void			swfdec_rtmp_channel_send		(SwfdecRtmpChannel *	channel,
-								 const SwfdecRtmpHeader *header,
-								 SwfdecBuffer *		data);
+SwfdecBuffer *		swfdec_rtmp_channel_next_buffer		(SwfdecRtmpChannel *	channel);
 
 #define swfdec_rtmp_channel_get_time(channel, tv) (swfdec_as_context_get_time (swfdec_gc_object_get_context ((channel)->conn), tv))
 #define swfdec_rtmp_channel_is_registered(channel) ((channel)->channel_id > 0)
+#define swfdec_rtmp_channel_send(channel) G_STMT_START{\
+  if (swfdec_rtmp_channel_is_registered(channel)) \
+    swfdec_rtmp_socket_send (channel->conn->socket); \
+}G_STMT_END
 void			swfdec_rtmp_channel_register		(SwfdecRtmpChannel *	channel,
 								 guint			channel_id,
 								 guint			stream_id);
