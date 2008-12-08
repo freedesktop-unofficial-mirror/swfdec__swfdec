@@ -79,8 +79,10 @@ swfdec_rtmp_connection_class_init (SwfdecRtmpConnectionClass *klass)
 }
 
 static void
-swfdec_rtmp_connection_init (SwfdecRtmpConnection *rtmp_connection)
+swfdec_rtmp_connection_init (SwfdecRtmpConnection *conn)
 {
+  conn->read_size = SWFDEC_RTMP_BLOCK_SIZE;
+  conn->write_size = SWFDEC_RTMP_BLOCK_SIZE;
 }
 
 void

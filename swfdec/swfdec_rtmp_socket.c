@@ -197,7 +197,7 @@ swfdec_rtmp_socket_receive (SwfdecRtmpSocket *sock, SwfdecBufferQueue *queue)
 
     /* read the data chunk */
     remaining = header.size - swfdec_buffer_queue_get_depth (channel->recv_queue);
-    remaining = MIN (remaining, SWFDEC_RTMP_BLOCK_SIZE);
+    remaining = MIN (remaining, conn->read_size);
     if (header_size + remaining > swfdec_buffer_queue_get_depth (queue))
       return;
     swfdec_buffer_queue_flush (queue, header_size);

@@ -56,6 +56,9 @@ struct _SwfdecRtmpConnection {
   GList *			last_send;	/* list entry of last channel sent to */
   SwfdecRtmpChannel *		handshake;	/* channel used for doing initial handshake or NULL */
   char *			error;		/* NULL or debug string for error message */
+
+  guint				read_size;	/* size of a block of data when reading */
+  guint				write_size;	/* size of a block of data when writing */
 };
 
 struct _SwfdecRtmpConnectionClass {

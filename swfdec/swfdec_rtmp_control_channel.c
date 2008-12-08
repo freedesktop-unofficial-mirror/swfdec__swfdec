@@ -44,6 +44,19 @@ swfdec_rtmp_control_channel_push (SwfdecRtmpControlChannel *control,
 }
 
 static void
+swfdec_rtmp_control_channel_handle_chunk_size (SwfdecRtmpChannel *channel, SwfdecBuffer *buffer)
+{
+  SwfdecBits bits;
+
+  swfdec_bits_init (&bits, buffer);
+  channel->conn->read_size = swfdec_bits_get_bu32 (&bits);
+  SWFDEC_INFO ("setting read chunk size to %u", channel->conn->read_size);
+  if (swfdec_bits_left (&bits)) {
+    SWFDEC_FIXME ("%u bytes left after chunk size", swfdec_bits_left (&bits) / 8);
+  }
+}
+
+static void
 swfdec_rtmp_control_channel_handle_ping (SwfdecRtmpChannel *channel, SwfdecBuffer *buffer)
 {
   SwfdecBits bits;
@@ -107,6 +120,9 @@ swfdec_rtmp_control_channel_receive (SwfdecRtmpChannel *channel,
     const SwfdecRtmpHeader *header, SwfdecBuffer *buffer)
 {
   switch ((guint) header->type) {
+    case SWFDEC_RTMP_PACKET_SIZE:
+      swfdec_rtmp_control_channel_handle_chunk_size (channel, buffer);
+      break;
     case SWFDEC_RTMP_PACKET_PING:
       swfdec_rtmp_control_channel_handle_ping (channel, buffer);
       break;
