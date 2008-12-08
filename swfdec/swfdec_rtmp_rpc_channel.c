@@ -191,7 +191,8 @@ swfdec_rtmp_rpc_channel_receive (SwfdecRtmpChannel *channel,
       }
       break;
     default:
-      SWFDEC_FIXME ("what to do with header type %u?", header->type);
+      SWFDEC_FIXME ("channel %u: what to do with header type %u?", 
+	  channel->channel_id, header->type);
       break;
   }
   swfdec_sandbox_unuse (channel->conn->sandbox);
