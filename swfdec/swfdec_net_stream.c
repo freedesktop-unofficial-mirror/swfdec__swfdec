@@ -170,7 +170,7 @@ swfdec_net_stream_onCreate (SwfdecAsContext *cx, SwfdecAsObject *object,
 {
   SwfdecNetStream *stream;
   SwfdecAsObject *o;
-  guint stream_id;
+  guint stream_id, channel_id;
 
   SWFDEC_AS_CHECK (0, NULL, "oi", &o, &stream_id);
 
@@ -179,10 +179,10 @@ swfdec_net_stream_onCreate (SwfdecAsContext *cx, SwfdecAsObject *object,
   stream = SWFDEC_NET_STREAM (o->relay);
 
   stream->stream_id = stream_id;
-  stream_id = 4 + ((stream_id - 1 % 12) * 5);
-  swfdec_rtmp_channel_register (stream->rpc_channel, stream_id);
-  swfdec_rtmp_channel_register (stream->video_channel, stream_id + 1);
-  swfdec_rtmp_channel_register (stream->audio_channel, stream_id + 2);
+  channel_id = 4 + ((stream_id - 1) * 5);
+  swfdec_rtmp_channel_register (stream->rpc_channel, channel_id, stream_id);
+  swfdec_rtmp_channel_register (stream->video_channel, channel_id, stream_id + 1);
+  swfdec_rtmp_channel_register (stream->audio_channel, channel_id, stream_id + 2);
 }
 
 SWFDEC_AS_NATIVE (2101, 202, swfdec_net_stream_send_connection)

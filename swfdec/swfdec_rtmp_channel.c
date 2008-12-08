@@ -145,27 +145,29 @@ swfdec_rtmp_channel_compare (gconstpointer a, gconstpointer b)
   SwfdecRtmpChannel *ca = (SwfdecRtmpChannel *) a;
   SwfdecRtmpChannel *cb = (SwfdecRtmpChannel *) b;
 
-  return cb->id - ca->id;
+  return cb->channel_id - ca->channel_id;
 }
 
 void
-swfdec_rtmp_channel_register (SwfdecRtmpChannel *channel, guint id)
+swfdec_rtmp_channel_register (SwfdecRtmpChannel *channel,
+    guint channel_id, guint stream_id)
 {
   SwfdecRtmpConnection *conn;
 
   g_return_if_fail (SWFDEC_IS_RTMP_CHANNEL (channel));
   g_return_if_fail (!swfdec_rtmp_channel_is_registered (channel));
-  g_return_if_fail (id > 1);
+  g_return_if_fail (channel_id > 1);
   
-  if (id >= 65536 + 64) {
-    SWFDEC_FIXME ("figure out how huge ids (like %u) are handled. Channel registration failed", id);
+  if (channel_id >= 65536 + 64) {
+    SWFDEC_FIXME ("figure out how huge ids (like %u) are handled. Channel registration failed", channel_id);
     return;
   }
 
   conn = channel->conn;
   conn->channels = g_list_insert_sorted (conn->channels, channel,
       swfdec_rtmp_channel_compare);
-  channel->id = id;
+  channel->channel_id = channel_id;
+  channel->stream_id = stream_id;
   g_object_ref (channel);
 
   if (swfdec_buffer_queue_get_depth (channel->send_queue) > 0)
@@ -185,7 +187,8 @@ swfdec_rtmp_channel_unregister (SwfdecRtmpChannel *channel)
       channel->conn->last_send->next : channel->conn->last_send->prev;
   }
   channel->conn->channels = g_list_remove (channel->conn->channels, channel);
-  channel->id = 0;
+  channel->channel_id = 0;
+  channel->stream_id = 0;
   g_object_unref (channel);
 }
 

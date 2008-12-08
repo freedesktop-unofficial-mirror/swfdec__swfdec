@@ -65,7 +65,7 @@ swfdec_rtmp_control_channel_handle_server_bandwidth (SwfdecRtmpChannel *channel,
   bots = swfdec_bots_new ();
   swfdec_bots_put_bu32 (bots, new_bandwidth);
   buffer = swfdec_bots_close (bots);
-  header.channel = channel->id;
+  header.channel = channel->channel_id;
   /* send diff between the timestamp that the server sent and our current time.
    * FIXME: Is that correct? */
   swfdec_rtmp_channel_get_time (channel, &tv);

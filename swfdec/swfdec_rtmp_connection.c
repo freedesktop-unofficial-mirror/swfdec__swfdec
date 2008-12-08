@@ -104,10 +104,10 @@ swfdec_rtmp_connection_connect (SwfdecRtmpConnection *conn, const SwfdecURL *url
 
   conn->handshake = swfdec_rtmp_handshake_channel_new (conn);
   channel = swfdec_rtmp_control_channel_new (conn);
-  swfdec_rtmp_channel_register (channel, 2);
+  swfdec_rtmp_channel_register (channel, 2, 0);
   g_object_unref (channel);
   channel = swfdec_rtmp_rpc_channel_new (conn);
-  swfdec_rtmp_channel_register (channel, 3);
+  swfdec_rtmp_channel_register (channel, 3, 0);
   g_object_unref (channel);
   conn->last_send = conn->channels;
 
@@ -185,9 +185,9 @@ swfdec_rtmp_connection_get_channel (SwfdecRtmpConnection *conn, guint id)
 
   for (walk = conn->channels; walk; walk = walk->next) {
     channel = walk->data;
-    if (channel->id < id)
+    if (channel->channel_id < id)
       continue;
-    if (channel->id == id)
+    if (channel->channel_id == id)
       return channel;
     return NULL;
   }
