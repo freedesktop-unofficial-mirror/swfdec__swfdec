@@ -33,6 +33,7 @@ G_BEGIN_DECLS
 
 /* forward declarations */
 typedef struct _SwfdecRtmpChannel SwfdecRtmpChannel;
+typedef struct _SwfdecRtmpHandshake SwfdecRtmpHandshake;
 typedef struct _SwfdecRtmpSocket SwfdecRtmpSocket;
 typedef struct _SwfdecRtmpStream SwfdecRtmpStream;
 
@@ -54,7 +55,7 @@ struct _SwfdecRtmpConnection {
   SwfdecRtmpSocket *		socket;		/* socket we're using for read/write */
   GList *	  		channels;	/* list of channels in use by this connection (ordered by channel) */
   GList *			last_send;	/* list entry of last channel sent to */
-  SwfdecRtmpChannel *		handshake;	/* channel used for doing initial handshake or NULL */
+  SwfdecRtmpHandshake *		handshake;	/* structure used for doing initial handshake or NULL */
   char *			error;		/* NULL or debug string for error message */
   GHashTable *			incoming;	/* channel id => incoming packets */
   GHashTable *			streams;	/* stream id => stream */
@@ -93,7 +94,6 @@ void			swfdec_rtmp_register_stream		(SwfdecRtmpConnection *	conn,
 void			swfdec_rtmp_unregister_stream		(SwfdecRtmpConnection *	conn,
 								 guint			id);
 
-#define swfdec_rtmp_connection_get_handshake_channel(conn) ((conn)->handshake)
 #define swfdec_rtmp_connection_get_command_channel(conn) (swfdec_rtmp_connection_get_channel (conn, 2))
 #define swfdec_rtmp_connection_get_rpc_channel(conn) (swfdec_rtmp_connection_get_channel (conn, 3))
 

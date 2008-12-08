@@ -29,7 +29,7 @@
 #include "swfdec_bots.h"
 #include "swfdec_debug.h"
 #include "swfdec_rtmp_control_channel.h"
-#include "swfdec_rtmp_handshake_channel.h"
+#include "swfdec_rtmp_handshake.h"
 #include "swfdec_rtmp_rpc_channel.h"
 #include "swfdec_rtmp_socket.h"
 #include "swfdec_rtmp_stream.h"
@@ -145,7 +145,8 @@ swfdec_rtmp_connection_connect (SwfdecRtmpConnection *conn, const SwfdecURL *url
   if (conn->error)
     return;
 
-  conn->handshake = swfdec_rtmp_handshake_channel_new (conn);
+  conn->handshake = swfdec_rtmp_handshake_new (conn);
+
   channel = swfdec_rtmp_control_channel_new (conn);
   swfdec_rtmp_channel_register (channel, 2, 0);
   g_object_unref (channel);
@@ -154,8 +155,7 @@ swfdec_rtmp_connection_connect (SwfdecRtmpConnection *conn, const SwfdecURL *url
   g_object_unref (channel);
   conn->last_send = conn->channels;
 
-  swfdec_rtmp_handshake_channel_start (SWFDEC_RTMP_HANDSHAKE_CHANNEL (
-	swfdec_rtmp_connection_get_handshake_channel (conn)));
+  swfdec_rtmp_socket_send (conn->socket);
 }
 
 void

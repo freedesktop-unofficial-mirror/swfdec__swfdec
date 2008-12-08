@@ -21,7 +21,7 @@
 #include "config.h"
 #endif
 
-#include "swfdec_rtmp_handshake_channel.h"
+#include "swfdec_rtmp_handshake.h"
 
 #include <string.h>
 
@@ -29,13 +29,9 @@
 #include "swfdec_as_strings.h"
 #include "swfdec_debug.h"
 #include "swfdec_player_internal.h"
-#include "swfdec_rtmp_rpc_channel.h"
+#include "swfdec_rtmp_rpc.h"
 #include "swfdec_rtmp_socket.h"
 #include "swfdec_utils.h"
-
-/*** SwfdecRtmpHandshakeChannel ***/
-
-G_DEFINE_TYPE (SwfdecRtmpHandshakeChannel, swfdec_rtmp_handshake_channel, SWFDEC_TYPE_RTMP_CHANNEL)
 
 static SwfdecBuffer *
 swfdec_rtmp_handshake_create (SwfdecAsContext *context)
@@ -60,8 +56,53 @@ swfdec_rtmp_handshake_create (SwfdecAsContext *context)
   return swfdec_bots_close (bots);
 }
 
-static void
-swfdec_rtmp_handshake_channel_push_connect (SwfdecRtmpHandshakeChannel *shake)
+SwfdecRtmpHandshake *
+swfdec_rtmp_handshake_new (SwfdecRtmpConnection *conn)
+{
+  SwfdecRtmpHandshake *shake;
+
+  g_return_val_if_fail (SWFDEC_IS_RTMP_CONNECTION (conn), NULL);
+
+  shake = g_slice_new0 (SwfdecRtmpHandshake);
+  shake->conn = conn;
+  
+  shake->next_buffer = swfdec_rtmp_handshake_create (swfdec_gc_object_get_context (conn));
+  shake->initial = swfdec_buffer_new_subbuffer (shake->next_buffer, 1, 1536);
+
+  return shake;
+}
+
+void
+swfdec_rtmp_handshake_free (SwfdecRtmpHandshake *shake)
+{
+  g_return_if_fail (shake != NULL);
+
+  if (shake->next_buffer)
+    swfdec_buffer_unref (shake->next_buffer);
+  if (shake->initial)
+    swfdec_buffer_unref (shake->initial);
+
+  g_slice_free (SwfdecRtmpHandshake, shake);
+}
+
+SwfdecBuffer *
+swfdec_rtmp_handshake_next_buffer (SwfdecRtmpHandshake *shake)
+{
+  SwfdecBuffer *buffer;
+
+  g_return_val_if_fail (shake != NULL, NULL);
+
+  if (shake->next_buffer == NULL)
+    return NULL;
+
+  buffer = shake->next_buffer;
+  shake->next_buffer = NULL;
+
+  return buffer;
+}
+
+static SwfdecBuffer *
+swfdec_rtmp_handshake_create_connect (SwfdecRtmpHandshake *shake)
 {
   SwfdecRtmpConnection *conn;
   SwfdecAsContext *cx;
@@ -71,7 +112,7 @@ swfdec_rtmp_handshake_channel_push_connect (SwfdecRtmpHandshakeChannel *shake)
   SwfdecAsValue val;
   const SwfdecURL *url;
 
-  conn = SWFDEC_RTMP_CHANNEL (shake)->conn;
+  conn = shake->conn;
   cx = swfdec_gc_object_get_context (conn);
   o = swfdec_as_object_new_empty (cx);
 
@@ -128,65 +169,33 @@ swfdec_rtmp_handshake_channel_push_connect (SwfdecRtmpHandshakeChannel *shake)
   val = swfdec_as_value_from_number (cx, 1);
   swfdec_as_object_set_variable (o, SWFDEC_AS_STR_videoFunction, &val);
 
-  swfdec_rtmp_rpc_channel_send_connect (SWFDEC_RTMP_RPC_CHANNEL (
-	swfdec_rtmp_connection_get_rpc_channel (conn)), SWFDEC_AS_VALUE_FROM_OBJECT (o));
-}
-
-void
-swfdec_rtmp_handshake_channel_start (SwfdecRtmpHandshakeChannel *shake)
-{
-  SwfdecRtmpChannel *channel;
-  SwfdecRtmpConnection *conn;
-  SwfdecBuffer *buffer;
-
-  g_return_if_fail (SWFDEC_IS_RTMP_HANDSHAKE_CHANNEL (shake));
-  g_return_if_fail (shake->initial == NULL);
-  g_return_if_fail (shake->reply == NULL);
-
-  channel = SWFDEC_RTMP_CHANNEL (shake);
-  conn = channel->conn;
-
-  buffer = swfdec_rtmp_handshake_create (swfdec_gc_object_get_context (conn));
-  shake->initial = swfdec_buffer_new_subbuffer (buffer, 1, 1536);
-  swfdec_buffer_queue_push (channel->send_queue, buffer);
-  swfdec_rtmp_socket_send (conn->socket);
-  swfdec_rtmp_handshake_channel_push_connect (shake);
-}
-
-/* FIXME: This is a rather large hack where we only send the connect command 
- * but not anything else until we got a reply to the connect command */
-static void
-swfdec_rtmp_handshake_channel_redirect_connect (SwfdecRtmpHandshakeChannel *shake)
-{
-  SwfdecRtmpConnection *conn = SWFDEC_RTMP_CHANNEL (shake)->conn;
-  SwfdecRtmpChannel *rpc = swfdec_rtmp_connection_get_rpc_channel (conn);
-  SwfdecBuffer *buffer;
-
-  buffer = swfdec_rtmp_channel_next_buffer (rpc);
-  swfdec_buffer_queue_push (SWFDEC_RTMP_CHANNEL (shake)->send_queue, buffer);
-  while ((buffer = swfdec_buffer_queue_pull_buffer (rpc->send_queue))) {
-    swfdec_buffer_queue_push (SWFDEC_RTMP_CHANNEL (shake)->send_queue, buffer);
-  }
-  swfdec_rtmp_header_invalidate (&rpc->send_cache);
+  return swfdec_rtmp_rpc_encode (cx, SWFDEC_AS_VALUE_FROM_STRING (SWFDEC_AS_STR_connect),
+      1, SWFDEC_AS_VALUE_FROM_OBJECT (o), 0, NULL);
 }
 
 gboolean
-swfdec_rtmp_handshake_channel_receive (SwfdecRtmpHandshakeChannel *shake,
+swfdec_rtmp_handshake_receive (SwfdecRtmpHandshake *shake,
     SwfdecBufferQueue *queue)
 {
   SwfdecRtmpConnection *conn;
+  SwfdecRtmpHeader header;
   SwfdecBuffer *buffer;
+  SwfdecBots *bots;
+  guint i;
 
-  g_return_val_if_fail (SWFDEC_IS_RTMP_HANDSHAKE_CHANNEL (shake), FALSE);
+  g_return_val_if_fail (shake != NULL, FALSE);
   g_return_val_if_fail (queue != NULL, FALSE);
 
-  if (shake->initial == NULL || shake->reply != NULL) 
+  if (shake->next_buffer != NULL)
+    return TRUE;
+
+  if (shake->initial == NULL)
     return FALSE;
 
   if (swfdec_buffer_queue_get_depth (queue) < 1536 * 2 + 1)
-    return FALSE;
+    return TRUE;
 
-  conn = SWFDEC_RTMP_CHANNEL (shake)->conn;
+  conn = shake->conn;
 
   /* check first byte is 0x3 */
   buffer = swfdec_buffer_queue_pull (queue, 1);
@@ -199,8 +208,10 @@ swfdec_rtmp_handshake_channel_receive (SwfdecRtmpHandshakeChannel *shake,
   swfdec_buffer_unref (buffer);
 
   /* send back next 1536 bytes verbatim */
-  shake->reply = swfdec_buffer_queue_pull (queue, 1536);
-  swfdec_buffer_queue_push (SWFDEC_RTMP_CHANNEL (shake)->send_queue, swfdec_buffer_ref (shake->reply));
+  bots = swfdec_bots_new ();
+  buffer = swfdec_buffer_queue_pull (queue, 1536);
+  swfdec_bots_put_buffer (bots, buffer);
+  swfdec_buffer_unref (buffer);
 
   /* compare last 1536 bytes to be equal to initial handshake */
   buffer = swfdec_buffer_queue_pull (queue, 1536);
@@ -208,84 +219,30 @@ swfdec_rtmp_handshake_channel_receive (SwfdecRtmpHandshakeChannel *shake,
     swfdec_rtmp_connection_error (conn,
 	"handshake reply packet is wrong, closing connection");
     swfdec_buffer_unref (buffer);
+    swfdec_bots_free (bots);
     return FALSE;
   }
   swfdec_buffer_unref (buffer);
+  swfdec_buffer_unref (shake->initial);
+  shake->initial = NULL;
 
   /* send connect command */
-  swfdec_rtmp_handshake_channel_redirect_connect (shake);
+  buffer = swfdec_rtmp_handshake_create_connect (shake);
+  header.channel = 3;
+  header.type = SWFDEC_RTMP_PACKET_INVOKE;
+  header.timestamp = 0;
+  header.size = buffer->length;
+  header.stream = 0;
+  swfdec_rtmp_header_write (&header, bots, SWFDEC_RTMP_HEADER_12_BYTES);
+  for (i = 0; i < buffer->length; i += SWFDEC_RTMP_BLOCK_SIZE) {
+    if (i > 0)
+      swfdec_bots_put_u8 (bots, 0xC3);
+    swfdec_bots_put_data (bots, buffer->data + i,
+	MIN (SWFDEC_RTMP_BLOCK_SIZE, buffer->length - i));
+  }
 
+  shake->next_buffer = swfdec_bots_close (bots);
   swfdec_rtmp_socket_send (conn->socket);
-  return FALSE;
+  return TRUE;
 }
 
-static void
-swfdec_rtmp_handshake_channel_dont_receive (SwfdecRtmpChannel *channel,
-    const SwfdecRtmpHeader *header, SwfdecBuffer *buffer)
-{
-  g_critical ("This function should never be called");
-}
-
-static void
-swfdec_rtmp_handshake_channel_dispose (GObject *object)
-{
-  SwfdecRtmpHandshakeChannel *shake = SWFDEC_RTMP_HANDSHAKE_CHANNEL (object);
-
-  if (shake->initial) {
-    swfdec_buffer_unref (shake->initial);
-    shake->initial = NULL;
-  }
-  if (shake->reply) {
-    swfdec_buffer_unref (shake->reply);
-    shake->reply = NULL;
-  }
-
-  G_OBJECT_CLASS (swfdec_rtmp_handshake_channel_parent_class)->dispose (object);
-}
-
-static void
-swfdec_rtmp_handshake_channel_class_init (SwfdecRtmpHandshakeChannelClass *klass)
-{
-  GObjectClass *object_class = G_OBJECT_CLASS (klass);
-  SwfdecRtmpChannelClass *channel_class = SWFDEC_RTMP_CHANNEL_CLASS (klass);
-
-  object_class->dispose = swfdec_rtmp_handshake_channel_dispose;
-
-  channel_class->receive = swfdec_rtmp_handshake_channel_dont_receive;
-}
-
-static void
-swfdec_rtmp_handshake_channel_init (SwfdecRtmpHandshakeChannel *command)
-{
-}
-
-void
-swfdec_rtmp_handshake_channel_connected (SwfdecRtmpHandshakeChannel *shake,
-    guint argc, const SwfdecAsValue *argv)
-{
-  SwfdecRtmpConnection *conn;
-
-  g_return_if_fail (SWFDEC_IS_RTMP_HANDSHAKE_CHANNEL (shake));
-
-  conn = SWFDEC_RTMP_CHANNEL (shake)->conn;
-
-  /* FIXME: Do something with the result value */
-
-  if (argc >= 2) {
-    swfdec_rtmp_connection_on_status (conn, argv[1]);
-  } else {
-    SWFDEC_ERROR ("no 2nd argument in connect reply");
-  }
-
-  conn->handshake = NULL;
-  swfdec_rtmp_socket_send (conn->socket);
-  g_object_unref (shake);
-}
-
-SwfdecRtmpChannel *
-swfdec_rtmp_handshake_channel_new (SwfdecRtmpConnection *conn)
-{
-  g_return_val_if_fail (SWFDEC_IS_RTMP_CONNECTION (conn), NULL);
-
-  return g_object_new (SWFDEC_TYPE_RTMP_HANDSHAKE_CHANNEL, "connection", conn, NULL);
-}

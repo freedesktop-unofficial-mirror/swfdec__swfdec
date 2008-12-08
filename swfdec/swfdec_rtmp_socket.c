@@ -26,8 +26,9 @@
 #include <string.h>
 
 #include "swfdec_debug.h"
-#include "swfdec_rtmp_handshake_channel.h"
 #include "swfdec_player_internal.h"
+#include "swfdec_rtmp_channel.h"
+#include "swfdec_rtmp_handshake.h"
 #include "swfdec_rtmp_stream.h"
 /* socket implementations for swfdec_rtmp_socket_new() */
 #include "swfdec_rtmp_socket_rtmp.h"
@@ -128,9 +129,8 @@ swfdec_rtmp_socket_next_buffer (SwfdecRtmpSocket *socket)
 
   conn = socket->conn;
 
-  if (G_UNLIKELY (swfdec_rtmp_connection_get_handshake_channel (conn))) {
-    return swfdec_buffer_queue_pull_buffer (swfdec_rtmp_connection_get_handshake_channel (conn)->send_queue);
-  }
+  if (G_UNLIKELY (conn->handshake))
+    return swfdec_rtmp_handshake_next_buffer (conn->handshake);
 
   walk = conn->last_send;
   g_assert (walk);
@@ -161,13 +161,9 @@ swfdec_rtmp_socket_receive (SwfdecRtmpSocket *sock, SwfdecBufferQueue *queue)
 
   conn = sock->conn;
 
-  if (G_UNLIKELY (swfdec_rtmp_connection_get_handshake_channel (conn))) {
-    SwfdecRtmpHandshakeChannel *shake = SWFDEC_RTMP_HANDSHAKE_CHANNEL (
-	swfdec_rtmp_connection_get_handshake_channel (conn));
-    if (shake->reply == NULL) {
-      while (swfdec_rtmp_handshake_channel_receive (shake, queue));
+  if (G_UNLIKELY (conn->handshake)) {
+    if (swfdec_rtmp_handshake_receive (conn->handshake, queue))
       return;
-    }
   }
 
   do {

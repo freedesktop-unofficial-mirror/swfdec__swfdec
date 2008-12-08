@@ -26,7 +26,7 @@
 #include "swfdec_amf.h"
 #include "swfdec_as_strings.h"
 #include "swfdec_debug.h"
-#include "swfdec_rtmp_handshake_channel.h"
+#include "swfdec_rtmp_handshake.h"
 #include "swfdec_rtmp_socket.h"
 #include "swfdec_sandbox.h"
 #include "swfdec_utils.h"
@@ -108,10 +108,20 @@ swfdec_rtmp_rpc_channel_receive_reply (SwfdecRtmpChannel *channel,
     SWFDEC_FIXME ("more than 2 values in a reply?");
   }
 
-  if (id == 1 && swfdec_rtmp_connection_get_handshake_channel (channel->conn)) {
-    swfdec_rtmp_handshake_channel_connected (SWFDEC_RTMP_HANDSHAKE_CHANNEL (
-	  swfdec_rtmp_connection_get_handshake_channel (channel->conn)),
-	  i, val);
+  if (id == 1 && channel->conn->handshake) {
+    SwfdecRtmpConnection *conn = channel->conn;
+
+    /* FIXME: Do something with the result value */
+
+    if (i >= 2) {
+      swfdec_rtmp_connection_on_status (conn, val[1]);
+    } else {
+      SWFDEC_ERROR ("no 2nd argument in connect reply");
+    }
+
+    swfdec_rtmp_handshake_free (conn->handshake);
+    conn->handshake = NULL;
+    swfdec_rtmp_socket_send (conn->socket);
   } else {
     if (!SWFDEC_AS_VALUE_IS_NULL (val[0])) {
       SWFDEC_FIXME ("first argument in reply is not null?");
