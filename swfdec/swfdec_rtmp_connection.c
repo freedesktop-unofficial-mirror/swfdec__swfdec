@@ -32,10 +32,36 @@
 #include "swfdec_rtmp_handshake_channel.h"
 #include "swfdec_rtmp_rpc_channel.h"
 #include "swfdec_rtmp_socket.h"
+#include "swfdec_rtmp_stream.h"
+
+/*** SwfdecRtmpStream ***/
+
+static void
+swfdec_rtmp_connection_rtmp_stream_receive (SwfdecRtmpStream *stream,
+    const SwfdecRtmpHeader *header, SwfdecBuffer *buffer)
+{
+  SwfdecRtmpConnection *conn = SWFDEC_RTMP_CONNECTION (stream);
+  SwfdecRtmpChannel *channel = swfdec_rtmp_connection_get_channel (conn, header->channel);
+  SwfdecRtmpChannelClass *klass;
+  
+  if (channel == NULL) {
+    SWFDEC_FIXME ("woot, no channel %u", header->channel);
+    return;
+  }
+  klass = SWFDEC_RTMP_CHANNEL_GET_CLASS (channel);
+  klass->receive (channel, header, buffer);
+}
+
+static void
+swfdec_rtmp_connection_rtmp_stream_init (SwfdecRtmpStreamInterface *iface)
+{
+  iface->receive = swfdec_rtmp_connection_rtmp_stream_receive;
+}
 
 /*** SwfdecRtmpConnection ***/
 
-G_DEFINE_TYPE (SwfdecRtmpConnection, swfdec_rtmp_connection, SWFDEC_TYPE_AS_RELAY)
+G_DEFINE_TYPE_WITH_CODE (SwfdecRtmpConnection, swfdec_rtmp_connection, SWFDEC_TYPE_AS_RELAY,
+    G_IMPLEMENT_INTERFACE (SWFDEC_TYPE_RTMP_STREAM, swfdec_rtmp_connection_rtmp_stream_init))
 
 static void
 swfdec_rtmp_connection_mark (SwfdecGcObject *object)
@@ -64,6 +90,15 @@ swfdec_rtmp_connection_dispose (GObject *object)
   g_free (conn->error);
   conn->error = NULL;
 
+  if (conn->incoming) {
+    g_hash_table_destroy (conn->incoming);
+    conn->incoming = NULL;
+  }
+  if (conn->streams) {
+    g_hash_table_destroy (conn->streams);
+    conn->streams = NULL;
+  }
+
   G_OBJECT_CLASS (swfdec_rtmp_connection_parent_class)->dispose (object);
 }
 
@@ -81,8 +116,14 @@ swfdec_rtmp_connection_class_init (SwfdecRtmpConnectionClass *klass)
 static void
 swfdec_rtmp_connection_init (SwfdecRtmpConnection *conn)
 {
+  conn->incoming = g_hash_table_new_full (g_direct_hash, g_direct_equal, 
+      NULL, (GDestroyNotify) swfdec_rtmp_packet_free);
+  conn->streams = g_hash_table_new (g_direct_hash, g_direct_equal);
+
   conn->read_size = SWFDEC_RTMP_BLOCK_SIZE;
   conn->write_size = SWFDEC_RTMP_BLOCK_SIZE;
+
+  swfdec_rtmp_register_stream (conn, 0, SWFDEC_RTMP_STREAM (conn));
 }
 
 void
@@ -197,3 +238,28 @@ swfdec_rtmp_connection_get_channel (SwfdecRtmpConnection *conn, guint id)
   return NULL;
 }
 
+void
+swfdec_rtmp_register_stream (SwfdecRtmpConnection *conn,
+    guint id, SwfdecRtmpStream *stream)
+{
+  g_return_if_fail (SWFDEC_IS_RTMP_CONNECTION (conn));
+  g_return_if_fail (SWFDEC_IS_RTMP_STREAM (stream));
+
+  if (g_hash_table_lookup (conn->streams, GUINT_TO_POINTER (id))) {
+    SWFDEC_FIXME ("stream %u is already registered, ignoring new request",
+	id);
+    return;
+  }
+
+  g_hash_table_insert (conn->streams, GUINT_TO_POINTER (id), stream);
+}
+
+void
+swfdec_rtmp_unregister_stream (SwfdecRtmpConnection *conn, guint id)
+{
+  g_return_if_fail (SWFDEC_IS_RTMP_CONNECTION (conn));
+
+  if (!g_hash_table_remove (conn->streams, GUINT_TO_POINTER (id))) {
+    g_assert_not_reached ();
+  }
+}

@@ -56,6 +56,8 @@ struct _SwfdecRtmpConnection {
   GList *			last_send;	/* list entry of last channel sent to */
   SwfdecRtmpChannel *		handshake;	/* channel used for doing initial handshake or NULL */
   char *			error;		/* NULL or debug string for error message */
+  GHashTable *			incoming;	/* channel id => incoming packets */
+  GHashTable *			streams;	/* stream id => stream */
 
   guint				read_size;	/* size of a block of data when reading */
   guint				write_size;	/* size of a block of data when writing */
@@ -84,6 +86,12 @@ void			swfdec_rtmp_connection_errorv		(SwfdecRtmpConnection *	conn,
 								 va_list		args) G_GNUC_PRINTF (2, 0);
 void			swfdec_rtmp_connection_on_status	(SwfdecRtmpConnection *	conn,
 								 SwfdecAsValue		value);
+
+void			swfdec_rtmp_register_stream		(SwfdecRtmpConnection *	conn,
+								 guint			id,
+								 SwfdecRtmpStream *	stream);
+void			swfdec_rtmp_unregister_stream		(SwfdecRtmpConnection *	conn,
+								 guint			id);
 
 #define swfdec_rtmp_connection_get_handshake_channel(conn) ((conn)->handshake)
 #define swfdec_rtmp_connection_get_command_channel(conn) (swfdec_rtmp_connection_get_channel (conn, 2))

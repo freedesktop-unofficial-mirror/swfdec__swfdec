@@ -24,6 +24,12 @@
 #include "swfdec_rtmp_packet.h"
 
 SwfdecRtmpPacket *
+swfdec_rtmp_packet_new_empty (void) 
+{
+  return g_slice_new0 (SwfdecRtmpPacket);
+}
+
+SwfdecRtmpPacket *
 swfdec_rtmp_packet_new (SwfdecRtmpPacketType type, guint timestamp,
     SwfdecBuffer *buffer)
 {
@@ -31,7 +37,7 @@ swfdec_rtmp_packet_new (SwfdecRtmpPacketType type, guint timestamp,
 
   g_return_val_if_fail (buffer != NULL, NULL);
 
-  packet = g_slice_new0 (SwfdecRtmpPacket);
+  packet = swfdec_rtmp_packet_new_empty ();
   packet->header.type = type;
   packet->header.timestamp = timestamp;
   packet->buffer = swfdec_buffer_ref (buffer);
@@ -44,7 +50,8 @@ swfdec_rtmp_packet_free (SwfdecRtmpPacket *packet)
 {
   g_return_if_fail (packet != NULL);
 
-  swfdec_buffer_unref (packet->buffer);
+  if (packet->buffer)
+    swfdec_buffer_unref (packet->buffer);
   g_slice_free (SwfdecRtmpPacket, packet);
 }
 

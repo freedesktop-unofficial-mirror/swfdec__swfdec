@@ -33,6 +33,7 @@ struct _SwfdecRtmpPacket {
   SwfdecBuffer *	buffer;		/* contents of packet */
 };
 
+SwfdecRtmpPacket *	swfdec_rtmp_packet_new_empty	(void);
 SwfdecRtmpPacket *	swfdec_rtmp_packet_new		(SwfdecRtmpPacketType		type,
 							 guint				timestamp,
 							 SwfdecBuffer *			buffer);

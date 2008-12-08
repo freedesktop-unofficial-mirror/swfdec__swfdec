@@ -23,6 +23,8 @@
 
 #include "swfdec_rtmp_header.h"
 
+#include <string.h>
+
 gsize
 swfdec_rtmp_header_peek_size (guint first_byte)
 {
@@ -51,7 +53,7 @@ swfdec_rtmp_header_invalidate (SwfdecRtmpHeader *header)
 {
   g_return_if_fail (header != NULL);
 
-  header->channel = (guint) -1;
+  memset (header, 0, sizeof (SwfdecRtmpHeader));
 }
 
 void
