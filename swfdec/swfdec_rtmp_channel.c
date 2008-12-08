@@ -180,6 +180,8 @@ swfdec_rtmp_channel_register (SwfdecRtmpChannel *channel,
     SWFDEC_FIXME ("figure out how huge ids (like %u) are handled. Channel registration failed", channel_id);
     return;
   }
+  SWFDEC_DEBUG ("registering %s as channel %u for stream %u", G_OBJECT_TYPE_NAME (channel),
+      channel_id, stream_id);
 
   conn = channel->conn;
   conn->channels = g_list_insert_sorted (conn->channels, channel,

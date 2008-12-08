@@ -39,6 +39,7 @@ typedef struct _SwfdecRtmpRpcChannelClass SwfdecRtmpRpcChannelClass;
 struct _SwfdecRtmpRpcChannel {
   SwfdecRtmpChannel		channel;
 
+  SwfdecAsObject *		target;		/* object to call received calls on */
   guint				id;		/* last id used for RPC call */
   GHashTable *			pending;	/* int => SwfdecAsObject mapping of calls having pending replies */
   GQueue *			packets;	/* outstanding packets */
@@ -60,6 +61,9 @@ void			swfdec_rtmp_rpc_channel_send		(SwfdecRtmpRpcChannel *	rpc,
 								 SwfdecAsObject *	reply_to,
 								 guint			argc,
 								 const SwfdecAsValue *	argv);
+
+void			swfdec_rtmp_rpc_channel_set_target	(SwfdecRtmpRpcChannel *	rpc,
+								 SwfdecAsObject *	object);
 
 
 G_END_DECLS

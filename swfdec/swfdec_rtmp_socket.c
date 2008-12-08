@@ -212,6 +212,10 @@ swfdec_rtmp_socket_receive (SwfdecRtmpSocket *sock, SwfdecBufferQueue *queue)
       SwfdecRtmpChannelClass *klass = SWFDEC_RTMP_CHANNEL_GET_CLASS (channel);
 
       g_assert (swfdec_buffer_queue_get_depth (channel->recv_queue) == 0);
+      if (header.stream != channel->stream_id) {
+	SWFDEC_FIXME ("channel has stream id %u, but message has stream id %u, is this bad?",
+	    channel->stream_id, header.stream);
+      }
       klass->receive (channel, &header, buffer);
       swfdec_buffer_unref (buffer);
     }

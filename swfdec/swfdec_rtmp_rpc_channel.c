@@ -132,6 +132,7 @@ swfdec_rtmp_rpc_channel_receive_call (SwfdecRtmpChannel *channel,
     SwfdecAmfContext *cx, SwfdecAsValue val, SwfdecBits *bits)
 {
   SwfdecAsContext *context = swfdec_gc_object_get_context (channel->conn);
+  SwfdecRtmpRpcChannel *rpc = SWFDEC_RTMP_RPC_CHANNEL (channel);
   const char *name;
   guint id, i;
   SwfdecAsValue *args;
@@ -153,13 +154,12 @@ swfdec_rtmp_rpc_channel_receive_call (SwfdecRtmpChannel *channel,
       return;
     }
   }
-  swfdec_as_relay_call (SWFDEC_AS_RELAY (channel->conn), name,
-      i, args, &val);
+  swfdec_as_object_call (rpc->target, name, i, args, &val);
   g_free (args);
 
   /* send reply */
   if (id) {
-    swfdec_rtmp_rpc_channel_do_send (SWFDEC_RTMP_RPC_CHANNEL (channel),
+    swfdec_rtmp_rpc_channel_do_send (rpc,
 	SWFDEC_AS_VALUE_FROM_STRING (SWFDEC_AS_STR__result), id, val, 0, NULL);
   }
 }
@@ -173,9 +173,6 @@ swfdec_rtmp_rpc_channel_receive (SwfdecRtmpChannel *channel,
   SwfdecAsValue val;
   SwfdecBits bits;
 
-  if (header->stream != 0) {
-    SWFDEC_FIXME ("not stream 0, but stream %u here?!", header->stream);
-  }
   context = swfdec_gc_object_get_context (channel->conn);
   cx = swfdec_amf_context_new (context);
   swfdec_sandbox_use (channel->conn->sandbox);
@@ -218,6 +215,8 @@ swfdec_rtmp_rpc_channel_mark (SwfdecRtmpChannel *channel)
        g_hash_table_iter_next (&iter, NULL, &value);) {
     swfdec_as_object_mark (value);
   }
+
+  swfdec_as_object_mark (rpc->target);
 }
 
 static void
@@ -289,8 +288,21 @@ swfdec_rtmp_rpc_channel_send (SwfdecRtmpRpcChannel *rpc,
 SwfdecRtmpChannel *
 swfdec_rtmp_rpc_channel_new (SwfdecRtmpConnection *conn)
 {
+  SwfdecRtmpRpcChannel *rpc;
   g_return_val_if_fail (SWFDEC_IS_RTMP_CONNECTION (conn), NULL);
 
-  return g_object_new (SWFDEC_TYPE_RTMP_RPC_CHANNEL, "connection", conn, NULL);
+  rpc = g_object_new (SWFDEC_TYPE_RTMP_RPC_CHANNEL, "connection", conn, NULL);
+  rpc->target = swfdec_as_relay_get_as_object (SWFDEC_AS_RELAY (conn));
+
+  return SWFDEC_RTMP_CHANNEL (rpc);
+}
+
+void
+swfdec_rtmp_rpc_channel_set_target (SwfdecRtmpRpcChannel *rpc, SwfdecAsObject *object)
+{
+  g_return_if_fail (SWFDEC_IS_RTMP_RPC_CHANNEL (rpc));
+  g_return_if_fail (object != NULL);
+
+  rpc->target = object;
 }
 

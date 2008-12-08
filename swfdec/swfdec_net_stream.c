@@ -158,6 +158,8 @@ swfdec_net_stream_construct (SwfdecAsContext *cx, SwfdecAsObject *object,
   stream->conn = conn;
   swfdec_as_object_set_relay (o, SWFDEC_AS_RELAY (stream));
   stream->rpc_channel = swfdec_rtmp_rpc_channel_new (conn);
+  swfdec_rtmp_rpc_channel_set_target (SWFDEC_RTMP_RPC_CHANNEL (stream->rpc_channel),
+      swfdec_as_relay_get_as_object (SWFDEC_AS_RELAY (stream)));
   stream->video_channel = swfdec_rtmp_video_channel_new (conn);
   /* FIXME: new class for audio plz */
   stream->audio_channel = swfdec_rtmp_rpc_channel_new (conn);
@@ -181,8 +183,8 @@ swfdec_net_stream_onCreate (SwfdecAsContext *cx, SwfdecAsObject *object,
   stream->stream_id = stream_id;
   channel_id = 4 + ((stream_id - 1) * 5);
   swfdec_rtmp_channel_register (stream->rpc_channel, channel_id, stream_id);
-  swfdec_rtmp_channel_register (stream->video_channel, channel_id, stream_id + 1);
-  swfdec_rtmp_channel_register (stream->audio_channel, channel_id, stream_id + 2);
+  swfdec_rtmp_channel_register (stream->video_channel, channel_id + 1, stream_id);
+  swfdec_rtmp_channel_register (stream->audio_channel, channel_id + 2, stream_id);
 }
 
 SWFDEC_AS_NATIVE (2101, 202, swfdec_net_stream_send_connection)
