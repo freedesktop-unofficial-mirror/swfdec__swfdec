@@ -29,8 +29,7 @@ G_BEGIN_DECLS
 typedef struct _SwfdecRtmpPacket SwfdecRtmpPacket;
 
 struct _SwfdecRtmpPacket {
-  SwfdecRtmpPacketType	type;		/* type of packet */
-  guint			timestamp;	/* timestamp associated with this packet */
+  SwfdecRtmpHeader	header;		/* header to use in packet */
   SwfdecBuffer *	buffer;		/* contents of packet */
 };
 

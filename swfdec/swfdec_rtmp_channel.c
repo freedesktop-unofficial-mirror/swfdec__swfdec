@@ -135,7 +135,8 @@ swfdec_rtmp_channel_next_buffer (SwfdecRtmpChannel *channel)
   buffer = packet->buffer;
   bots = swfdec_bots_new ();
   header.channel = channel->channel_id;
-  header.type = packet->type;
+  header.type = packet->header.type;
+  header.timestamp = packet->header.timestamp;
   header.size = buffer->length;
   header.stream = channel->stream_id;
 

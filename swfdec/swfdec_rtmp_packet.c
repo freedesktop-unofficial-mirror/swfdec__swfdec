@@ -32,8 +32,8 @@ swfdec_rtmp_packet_new (SwfdecRtmpPacketType type, guint timestamp,
   g_return_val_if_fail (buffer != NULL, NULL);
 
   packet = g_slice_new0 (SwfdecRtmpPacket);
-  packet->type = type;
-  packet->timestamp = timestamp;
+  packet->header.type = type;
+  packet->header.timestamp = timestamp;
   packet->buffer = swfdec_buffer_ref (buffer);
 
   return packet;
