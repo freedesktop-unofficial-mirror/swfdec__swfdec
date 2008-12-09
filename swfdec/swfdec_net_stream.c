@@ -26,10 +26,58 @@
 #include "swfdec_as_frame_internal.h"
 #include "swfdec_as_internal.h"
 #include "swfdec_debug.h"
+#include "swfdec_sandbox.h"
+#include "swfdec_rtmp_rpc.h"
+#include "swfdec_rtmp_stream.h"
+
+#define SWFDEC_NET_STREAM_RPC_CHANNEL(stream) ((((stream)->stream - 1) * 5 % 65592) + 8)
+#define SWFDEC_NET_STREAM_VIDEO_CHANNEL(stream) ((((stream)->stream - 1) * 5 % 65592) + 5)
+#define SWFDEC_NET_STREAM_AUDIO_CHANNEL(stream) ((((stream)->stream - 1) * 5 % 65592) + 6)
+
+static void
+swfdec_net_stream_rtmp_stream_receive (SwfdecRtmpStream *rtmp_stream,
+    const SwfdecRtmpHeader *header, SwfdecBuffer *buffer)
+{
+  SwfdecNetStream *stream = SWFDEC_NET_STREAM (rtmp_stream);
+
+  switch ((guint) header->type) {
+    case SWFDEC_RTMP_PACKET_INVOKE:
+      swfdec_sandbox_use (stream->conn->sandbox);
+      if (swfdec_rtmp_rpc_receive (stream->rpc, buffer)) {
+	SwfdecRtmpPacket *packet = swfdec_rtmp_rpc_pop (stream->rpc, FALSE);
+	if (packet) {
+	  packet->header.channel = SWFDEC_NET_STREAM_RPC_CHANNEL (stream);
+	  packet->header.stream = stream->stream;
+	  swfdec_rtmp_connection_send (stream->conn, packet);
+	}
+      }
+      swfdec_sandbox_unuse (stream->conn->sandbox);
+      break;
+    default:
+      SWFDEC_FIXME ("what to do with header type %u (channel %u, stream %u)?",
+	  header->type, header->channel, header->stream);
+      break;
+  }
+}
+
+static SwfdecRtmpPacket *
+swfdec_net_stream_rtmp_stream_sent (SwfdecRtmpStream *stream,
+    const SwfdecRtmpPacket *packet)
+{
+  return NULL;
+}
+
+static void
+swfdec_net_stream_rtmp_stream_init (SwfdecRtmpStreamInterface *iface)
+{
+  iface->receive = swfdec_net_stream_rtmp_stream_receive;
+  iface->sent = swfdec_net_stream_rtmp_stream_sent;
+}
 
 /*** NET STREAM ***/
 
-G_DEFINE_TYPE (SwfdecNetStream, swfdec_net_stream, SWFDEC_TYPE_AS_RELAY)
+G_DEFINE_TYPE_WITH_CODE (SwfdecNetStream, swfdec_net_stream, SWFDEC_TYPE_AS_RELAY,
+    G_IMPLEMENT_INTERFACE (SWFDEC_TYPE_RTMP_STREAM, swfdec_net_stream_rtmp_stream_init))
 
 static void
 swfdec_net_stream_mark (SwfdecGcObject *object)
@@ -45,7 +93,12 @@ swfdec_net_stream_mark (SwfdecGcObject *object)
 static void
 swfdec_net_stream_dispose (GObject *object)
 {
-  //SwfdecNetStream *stream = SWFDEC_NET_STREAM (object);
+  SwfdecNetStream *stream = SWFDEC_NET_STREAM (object);
+
+  if (stream->rpc) {
+    swfdec_rtmp_rpc_free (stream->rpc);
+    stream->rpc = NULL;
+  }
 
   G_OBJECT_CLASS (swfdec_net_stream_parent_class)->dispose (object);
 }
@@ -62,7 +115,7 @@ swfdec_net_stream_class_init (SwfdecNetStreamClass *klass)
 }
 
 static void
-swfdec_net_stream_init (SwfdecNetStream *net_stream)
+swfdec_net_stream_init (SwfdecNetStream *stream)
 {
 }
 
@@ -147,6 +200,8 @@ swfdec_net_stream_construct (SwfdecAsContext *cx, SwfdecAsObject *object,
 
   stream = g_object_new (SWFDEC_TYPE_NET_STREAM, "context", cx, NULL);
   stream->conn = conn;
+  stream->rpc = swfdec_rtmp_rpc_new (conn, SWFDEC_AS_RELAY (stream));
+  swfdec_as_context_get_time (cx, &stream->rpc->last_send);
   swfdec_as_object_set_relay (o, SWFDEC_AS_RELAY (stream));
 }
 
@@ -158,6 +213,7 @@ swfdec_net_stream_onCreate (SwfdecAsContext *cx, SwfdecAsObject *object,
   SwfdecNetStream *stream;
   SwfdecAsObject *o;
   guint stream_id;
+  SwfdecRtmpPacket *packet;
 
   SWFDEC_AS_CHECK (0, NULL, "oi", &o, &stream_id);
 
@@ -166,6 +222,15 @@ swfdec_net_stream_onCreate (SwfdecAsContext *cx, SwfdecAsObject *object,
   stream = SWFDEC_NET_STREAM (o->relay);
 
   stream->stream = stream_id;
+  swfdec_rtmp_connection_register_stream (stream->conn, 
+      stream_id, SWFDEC_RTMP_STREAM (stream));
+
+  packet = swfdec_rtmp_rpc_pop (stream->rpc, FALSE);
+  if (packet) {
+    packet->header.channel = SWFDEC_NET_STREAM_RPC_CHANNEL (stream);
+    packet->header.stream = stream->stream;
+    swfdec_rtmp_connection_send (stream->conn, packet);
+  }
 }
 
 SWFDEC_AS_NATIVE (2101, 202, swfdec_net_stream_send_connection)
@@ -183,10 +248,15 @@ swfdec_net_stream_send_connection (SwfdecAsContext *cx, SwfdecAsObject *object,
     return;
   stream = SWFDEC_NET_STREAM (o->relay);
 
-#if 0
-  swfdec_rtmp_rpc_channel_send (SWFDEC_RTMP_RPC_CHANNEL (
-	stream->rpc_channel), name,
-      ret_cb, MAX (3, argc) - 3, argv + 3);
-#endif
+  swfdec_rtmp_rpc_send (stream->rpc, name, ret_cb, MAX (3, argc) - 3, argv + 3);
+  /* FIXME: This should be done by some smart API */
+  if (stream->stream) {
+    SwfdecRtmpPacket *packet = swfdec_rtmp_rpc_pop (stream->rpc, FALSE);
+    if (packet) {
+      packet->header.channel = SWFDEC_NET_STREAM_RPC_CHANNEL (stream);
+      packet->header.stream = stream->stream;
+      swfdec_rtmp_connection_send (stream->conn, packet);
+    }
+  }
 }
 

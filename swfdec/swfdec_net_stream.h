@@ -39,6 +39,7 @@ struct _SwfdecNetStream {
   SwfdecAsRelay			relay;
 
   SwfdecRtmpConnection *	conn;		/* the connection in use */
+  SwfdecRtmpRpc *		rpc;		/* rpc */
   guint				stream;		/* id of this stream */
 };
 
