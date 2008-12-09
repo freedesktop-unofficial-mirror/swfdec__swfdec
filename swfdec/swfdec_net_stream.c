@@ -41,6 +41,11 @@ swfdec_net_stream_rtmp_stream_receive (SwfdecRtmpStream *rtmp_stream,
   SwfdecNetStream *stream = SWFDEC_NET_STREAM (rtmp_stream);
 
   switch ((guint) header->type) {
+    case SWFDEC_RTMP_PACKET_NOTIFY:
+      swfdec_sandbox_use (stream->conn->sandbox);
+      swfdec_rtmp_rpc_notify (stream->rpc, buffer);
+      swfdec_sandbox_unuse (stream->conn->sandbox);
+      break;
     case SWFDEC_RTMP_PACKET_INVOKE:
       swfdec_sandbox_use (stream->conn->sandbox);
       if (swfdec_rtmp_rpc_receive (stream->rpc, buffer)) {

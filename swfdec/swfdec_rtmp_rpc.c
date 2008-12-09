@@ -192,6 +192,9 @@ swfdec_rtmp_rpc_receive (SwfdecRtmpRpc *rpc, SwfdecBuffer *buffer)
   SwfdecBits bits;
   gboolean result;
 
+  g_return_val_if_fail (rpc != NULL, FALSE);
+  g_return_val_if_fail (buffer != NULL, FALSE);
+
   context = swfdec_gc_object_get_context (rpc->conn);
   cx = swfdec_amf_context_new (context);
   g_assert (context->global);
@@ -215,6 +218,49 @@ swfdec_rtmp_rpc_receive (SwfdecRtmpRpc *rpc, SwfdecBuffer *buffer)
   }
 
   return result;
+}
+
+void
+swfdec_rtmp_rpc_notify (SwfdecRtmpRpc *rpc, SwfdecBuffer *buffer)
+{
+  SwfdecAsContext *context;
+  SwfdecAmfContext *cx;
+  SwfdecAsValue *args;
+  SwfdecAsValue name;
+  SwfdecBits bits;
+  guint i;
+
+  g_return_if_fail (rpc != NULL);
+  g_return_if_fail (buffer != NULL);
+
+  context = swfdec_gc_object_get_context (rpc->conn);
+  cx = swfdec_amf_context_new (context);
+  g_assert (context->global);
+  swfdec_bits_init (&bits, buffer);
+
+  if (!swfdec_amf_decode (cx, &bits, &name)) {
+    SWFDEC_ERROR ("could not decode name");
+    return;
+  }
+
+  args = NULL;
+  for (i = 0; swfdec_bits_left (&bits); i++) {
+    if ((i % 4) == 0)
+      args = g_realloc (args, sizeof (SwfdecAsValue) * (i + 4));
+
+    if (!swfdec_amf_decode (cx, &bits, &args[i])) {
+      SWFDEC_ERROR ("could not decode argument %u", i);
+      return;
+    }
+  }
+  swfdec_as_relay_call (rpc->target, swfdec_as_value_to_string (context, name),
+      i, args, NULL);
+  g_free (args);
+
+  swfdec_amf_context_free (cx);
+  if (swfdec_bits_left (&bits)) {
+    SWFDEC_FIXME ("%u bytes left after invoke", swfdec_bits_left (&bits) / 8);
+  }
 }
 
 SwfdecRtmpPacket *

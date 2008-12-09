@@ -57,6 +57,8 @@ void			swfdec_rtmp_rpc_send		(SwfdecRtmpRpc *	rpc,
 							 const SwfdecAsValue *	argv);
 gboolean		swfdec_rtmp_rpc_receive		(SwfdecRtmpRpc *	rpc,
 							 SwfdecBuffer *		buffer);
+void			swfdec_rtmp_rpc_notify		(SwfdecRtmpRpc *	rpc,
+							 SwfdecBuffer *		buffer);
 
 
 G_END_DECLS

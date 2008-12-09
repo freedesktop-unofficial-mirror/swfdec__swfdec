@@ -142,6 +142,11 @@ swfdec_rtmp_connection_rtmp_stream_receive (SwfdecRtmpStream *stream,
     case SWFDEC_RTMP_PACKET_CLIENT_BANDWIDTH:
       swfdec_rtmp_connection_handle_client_bandwidth (conn, buffer);
       break;
+    case SWFDEC_RTMP_PACKET_NOTIFY:
+      swfdec_sandbox_use (conn->sandbox);
+      swfdec_rtmp_rpc_notify (conn->rpc, buffer);
+      swfdec_sandbox_unuse (conn->sandbox);
+      break;
     case SWFDEC_RTMP_PACKET_INVOKE:
       swfdec_sandbox_use (conn->sandbox);
       if (swfdec_rtmp_rpc_receive (conn->rpc, buffer)) {
