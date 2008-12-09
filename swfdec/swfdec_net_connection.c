@@ -35,7 +35,7 @@
 #include "swfdec_debug.h"
 #include "swfdec_internal.h"
 #include "swfdec_player_internal.h"
-#include "swfdec_rtmp_rpc_channel.h"
+#include "swfdec_rtmp_rpc.h"
 #include "swfdec_sandbox.h"
 
 /*** AS CODE ***/
@@ -81,13 +81,25 @@ swfdec_net_connection_do_call (SwfdecAsContext *cx, SwfdecAsObject *object,
 {
   SwfdecRtmpConnection *conn;
   SwfdecAsObject *ret_cb = NULL;
+  SwfdecRtmpPacket *packet;
   SwfdecAsValue name;
 
   SWFDEC_AS_CHECK (SWFDEC_TYPE_RTMP_CONNECTION, &conn, "v|O", &name, &ret_cb);
 
-  swfdec_rtmp_rpc_channel_send (SWFDEC_RTMP_RPC_CHANNEL (
-	swfdec_rtmp_connection_get_rpc_channel (conn)), name,
+  if (!swfdec_rtmp_connection_is_connected (conn)) {
+    SWFDEC_WARNING ("NetConnection.call does not work on closed connections.");
+    return;
+  }
+
+  swfdec_rtmp_rpc_send (conn->rpc, name,
       ret_cb, MAX (2, argc) - 2, argv + 2);
+  /* FIXME: This should be done by some smart API */
+  packet = swfdec_rtmp_rpc_pop (conn->rpc, FALSE);
+  if (packet) {
+    packet->header.channel = 3;
+    packet->header.stream = 0;
+    swfdec_rtmp_connection_send (conn, packet);
+  }
 }
 
 SWFDEC_AS_NATIVE (2100, 3, swfdec_net_connection_do_addHeader)

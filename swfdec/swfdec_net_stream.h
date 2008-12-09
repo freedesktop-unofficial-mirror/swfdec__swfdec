@@ -39,10 +39,7 @@ struct _SwfdecNetStream {
   SwfdecAsRelay			relay;
 
   SwfdecRtmpConnection *	conn;		/* the connection in use */
-  guint				stream_id;	/* id of this stream */
-  SwfdecRtmpChannel *		rpc_channel;	/* channel used for RPC */
-  SwfdecRtmpChannel *		video_channel;	/* channel used for video */
-  SwfdecRtmpChannel *		audio_channel;	/* channel used for audio */
+  guint				stream;		/* id of this stream */
 };
 
 struct _SwfdecNetStreamClass {

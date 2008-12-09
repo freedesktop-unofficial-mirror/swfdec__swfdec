@@ -26,8 +26,6 @@
 #include "swfdec_as_frame_internal.h"
 #include "swfdec_as_internal.h"
 #include "swfdec_debug.h"
-#include "swfdec_rtmp_rpc_channel.h"
-#include "swfdec_rtmp_video_channel.h"
 
 /*** NET STREAM ***/
 
@@ -47,14 +45,7 @@ swfdec_net_stream_mark (SwfdecGcObject *object)
 static void
 swfdec_net_stream_dispose (GObject *object)
 {
-  SwfdecNetStream *stream = SWFDEC_NET_STREAM (object);
-
-  swfdec_rtmp_channel_unregister (stream->rpc_channel);
-  g_object_unref (stream->rpc_channel);
-  swfdec_rtmp_channel_unregister (stream->video_channel);
-  g_object_unref (stream->video_channel);
-  swfdec_rtmp_channel_unregister (stream->audio_channel);
-  g_object_unref (stream->audio_channel);
+  //SwfdecNetStream *stream = SWFDEC_NET_STREAM (object);
 
   G_OBJECT_CLASS (swfdec_net_stream_parent_class)->dispose (object);
 }
@@ -157,12 +148,6 @@ swfdec_net_stream_construct (SwfdecAsContext *cx, SwfdecAsObject *object,
   stream = g_object_new (SWFDEC_TYPE_NET_STREAM, "context", cx, NULL);
   stream->conn = conn;
   swfdec_as_object_set_relay (o, SWFDEC_AS_RELAY (stream));
-  stream->rpc_channel = swfdec_rtmp_rpc_channel_new (conn);
-  swfdec_rtmp_rpc_channel_set_target (SWFDEC_RTMP_RPC_CHANNEL (stream->rpc_channel),
-      swfdec_as_relay_get_as_object (SWFDEC_AS_RELAY (stream)));
-  stream->video_channel = swfdec_rtmp_video_channel_new (conn);
-  /* FIXME: new class for audio plz */
-  stream->audio_channel = swfdec_rtmp_rpc_channel_new (conn);
 }
 
 SWFDEC_AS_NATIVE (2101, 201, swfdec_net_stream_onCreate)
@@ -172,7 +157,7 @@ swfdec_net_stream_onCreate (SwfdecAsContext *cx, SwfdecAsObject *object,
 {
   SwfdecNetStream *stream;
   SwfdecAsObject *o;
-  guint stream_id, channel_id;
+  guint stream_id;
 
   SWFDEC_AS_CHECK (0, NULL, "oi", &o, &stream_id);
 
@@ -180,11 +165,7 @@ swfdec_net_stream_onCreate (SwfdecAsContext *cx, SwfdecAsObject *object,
     return;
   stream = SWFDEC_NET_STREAM (o->relay);
 
-  stream->stream_id = stream_id;
-  channel_id = 4 + ((stream_id - 1) * 5);
-  swfdec_rtmp_channel_register (stream->rpc_channel, channel_id, stream_id);
-  swfdec_rtmp_channel_register (stream->video_channel, channel_id + 1, stream_id);
-  swfdec_rtmp_channel_register (stream->audio_channel, channel_id + 2, stream_id);
+  stream->stream = stream_id;
 }
 
 SWFDEC_AS_NATIVE (2101, 202, swfdec_net_stream_send_connection)
@@ -202,8 +183,10 @@ swfdec_net_stream_send_connection (SwfdecAsContext *cx, SwfdecAsObject *object,
     return;
   stream = SWFDEC_NET_STREAM (o->relay);
 
+#if 0
   swfdec_rtmp_rpc_channel_send (SWFDEC_RTMP_RPC_CHANNEL (
 	stream->rpc_channel), name,
       ret_cb, MAX (3, argc) - 3, argv + 3);
+#endif
 }
 

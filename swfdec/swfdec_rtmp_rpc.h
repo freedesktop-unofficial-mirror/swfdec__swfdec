@@ -26,19 +26,18 @@
 G_BEGIN_DECLS
 
 
-typedef struct _SwfdecRtmpRpc SwfdecRtmpRpc;
-
 struct _SwfdecRtmpRpc {
   SwfdecRtmpConnection *	conn;		/* connection to use */
-  SwfdecAsObject *		target;		/* object to call received calls on */
+  SwfdecAsRelay *		target;		/* object to call received calls on */
   guint				id;		/* last id used for RPC call */
   GHashTable *			pending;	/* int => SwfdecAsObject mapping of calls having pending replies */
   GQueue *			packets;	/* outstanding SwfdecRtmpPackets */
+  gboolean			packet_pending;	/* if a packet is known to be pending */
   GTimeVal			last_send;	/* time the last call was sent */
 };
 
 SwfdecRtmpRpc *		swfdec_rtmp_rpc_new		(SwfdecRtmpConnection *	conn,
-							 SwfdecAsObject *	target);
+							 SwfdecAsRelay *	target);
 void			swfdec_rtmp_rpc_free		(SwfdecRtmpRpc *	rpc);
 void			swfdec_rtmp_rpc_mark		(SwfdecRtmpRpc *	rpc);
 
@@ -49,14 +48,14 @@ SwfdecBuffer *		swfdec_rtmp_rpc_encode		(SwfdecAsContext *	context,
 							 guint			argc,
 							 const SwfdecAsValue *	argv);
 							 
-SwfdecRtmpPacket *	swfdec_rtmp_rpc_pop		(SwfdecRtmpRpc *	rpc);
+SwfdecRtmpPacket *	swfdec_rtmp_rpc_pop		(SwfdecRtmpRpc *	rpc,
+							 gboolean		pull_if_pending);
 void			swfdec_rtmp_rpc_send		(SwfdecRtmpRpc *	rpc,
 							 SwfdecAsValue		name,
 							 SwfdecAsObject *	reply_to,
 							 guint			argc,
 							 const SwfdecAsValue *	argv);
-void			swfdec_rtmp_rpc_receive		(SwfdecRtmpRpc *	rpc,
-							 const SwfdecRtmpHeader *header,
+gboolean		swfdec_rtmp_rpc_receive		(SwfdecRtmpRpc *	rpc,
 							 SwfdecBuffer *		buffer);
 
 

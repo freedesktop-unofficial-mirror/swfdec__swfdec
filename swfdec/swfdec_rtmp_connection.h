@@ -23,6 +23,7 @@
 #include <swfdec/swfdec.h>
 #include <swfdec/swfdec_as_relay.h>
 #include <swfdec/swfdec_rtmp_header.h>
+#include <swfdec/swfdec_rtmp_packet.h>
 #include <swfdec/swfdec_types.h>
 
 G_BEGIN_DECLS
@@ -32,8 +33,8 @@ G_BEGIN_DECLS
 #define SWFDEC_RTMP_BLOCK_SIZE 128
 
 /* forward declarations */
-typedef struct _SwfdecRtmpChannel SwfdecRtmpChannel;
 typedef struct _SwfdecRtmpHandshake SwfdecRtmpHandshake;
+typedef struct _SwfdecRtmpRpc SwfdecRtmpRpc;
 typedef struct _SwfdecRtmpSocket SwfdecRtmpSocket;
 typedef struct _SwfdecRtmpStream SwfdecRtmpStream;
 
@@ -53,15 +54,20 @@ struct _SwfdecRtmpConnection {
   SwfdecURL *			url;		/* URL in use by this connection */
   SwfdecSandbox *		sandbox;	/* sandbox we execute functions in or NULL */
   SwfdecRtmpSocket *		socket;		/* socket we're using for read/write */
-  GList *	  		channels;	/* list of channels in use by this connection (ordered by channel) */
-  GList *			last_send;	/* list entry of last channel sent to */
   SwfdecRtmpHandshake *		handshake;	/* structure used for doing initial handshake or NULL */
   char *			error;		/* NULL or debug string for error message */
   GHashTable *			incoming;	/* channel id => incoming packets */
   GHashTable *			streams;	/* stream id => stream */
+  GQueue *			packets;	/* queue of packets in send order */
+  GTimeVal			connect_time;	/* time at which this connectioon was opened */
+
+  GQueue *			control_packets;/* packets waiting to be sent on queue 2 */
+  SwfdecRtmpRpc *		rpc;		/* queue for rpc */
 
   guint				read_size;	/* size of a block of data when reading */
   guint				write_size;	/* size of a block of data when writing */
+  guint				server_bandwidth; /* ??? */
+  guint				client_bandwidth; /* ??? */
 };
 
 struct _SwfdecRtmpConnectionClass {
@@ -70,15 +76,16 @@ struct _SwfdecRtmpConnectionClass {
 
 GType			swfdec_rtmp_connection_get_type		(void);
 
+#define swfdec_rtmp_connection_is_connected(conn) ((conn)->socket != NULL)
 void			swfdec_rtmp_connection_connect	  	(SwfdecRtmpConnection *	conn,
 								 const SwfdecURL *	url);
 void			swfdec_rtmp_connection_close		(SwfdecRtmpConnection *	conn);
 
 void			swfdec_rtmp_connection_receive		(SwfdecRtmpConnection *	conn,
 								 SwfdecBufferQueue *	queue);
-void			swfdec_rtmp_connection_send		(SwfdecRtmpConnection *	conn);
-SwfdecRtmpChannel *	swfdec_rtmp_connection_get_channel	(SwfdecRtmpConnection *	conn,
-								 guint			id);
+void			swfdec_rtmp_connection_send		(SwfdecRtmpConnection *	conn,
+								 SwfdecRtmpPacket *	packet);
+
 void			swfdec_rtmp_connection_error		(SwfdecRtmpConnection *	conn,
 								 const char *		error,
 								 ...) G_GNUC_PRINTF (2, 3);
@@ -93,9 +100,6 @@ void			swfdec_rtmp_register_stream		(SwfdecRtmpConnection *	conn,
 								 SwfdecRtmpStream *	stream);
 void			swfdec_rtmp_unregister_stream		(SwfdecRtmpConnection *	conn,
 								 guint			id);
-
-#define swfdec_rtmp_connection_get_command_channel(conn) (swfdec_rtmp_connection_get_channel (conn, 2))
-#define swfdec_rtmp_connection_get_rpc_channel(conn) (swfdec_rtmp_connection_get_channel (conn, 3))
 
 
 G_END_DECLS

@@ -30,16 +30,19 @@ swfdec_rtmp_packet_new_empty (void)
 }
 
 SwfdecRtmpPacket *
-swfdec_rtmp_packet_new (SwfdecRtmpPacketType type, guint timestamp,
-    SwfdecBuffer *buffer)
+swfdec_rtmp_packet_new (guint channel, guint stream, SwfdecRtmpPacketType type,
+    guint timestamp, SwfdecBuffer *buffer)
 {
   SwfdecRtmpPacket *packet;
 
   g_return_val_if_fail (buffer != NULL, NULL);
 
   packet = swfdec_rtmp_packet_new_empty ();
+  packet->header.channel = channel;
+  packet->header.stream = stream;
   packet->header.type = type;
   packet->header.timestamp = timestamp;
+  packet->header.size = buffer->length;
   packet->buffer = swfdec_buffer_ref (buffer);
 
   return packet;

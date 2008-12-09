@@ -34,7 +34,9 @@ struct _SwfdecRtmpPacket {
 };
 
 SwfdecRtmpPacket *	swfdec_rtmp_packet_new_empty	(void);
-SwfdecRtmpPacket *	swfdec_rtmp_packet_new		(SwfdecRtmpPacketType		type,
+SwfdecRtmpPacket *	swfdec_rtmp_packet_new		(guint				channel,
+							 guint				stream,
+							 SwfdecRtmpPacketType		type,
 							 guint				timestamp,
 							 SwfdecBuffer *			buffer);
 void			swfdec_rtmp_packet_free		(SwfdecRtmpPacket *		packet);

@@ -27,7 +27,6 @@
 
 #include "swfdec_debug.h"
 #include "swfdec_player_internal.h"
-#include "swfdec_rtmp_channel.h"
 #include "swfdec_rtmp_handshake.h"
 #include "swfdec_rtmp_stream.h"
 /* socket implementations for swfdec_rtmp_socket_new() */
@@ -121,9 +120,8 @@ SwfdecBuffer *
 swfdec_rtmp_socket_next_buffer (SwfdecRtmpSocket *socket)
 {
   SwfdecRtmpConnection *conn;
-  SwfdecRtmpChannel *channel;
-  SwfdecBuffer *buffer;
-  GList *walk;
+  SwfdecRtmpPacket *packet;
+  SwfdecBots *bots;
 
   g_return_val_if_fail (SWFDEC_IS_RTMP_SOCKET (socket), NULL);
 
@@ -132,18 +130,42 @@ swfdec_rtmp_socket_next_buffer (SwfdecRtmpSocket *socket)
   if (G_UNLIKELY (conn->handshake))
     return swfdec_rtmp_handshake_next_buffer (conn->handshake);
 
-  walk = conn->last_send;
-  g_assert (walk);
-  do {
-    walk = walk->next ? walk->next : conn->channels;
-    channel = walk->data;
-    buffer = swfdec_rtmp_channel_next_buffer (channel);
-    if (buffer != NULL) {
-      conn->last_send = walk;
-      return buffer;
+  bots = swfdec_bots_new ();
+next_packet:
+  packet = g_queue_pop_head (conn->packets);
+  if (packet == NULL)
+    return NULL;
+  if (packet->header.size == packet->buffer->length) {
+    SwfdecRtmpStream *stream;
+    SwfdecRtmpPacket *next;
+    
+    stream = g_hash_table_lookup (conn->streams, GUINT_TO_POINTER (packet->header.stream));
+    if (stream == NULL) {
+      swfdec_rtmp_packet_free (packet);
+      goto next_packet;
     }
-  } while (walk != conn->last_send);
-  return NULL;
+    next = swfdec_rtmp_stream_sent (stream, packet);
+    if (next == NULL) {
+      swfdec_rtmp_packet_free (packet);
+      goto next_packet;
+    }
+    swfdec_rtmp_header_write (&next->header, bots,
+	swfdec_rtmp_header_diff (&next->header, &packet->header));
+    swfdec_rtmp_packet_free (packet);
+    packet = next;
+    packet->buffer->length = 0;
+  } else if (packet->buffer->length == 0) {
+    swfdec_rtmp_header_write (&packet->header, bots, SWFDEC_RTMP_HEADER_12_BYTES);
+  } else {
+    swfdec_rtmp_header_write (&packet->header, bots, SWFDEC_RTMP_HEADER_1_BYTE);
+  }
+  swfdec_bots_put_data (bots, packet->buffer->data + packet->buffer->length, 
+      MIN (conn->write_size, packet->header.size - packet->buffer->length));
+  packet->buffer->length += conn->write_size;
+  packet->buffer->length = MIN (packet->buffer->length, packet->header.size);
+
+  g_queue_push_tail (conn->packets, packet);
+  return swfdec_bots_close (bots);
 }
 
 void

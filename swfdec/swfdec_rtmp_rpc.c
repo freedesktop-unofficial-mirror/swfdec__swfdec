@@ -77,7 +77,7 @@ swfdec_rtmp_rpc_do_send (SwfdecRtmpRpc *rpc, SwfdecAsValue name,
   buffer = swfdec_rtmp_rpc_encode (swfdec_gc_object_get_context (rpc->conn),
       name, id, special, argc, argv);
 
-  packet = swfdec_rtmp_packet_new (SWFDEC_RTMP_PACKET_INVOKE,
+  packet = swfdec_rtmp_packet_new (0, 0, SWFDEC_RTMP_PACKET_INVOKE,
       swfdec_rtmp_rpc_update_last_send (rpc), buffer);
   swfdec_buffer_unref (buffer);
   empty = g_queue_is_empty (rpc->packets);
@@ -137,7 +137,7 @@ swfdec_rtmp_rpc_receive_reply (SwfdecRtmpRpc *rpc,
   }
 }
 
-static void
+static gboolean
 swfdec_rtmp_rpc_receive_call (SwfdecRtmpRpc *rpc, SwfdecAmfContext *cx, 
     SwfdecAsValue val, SwfdecBits *bits)
 {
@@ -149,7 +149,7 @@ swfdec_rtmp_rpc_receive_call (SwfdecRtmpRpc *rpc, SwfdecAmfContext *cx,
   name = swfdec_as_value_to_string (context, val);
   if (!swfdec_amf_decode (cx, bits, &val)) {
     SWFDEC_ERROR ("could not decode reply id");
-    return;
+    return FALSE;
   }
   id = swfdec_as_value_to_integer (context, val);
   
@@ -160,64 +160,69 @@ swfdec_rtmp_rpc_receive_call (SwfdecRtmpRpc *rpc, SwfdecAmfContext *cx,
 
     if (!swfdec_amf_decode (cx, bits, &args[i])) {
       SWFDEC_ERROR ("could not decode argument %u", i);
-      return;
+      return FALSE;
     }
   }
-  swfdec_as_object_call (rpc->target, name, i, args, &val);
+  swfdec_as_relay_call (rpc->target, name, i, args, &val);
   g_free (args);
 
   /* send reply */
   if (id) {
     swfdec_rtmp_rpc_do_send (rpc, SWFDEC_AS_VALUE_FROM_STRING (SWFDEC_AS_STR__result), 
 	id, val, 0, NULL);
+    return TRUE;
+  }  else {
+    return FALSE;
   }
 }
 
-void
-swfdec_rtmp_rpc_receive (SwfdecRtmpRpc *rpc,
-    const SwfdecRtmpHeader *header, SwfdecBuffer *buffer)
+gboolean
+swfdec_rtmp_rpc_receive (SwfdecRtmpRpc *rpc, SwfdecBuffer *buffer)
 {
   SwfdecAmfContext *cx;
   SwfdecAsContext *context;
   SwfdecAsValue val;
   SwfdecBits bits;
+  gboolean result;
 
   context = swfdec_gc_object_get_context (rpc->conn);
   cx = swfdec_amf_context_new (context);
   g_assert (context->global);
+  swfdec_bits_init (&bits, buffer);
 
-  switch ((guint) header->type) {
-    case SWFDEC_RTMP_PACKET_INVOKE:
-      swfdec_bits_init (&bits, buffer);
-      if (!swfdec_amf_decode (cx, &bits, &val)) {
-	SWFDEC_ERROR ("could not decode call name");
-	break;
-      }
-      if (SWFDEC_AS_VALUE_IS_STRING (val) && 
-	  SWFDEC_AS_VALUE_GET_STRING (val) == SWFDEC_AS_STR__result) {
-	swfdec_rtmp_rpc_receive_reply (rpc, cx, &bits);
-      } else {
-	swfdec_rtmp_rpc_receive_call (rpc, cx, val, &bits);
-      }
-      if (swfdec_bits_left (&bits)) {
-	SWFDEC_FIXME ("%u bytes left after invoke on channel %u (stream %u)",
-	    swfdec_bits_left (&bits) / 8, header->channel, header->stream);
-      }
-      break;
-    default:
-      SWFDEC_FIXME ("channel %u: what to do with header type %u?", 
-	  header->channel, header->type);
-      break;
+  if (!swfdec_amf_decode (cx, &bits, &val)) {
+    SWFDEC_ERROR ("could not decode call name");
+    return FALSE;
+  }
+  if (SWFDEC_AS_VALUE_IS_STRING (val) && 
+      SWFDEC_AS_VALUE_GET_STRING (val) == SWFDEC_AS_STR__result) {
+    swfdec_rtmp_rpc_receive_reply (rpc, cx, &bits);
+    result = FALSE;
+  } else {
+    result = swfdec_rtmp_rpc_receive_call (rpc, cx, val, &bits);
   }
   swfdec_amf_context_free (cx);
+
+  if (swfdec_bits_left (&bits)) {
+    SWFDEC_FIXME ("%u bytes left after invoke", swfdec_bits_left (&bits) / 8);
+  }
+
+  return result;
 }
 
 SwfdecRtmpPacket *
-swfdec_rtmp_rpc_pop (SwfdecRtmpRpc *rpc)
+swfdec_rtmp_rpc_pop (SwfdecRtmpRpc *rpc, gboolean pull_if_pending)
 {
+  SwfdecRtmpPacket *packet;
+
   g_return_val_if_fail (rpc != NULL, NULL);
 
-  return g_queue_pop_head (rpc->packets);
+  if (!pull_if_pending && rpc->packet_pending)
+    return NULL;
+
+  packet = g_queue_pop_head (rpc->packets);
+  rpc->packet_pending = (packet != NULL);
+  return packet;
 }
 
 void
@@ -239,19 +244,18 @@ swfdec_rtmp_rpc_send (SwfdecRtmpRpc *rpc, SwfdecAsValue name,
 }
 
 SwfdecRtmpRpc *
-swfdec_rtmp_rpc_new (SwfdecRtmpConnection *conn, SwfdecAsObject *target)
+swfdec_rtmp_rpc_new (SwfdecRtmpConnection *conn, SwfdecAsRelay *target)
 {
   SwfdecRtmpRpc *rpc;
 
   g_return_val_if_fail (SWFDEC_IS_RTMP_CONNECTION (conn), NULL);
-  g_return_val_if_fail (target != NULL, NULL);
+  g_return_val_if_fail (SWFDEC_IS_AS_RELAY (target), NULL);
 
-  rpc = g_slice_new (SwfdecRtmpRpc);
+  rpc = g_slice_new0 (SwfdecRtmpRpc);
   rpc->conn = conn;
   rpc->target = target;
   rpc->pending = g_hash_table_new (g_direct_hash, g_direct_equal);
   rpc->packets = g_queue_new ();
-  swfdec_as_context_get_time (swfdec_gc_object_get_context (conn), &rpc->last_send);
 
   return rpc;
 }
@@ -269,7 +273,7 @@ swfdec_rtmp_rpc_mark (SwfdecRtmpRpc *rpc)
     swfdec_as_object_mark (value);
   }
 
-  swfdec_as_object_mark (rpc->target);
+  swfdec_gc_object_mark (rpc->target);
 }
 
 void
