@@ -147,12 +147,19 @@ swfdec_rtmp_rpc_receive_call (SwfdecRtmpRpc *rpc, SwfdecAmfContext *cx,
   SwfdecAsValue *args;
 
   name = swfdec_as_value_to_string (context, val);
+
   if (!swfdec_amf_decode (cx, bits, &val)) {
     SWFDEC_ERROR ("could not decode reply id");
     return FALSE;
   }
   id = swfdec_as_value_to_integer (context, val);
   
+  if (!swfdec_amf_decode (cx, bits, &val) || 
+      !SWFDEC_AS_VALUE_IS_NULL (val)) {
+    SWFDEC_ERROR ("could not decode null value");
+    return FALSE;
+  }
+
   args = NULL;
   for (i = 0; swfdec_bits_left (bits); i++) {
     if ((i % 4) == 0)
