@@ -291,7 +291,7 @@ swfdec_rtmp_connection_init (SwfdecRtmpConnection *conn)
   conn->read_size = SWFDEC_RTMP_BLOCK_SIZE;
   conn->write_size = SWFDEC_RTMP_BLOCK_SIZE;
 
-  swfdec_rtmp_register_stream (conn, 0, SWFDEC_RTMP_STREAM (conn));
+  swfdec_rtmp_connection_register_stream (conn, 0, SWFDEC_RTMP_STREAM (conn));
 }
 
 void
@@ -373,7 +373,7 @@ swfdec_rtmp_connection_on_status (SwfdecRtmpConnection *conn, SwfdecAsValue valu
 }
 
 void
-swfdec_rtmp_register_stream (SwfdecRtmpConnection *conn,
+swfdec_rtmp_connection_register_stream (SwfdecRtmpConnection *conn,
     guint id, SwfdecRtmpStream *stream)
 {
   g_return_if_fail (SWFDEC_IS_RTMP_CONNECTION (conn));
@@ -389,7 +389,7 @@ swfdec_rtmp_register_stream (SwfdecRtmpConnection *conn,
 }
 
 void
-swfdec_rtmp_unregister_stream (SwfdecRtmpConnection *conn, guint id)
+swfdec_rtmp_connection_unregister_stream (SwfdecRtmpConnection *conn, guint id)
 {
   g_return_if_fail (SWFDEC_IS_RTMP_CONNECTION (conn));
 
@@ -412,7 +412,7 @@ swfdec_rtmp_connection_send (SwfdecRtmpConnection *conn, SwfdecRtmpPacket *packe
   packet->buffer->length = 0;
   send = g_queue_is_empty (conn->packets);
   g_queue_push_tail (conn->packets, packet);
-  g_print ("pushed channel %u - %u packets now\n", packet->header.channel, 
+  SWFDEC_LOG ("pushed channel %u - %u packets now", packet->header.channel, 
       g_queue_get_length (conn->packets));
   if (send)
     swfdec_rtmp_socket_send (conn->socket);

@@ -95,10 +95,10 @@ void			swfdec_rtmp_connection_errorv		(SwfdecRtmpConnection *	conn,
 void			swfdec_rtmp_connection_on_status	(SwfdecRtmpConnection *	conn,
 								 SwfdecAsValue		value);
 
-void			swfdec_rtmp_register_stream		(SwfdecRtmpConnection *	conn,
+void			swfdec_rtmp_connection_register_stream	(SwfdecRtmpConnection *	conn,
 								 guint			id,
 								 SwfdecRtmpStream *	stream);
-void			swfdec_rtmp_unregister_stream		(SwfdecRtmpConnection *	conn,
+void			swfdec_rtmp_connection_unregister_stream(SwfdecRtmpConnection *	conn,
 								 guint			id);
 
 
