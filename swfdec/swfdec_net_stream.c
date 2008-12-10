@@ -50,7 +50,7 @@ swfdec_net_stream_onstatus (SwfdecNetStream *stream, const char *code)
   SWFDEC_INFO ("emitting onStatus for %s", code);
   SWFDEC_AS_VALUE_SET_STRING (&val, code);
   swfdec_as_object_set_variable (object, SWFDEC_AS_STR_code, &val);
-  SWFDEC_AS_VALUE_SET_STRING (&val, SWFDEC_AS_STR_level);
+  SWFDEC_AS_VALUE_SET_STRING (&val, SWFDEC_AS_STR_status);
   swfdec_as_object_set_variable (object, SWFDEC_AS_STR_level, &val);
 
   SWFDEC_AS_VALUE_SET_OBJECT (&val, object);
