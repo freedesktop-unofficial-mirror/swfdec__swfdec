@@ -47,20 +47,16 @@ swfdec_audio_stream_dispose (GObject *object)
   G_OBJECT_CLASS (swfdec_audio_stream_parent_class)->dispose (object);
 }
 
-/* returns: number of samples available */
 static void
 swfdec_audio_stream_require (SwfdecAudioStream *stream, guint n_samples)
 {
   SwfdecAudioStreamClass *klass = SWFDEC_AUDIO_STREAM_GET_CLASS (stream);
   SwfdecBuffer *buffer;
 
-  /* subclasses are responsible for having set a proper decoder */
-  g_assert (SWFDEC_IS_AUDIO_DECODER (stream->decoder));
-
   while (stream->queue_size < n_samples && !stream->done) {
     /* if the decoder still has data */
-    buffer = swfdec_audio_decoder_pull (stream->decoder);
-    if (buffer) {
+    if (stream->decoder && 
+	(buffer = swfdec_audio_decoder_pull (stream->decoder))) {
       g_queue_push_tail (stream->queue, buffer);
       stream->queue_size += buffer->length / 4;
       continue;
@@ -71,6 +67,8 @@ swfdec_audio_stream_require (SwfdecAudioStream *stream, guint n_samples)
       stream->buffering = TRUE;
       break;
     }
+    /* subclasses are responsible for having set a proper decoder */
+    g_assert (SWFDEC_IS_AUDIO_DECODER (stream->decoder));
     swfdec_audio_decoder_push (stream->decoder, buffer);
     swfdec_buffer_unref (buffer);
   }
