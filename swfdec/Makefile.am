@@ -43,7 +43,6 @@ libswfdec_source_files = \
 	$(CODEC_FILES) \
 	swfdec_audio_event.c \
 	swfdec_audio_load.c \
-	swfdec_audio_flv.c \
 	swfdec_audio_stream.c \
 	swfdec_audio_swf_stream.c \
 	swfdec_bevel_filter.c \
@@ -119,6 +118,7 @@ libswfdec_source_files = \
 	swfdec_movie_clip_loader.c \
 	swfdec_net_connection.c \
 	swfdec_net_stream.c \
+	swfdec_net_stream_audio.c \
 	swfdec_net_stream_video.c \
 	swfdec_path.c \
 	swfdec_pattern.c \
@@ -268,7 +268,6 @@ noinst_HEADERS = \
 	swfdec_audio_decoder_gst.h \
 	swfdec_audio_decoder_uncompressed.h \
 	swfdec_audio_event.h \
-	swfdec_audio_flv.h \
 	swfdec_audio_load.h \
 	swfdec_audio_stream.h \
 	swfdec_audio_swf_stream.h \
@@ -322,6 +321,7 @@ noinst_HEADERS = \
 	swfdec_movie.h \
 	swfdec_movie_clip_loader.h \
 	swfdec_net_stream.h \
+	swfdec_net_stream_audio.h \
 	swfdec_net_stream_video.h \
 	swfdec_path.h \
 	swfdec_pattern.h \

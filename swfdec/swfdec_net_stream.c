@@ -27,6 +27,7 @@
 #include "swfdec_as_internal.h"
 #include "swfdec_as_strings.h"
 #include "swfdec_debug.h"
+#include "swfdec_net_stream_audio.h"
 #include "swfdec_net_stream_video.h"
 #include "swfdec_sandbox.h"
 #include "swfdec_rtmp_rpc.h"
@@ -81,6 +82,9 @@ swfdec_net_stream_rtmp_stream_receive (SwfdecRtmpStream *rtmp_stream,
   SwfdecNetStream *stream = SWFDEC_NET_STREAM (rtmp_stream);
 
   switch ((guint) header->type) {
+    case SWFDEC_RTMP_PACKET_AUDIO:
+      swfdec_net_stream_audio_push (stream->audio, swfdec_buffer_ref (buffer));
+      break;
     case SWFDEC_RTMP_PACKET_VIDEO:
       swfdec_net_stream_video_push (stream->video, header, buffer);
       break;
@@ -140,6 +144,7 @@ swfdec_net_stream_rtmp_stream_flush (SwfdecRtmpStream *rtmp_stream)
 {
   SwfdecNetStream *stream = SWFDEC_NET_STREAM (rtmp_stream);
 
+  swfdec_net_stream_audio_push (stream->audio, NULL);
   swfdec_net_stream_onstatus (stream, SWFDEC_AS_STR_NetStream_Buffer_Flush);
 }
 
@@ -180,8 +185,13 @@ static void
 swfdec_net_stream_video_buffer_status (SwfdecNetStreamVideo *video, GParamSpec *pspec,
     SwfdecNetStream* stream)
 {
-  swfdec_net_stream_onstatus (stream, video->playing ?
-      SWFDEC_AS_STR_NetStream_Buffer_Full : SWFDEC_AS_STR_NetStream_Buffer_Empty);
+  if (video->playing) {
+    swfdec_net_stream_onstatus (stream, SWFDEC_AS_STR_NetStream_Buffer_Full);
+    swfdec_audio_add (SWFDEC_AUDIO (stream->audio),
+	SWFDEC_PLAYER (swfdec_gc_object_get_context (stream)));
+  } else {
+    swfdec_net_stream_onstatus (stream, SWFDEC_AS_STR_NetStream_Buffer_Empty);
+  }
 }
 
 static void
@@ -196,6 +206,10 @@ swfdec_net_stream_dispose (GObject *object)
   g_signal_handlers_disconnect_by_func (stream->video, 
       swfdec_net_stream_video_buffer_status, stream);
   g_object_unref (stream->video);
+  if (stream->audio) {
+    g_object_unref (stream->audio);
+    stream->audio = NULL;
+  }
 
   G_OBJECT_CLASS (swfdec_net_stream_parent_class)->dispose (object);
 }
@@ -404,6 +418,7 @@ swfdec_net_stream_construct (SwfdecAsContext *cx, SwfdecAsObject *object,
   stream->conn = conn;
   stream->rpc = swfdec_rtmp_rpc_new (conn, SWFDEC_AS_RELAY (stream));
   stream->video = swfdec_net_stream_video_new (SWFDEC_PLAYER (cx));
+  stream->audio = swfdec_net_stream_audio_new (SWFDEC_PLAYER (cx));
   g_object_ref (stream->video);
   g_signal_connect (stream->video, "notify::playing", 
       G_CALLBACK (swfdec_net_stream_video_buffer_status), stream);

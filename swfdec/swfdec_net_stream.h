@@ -25,6 +25,7 @@
 G_BEGIN_DECLS
 
 /* forward decls */
+typedef struct _SwfdecNetStreamAudio SwfdecNetStreamAudio;
 typedef struct _SwfdecNetStreamVideo SwfdecNetStreamVideo;
 
 typedef struct _SwfdecNetStream SwfdecNetStream;
@@ -44,6 +45,7 @@ struct _SwfdecNetStream {
   SwfdecRtmpRpc *		rpc;		/* rpc */
   guint				stream;		/* id of this stream */
   SwfdecNetStreamVideo *	video;		/* video object */
+  SwfdecNetStreamAudio *	audio;		/* video object */
 };
 
 struct _SwfdecNetStreamClass {
