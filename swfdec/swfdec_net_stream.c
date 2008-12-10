@@ -177,6 +177,14 @@ swfdec_net_stream_mark (SwfdecGcObject *object)
 }
 
 static void
+swfdec_net_stream_video_buffer_status (SwfdecNetStreamVideo *video, GParamSpec *pspec,
+    SwfdecNetStream* stream)
+{
+  swfdec_net_stream_onstatus (stream, video->playing ?
+      SWFDEC_AS_STR_NetStream_Buffer_Full : SWFDEC_AS_STR_NetStream_Buffer_Empty);
+}
+
+static void
 swfdec_net_stream_dispose (GObject *object)
 {
   SwfdecNetStream *stream = SWFDEC_NET_STREAM (object);
@@ -185,6 +193,8 @@ swfdec_net_stream_dispose (GObject *object)
     swfdec_rtmp_rpc_free (stream->rpc);
     stream->rpc = NULL;
   }
+  g_signal_handlers_disconnect_by_func (stream->video, 
+      swfdec_net_stream_video_buffer_status, stream);
 
   G_OBJECT_CLASS (swfdec_net_stream_parent_class)->dispose (object);
 }
@@ -288,6 +298,8 @@ swfdec_net_stream_construct (SwfdecAsContext *cx, SwfdecAsObject *object,
   stream->conn = conn;
   stream->rpc = swfdec_rtmp_rpc_new (conn, SWFDEC_AS_RELAY (stream));
   stream->video = swfdec_net_stream_video_new (SWFDEC_PLAYER (cx));
+  g_signal_connect (stream->video, "notify::playing", 
+      G_CALLBACK (swfdec_net_stream_video_buffer_status), stream);
   swfdec_as_context_get_time (cx, &stream->rpc->last_send);
   swfdec_as_object_set_relay (o, SWFDEC_AS_RELAY (stream));
 }

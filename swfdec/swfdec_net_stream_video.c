@@ -75,8 +75,29 @@ swfdec_net_stream_video_video_provider_init (SwfdecVideoProviderInterface *iface
 
 /*** SWFDEC_NET_STREAM_VIDEO ***/
 
+enum {
+  PROP_0,
+  PROP_PLAYING
+};
+
 G_DEFINE_TYPE_WITH_CODE (SwfdecNetStreamVideo, swfdec_net_stream_video, SWFDEC_TYPE_GC_OBJECT,
     G_IMPLEMENT_INTERFACE (SWFDEC_TYPE_VIDEO_PROVIDER, swfdec_net_stream_video_video_provider_init))
+
+static void
+swfdec_net_stream_video_get_property (GObject *object, guint param_id, GValue *value, 
+    GParamSpec * pspec)
+{
+  SwfdecNetStreamVideo *video = SWFDEC_NET_STREAM_VIDEO (object);
+  
+  switch (param_id) {
+    case PROP_PLAYING:
+      g_value_set_boolean (value, video->playing);
+      break;
+    default:
+      G_OBJECT_WARN_INVALID_PROPERTY_ID (object, param_id, pspec);
+      break;
+  }
+}
 
 static void
 swfdec_net_stream_video_dispose (GObject *object)
@@ -106,11 +127,17 @@ swfdec_net_stream_video_class_init (SwfdecNetStreamVideoClass * g_class)
   GObjectClass *object_class = G_OBJECT_CLASS (g_class);
 
   object_class->dispose = swfdec_net_stream_video_dispose;
+  object_class->get_property = swfdec_net_stream_video_get_property;
+
+  g_object_class_install_property (object_class, PROP_PLAYING,
+      g_param_spec_boolean ("playing", "playing", "TRUE when the video is playing",
+	  FALSE, G_PARAM_READABLE));
 }
 
 static void
 swfdec_net_stream_video_init (SwfdecNetStreamVideo *video)
 {
+  video->buffer_time = 100;
   video->next = g_queue_new ();
 }
 
@@ -221,8 +248,11 @@ swfdec_net_stream_video_decode (SwfdecNetStreamVideo *video)
 
   for (;;) {
     packet = g_queue_pop_head (video->next);
-    if (packet == NULL)
+    if (packet == NULL) {
+      video->playing = FALSE;
+      g_object_notify (G_OBJECT (video), "playing");
       return;
+    }
     video->timeout.timestamp += SWFDEC_TICKS_PER_SECOND * packet->header.timestamp / 1000;
     if (player->priv->time < video->timeout.timestamp) {
       g_queue_push_head (video->next, packet);
@@ -231,6 +261,7 @@ swfdec_net_stream_video_decode (SwfdecNetStreamVideo *video)
       return;
     }
     swfdec_net_stream_video_decode_one (video, packet->buffer);
+    video->next_length -= packet->header.timestamp;
     swfdec_rtmp_packet_free (packet);
   }
 }
@@ -238,7 +269,9 @@ swfdec_net_stream_video_decode (SwfdecNetStreamVideo *video)
 static void
 swfdec_net_stream_video_start (SwfdecNetStreamVideo *video)
 {
+  video->playing = TRUE;
   video->timeout.timestamp = SWFDEC_PLAYER (swfdec_gc_object_get_context (video))->priv->time;
+  g_object_notify (G_OBJECT (video), "playing");
 }
 
 void
@@ -252,13 +285,11 @@ swfdec_net_stream_video_push (SwfdecNetStreamVideo *video,
 
   packet = swfdec_rtmp_packet_new (header->channel, header->stream,
       header->type, header->timestamp, buffer);
-  if (g_queue_is_empty (video->next)) {
-    g_queue_push_tail (video->next, packet);
-    if (video->decoder == NULL)
-      swfdec_net_stream_video_start (video);
+  g_queue_push_tail (video->next, packet);
+  video->next_length += header->timestamp;
+  if (!video->playing && video->next_length >= video->buffer_time) {
+    swfdec_net_stream_video_start (video);
     swfdec_net_stream_video_decode (video);
-  } else {
-    g_queue_push_tail (video->next, packet);
   }
 }
 

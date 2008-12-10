@@ -41,7 +41,10 @@ typedef struct _SwfdecNetStreamVideoClass SwfdecNetStreamVideoClass;
 struct _SwfdecNetStreamVideo {
   SwfdecGcObject		object;
 
+  gulong			buffer_time;	/* time to buffer before starting to play */
   GQueue *			next;		/* queue of pending packets */
+  gulong			next_length;	/* number of milliseconds in the next queue */
+  gboolean			playing;	/* TRUE if we're currently playing */
   SwfdecTimeout			timeout;	/* time the next image should be decoded */
   SwfdecVideoDecoder *		decoder;	/* the current decoder */
 };
