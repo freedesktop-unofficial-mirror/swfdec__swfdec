@@ -372,7 +372,7 @@ swfdec_rtmp_connection_connect (SwfdecRtmpConnection *conn, const SwfdecURL *url
     conn->socket = swfdec_rtmp_socket_new (conn, url);
     conn->url = swfdec_url_copy (url);
   } else {
-    SWFDEC_FIXME ("handle NULL urls in connect()");
+    swfdec_rtmp_connection_error (conn, "handle NULL urls in connect()");
   }
 
   if (conn->error)
