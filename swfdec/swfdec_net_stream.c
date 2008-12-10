@@ -25,6 +25,7 @@
 
 #include "swfdec_as_frame_internal.h"
 #include "swfdec_as_internal.h"
+#include "swfdec_as_strings.h"
 #include "swfdec_debug.h"
 #include "swfdec_net_stream_video.h"
 #include "swfdec_sandbox.h"
@@ -34,6 +35,44 @@
 #define SWFDEC_NET_STREAM_RPC_CHANNEL(stream) ((((stream)->stream - 1) * 5 % 65592) + 8)
 #define SWFDEC_NET_STREAM_VIDEO_CHANNEL(stream) ((((stream)->stream - 1) * 5 % 65592) + 5)
 #define SWFDEC_NET_STREAM_AUDIO_CHANNEL(stream) ((((stream)->stream - 1) * 5 % 65592) + 6)
+
+static void
+swfdec_net_stream_onstatus (SwfdecNetStream *stream, const char *code)
+{
+  SwfdecAsValue val;
+  SwfdecAsObject *object;
+  SwfdecAsContext *cx;
+
+  cx = swfdec_gc_object_get_context (stream);
+  swfdec_sandbox_use (stream->conn->sandbox);
+
+  object = swfdec_as_object_new (cx, SWFDEC_AS_STR_Object, NULL);
+  SWFDEC_INFO ("emitting onStatus for %s", code);
+  SWFDEC_AS_VALUE_SET_STRING (&val, code);
+  swfdec_as_object_set_variable (object, SWFDEC_AS_STR_code, &val);
+  SWFDEC_AS_VALUE_SET_STRING (&val, SWFDEC_AS_STR_level);
+  swfdec_as_object_set_variable (object, SWFDEC_AS_STR_level, &val);
+
+  SWFDEC_AS_VALUE_SET_OBJECT (&val, object);
+  if (!swfdec_as_relay_call (SWFDEC_AS_RELAY (stream),
+        SWFDEC_AS_STR_onStatus, 1, &val, NULL)) {
+#if 0
+    // if it's an error message and the stream object didn't have onStatus
+    // handler, call System.onStatus
+    if (level == SWFDEC_AS_STR_error) {
+      SwfdecAsValue system;
+
+      swfdec_as_object_get_variable (cx->global,
+          SWFDEC_AS_STR_System, &system);
+      if (SWFDEC_AS_VALUE_IS_COMPOSITE (system) &&
+	  (object = SWFDEC_AS_VALUE_GET_COMPOSITE (system)) != NULL) {
+        swfdec_as_object_call (object, SWFDEC_AS_STR_onStatus, 1, &val, NULL);
+      }
+    }
+#endif
+  }
+  swfdec_sandbox_unuse (stream->conn->sandbox);
+}
 
 static void
 swfdec_net_stream_rtmp_stream_receive (SwfdecRtmpStream *rtmp_stream,
@@ -97,9 +136,11 @@ swfdec_net_stream_rtmp_stream_sync (SwfdecRtmpStream *stream)
 }
 
 static void
-swfdec_net_stream_rtmp_stream_flush (SwfdecRtmpStream *stream)
+swfdec_net_stream_rtmp_stream_flush (SwfdecRtmpStream *rtmp_stream)
 {
-  SWFDEC_FIXME ("implement");
+  SwfdecNetStream *stream = SWFDEC_NET_STREAM (rtmp_stream);
+
+  swfdec_net_stream_onstatus (stream, SWFDEC_AS_STR_NetStream_Buffer_Flush);
 }
 
 static void
