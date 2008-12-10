@@ -98,6 +98,11 @@ swfdec_audio_swf_stream_block (SwfdecAudioSwfStream *stream, SwfdecBuffer *buffe
   guint n_samples;
   int skip;
 
+  if (SWFDEC_AUDIO_STREAM (stream)->decoder == NULL) {
+    SWFDEC_ERROR ("SoundStreamBlock tag without SoundStreamHead");
+    return NULL;
+  }
+
   swfdec_bits_init (&bits, buffer);
 
   /* FIXME: we want accessor functions for this */
