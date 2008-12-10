@@ -304,6 +304,24 @@ swfdec_net_stream_construct (SwfdecAsContext *cx, SwfdecAsObject *object,
   swfdec_as_object_set_relay (o, SWFDEC_AS_RELAY (stream));
 }
 
+static void
+swfdec_net_stream_send_buffer_time (SwfdecNetStream *stream)
+{
+  SwfdecRtmpPacket *packet;
+  SwfdecBots *bots;
+  SwfdecBuffer *buffer;
+
+  bots = swfdec_bots_new ();
+  swfdec_bots_put_bu16 (bots, 3);
+  swfdec_bots_put_bu32 (bots, stream->stream);
+  swfdec_bots_put_bu32 (bots, stream->video->buffer_time);
+  buffer = swfdec_bots_close (bots);
+
+  packet = swfdec_rtmp_packet_new (2, 0, SWFDEC_RTMP_PACKET_PING, 0, buffer);
+  swfdec_buffer_unref (buffer);
+  swfdec_rtmp_connection_queue_control_packet (stream->conn, packet);
+}
+
 SWFDEC_AS_NATIVE (2101, 201, swfdec_net_stream_onCreate)
 void
 swfdec_net_stream_onCreate (SwfdecAsContext *cx, SwfdecAsObject *object,
@@ -330,6 +348,7 @@ swfdec_net_stream_onCreate (SwfdecAsContext *cx, SwfdecAsObject *object,
     packet->header.stream = stream->stream;
     swfdec_rtmp_connection_send (stream->conn, packet);
   }
+  swfdec_net_stream_send_buffer_time (stream);
 }
 
 SWFDEC_AS_NATIVE (2101, 202, swfdec_net_stream_send_connection)

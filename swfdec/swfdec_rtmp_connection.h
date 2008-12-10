@@ -85,6 +85,9 @@ void			swfdec_rtmp_connection_receive		(SwfdecRtmpConnection *	conn,
 								 SwfdecBufferQueue *	queue);
 void			swfdec_rtmp_connection_send		(SwfdecRtmpConnection *	conn,
 								 SwfdecRtmpPacket *	packet);
+void			swfdec_rtmp_connection_queue_control_packet
+								(SwfdecRtmpConnection *	conn,
+								 SwfdecRtmpPacket *	packet);
 
 void			swfdec_rtmp_connection_error		(SwfdecRtmpConnection *	conn,
 								 const char *		error,

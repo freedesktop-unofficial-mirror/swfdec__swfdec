@@ -37,11 +37,13 @@
 
 /*** SwfdecRtmpStream ***/
 
-static void
-swfdec_rtmp_connection_push_control (SwfdecRtmpConnection *conn,
+void
+swfdec_rtmp_connection_queue_control_packet (SwfdecRtmpConnection *conn,
     SwfdecRtmpPacket *packet)
 {
+  g_return_if_fail (SWFDEC_IS_RTMP_CONNECTION (conn));
   g_return_if_fail (packet->header.channel == 2);
+  g_return_if_fail (packet->header.stream == 0);
 
   if (g_queue_is_empty (conn->control_packets)) {
     g_queue_push_tail (conn->control_packets, NULL);
@@ -148,7 +150,7 @@ swfdec_rtmp_connection_handle_server_bandwidth (SwfdecRtmpConnection *conn,
       org_header->timestamp - diff, buffer);
   swfdec_buffer_unref (buffer);
 
-  swfdec_rtmp_connection_push_control (conn, packet);
+  swfdec_rtmp_connection_queue_control_packet (conn, packet);
 }
 
 static void
