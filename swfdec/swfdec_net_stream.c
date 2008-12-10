@@ -195,6 +195,7 @@ swfdec_net_stream_dispose (GObject *object)
   }
   g_signal_handlers_disconnect_by_func (stream->video, 
       swfdec_net_stream_video_buffer_status, stream);
+  g_object_unref (stream->video);
 
   G_OBJECT_CLASS (swfdec_net_stream_parent_class)->dispose (object);
 }
@@ -273,6 +274,103 @@ swfdec_net_stream_set_checkPolicyFile (SwfdecAsContext *cx, SwfdecAsObject *obje
   SWFDEC_STUB ("NetStream.checkPolicyFile (set)");
 }
 
+static void
+swfdec_net_stream_get_audiocodec (SwfdecAsContext *cx, SwfdecAsObject *object,
+    guint argc, SwfdecAsValue *argv, SwfdecAsValue *rval)
+{
+  SWFDEC_STUB ("NetStream.audiocodec (get)");
+}
+
+static void
+swfdec_net_stream_get_bufferLength (SwfdecAsContext *cx, SwfdecAsObject *object,
+    guint argc, SwfdecAsValue *argv, SwfdecAsValue *rval)
+{
+  SWFDEC_STUB ("NetStream.bufferLength (get)");
+}
+
+static void
+swfdec_net_stream_get_bufferTime (SwfdecAsContext *cx, SwfdecAsObject *object,
+    guint argc, SwfdecAsValue *argv, SwfdecAsValue *rval)
+{
+  SWFDEC_STUB ("NetStream.bufferTime (get)");
+}
+
+static void
+swfdec_net_stream_get_bytesLoaded (SwfdecAsContext *cx, SwfdecAsObject *object,
+    guint argc, SwfdecAsValue *argv, SwfdecAsValue *rval)
+{
+  SWFDEC_STUB ("NetStream.bytesLoaded (get)");
+}
+
+static void
+swfdec_net_stream_get_bytesTotal (SwfdecAsContext *cx, SwfdecAsObject *object,
+    guint argc, SwfdecAsValue *argv, SwfdecAsValue *rval)
+{
+  SWFDEC_STUB ("NetStream.bytesTotal (get)");
+}
+
+static void
+swfdec_net_stream_get_currentFps (SwfdecAsContext *cx, SwfdecAsObject *object,
+    guint argc, SwfdecAsValue *argv, SwfdecAsValue *rval)
+{
+  SWFDEC_STUB ("NetStream.currentFps (get)");
+}
+
+static void
+swfdec_net_stream_get_decodedFrames (SwfdecAsContext *cx, SwfdecAsObject *object,
+    guint argc, SwfdecAsValue *argv, SwfdecAsValue *rval)
+{
+  SWFDEC_STUB ("NetStream.decodedFrames (get)");
+}
+
+static void
+swfdec_net_stream_get_liveDelay (SwfdecAsContext *cx, SwfdecAsObject *object,
+    guint argc, SwfdecAsValue *argv, SwfdecAsValue *rval)
+{
+  SWFDEC_STUB ("NetStream.liveDelay (get)");
+}
+
+static void
+swfdec_net_stream_get_time (SwfdecAsContext *cx, SwfdecAsObject *object,
+    guint argc, SwfdecAsValue *argv, SwfdecAsValue *rval)
+{
+  SWFDEC_STUB ("NetStream.time (get)");
+}
+
+static void
+swfdec_net_stream_get_videocodec (SwfdecAsContext *cx, SwfdecAsObject *object,
+    guint argc, SwfdecAsValue *argv, SwfdecAsValue *rval)
+{
+  SWFDEC_STUB ("NetStream.videocodec (get)");
+}
+
+static void
+swfdec_net_stream_install_properties (SwfdecAsObject *object)
+{
+  object = object->prototype;
+
+  swfdec_as_object_add_native_variable (object, SWFDEC_AS_STR_audiocodec,
+      swfdec_net_stream_get_audiocodec, NULL);
+  swfdec_as_object_add_native_variable (object, SWFDEC_AS_STR_bufferLength,
+      swfdec_net_stream_get_bufferLength, NULL);
+  swfdec_as_object_add_native_variable (object, SWFDEC_AS_STR_bufferTime,
+      swfdec_net_stream_get_bufferTime, NULL);
+  swfdec_as_object_add_native_variable (object, SWFDEC_AS_STR_bytesLoaded,
+      swfdec_net_stream_get_bytesLoaded, NULL);
+  swfdec_as_object_add_native_variable (object, SWFDEC_AS_STR_bytesTotal,
+      swfdec_net_stream_get_bytesTotal, NULL);
+  swfdec_as_object_add_native_variable (object, SWFDEC_AS_STR_currentFps,
+      swfdec_net_stream_get_currentFps, NULL);
+  swfdec_as_object_add_native_variable (object, SWFDEC_AS_STR_decodedFrames,
+      swfdec_net_stream_get_decodedFrames, NULL);
+  swfdec_as_object_add_native_variable (object, SWFDEC_AS_STR_liveDelay,
+      swfdec_net_stream_get_liveDelay, NULL);
+  swfdec_as_object_add_native_variable (object, SWFDEC_AS_STR_time,
+      swfdec_net_stream_get_time, NULL);
+  swfdec_as_object_add_native_variable (object, SWFDEC_AS_STR_videocodec,
+      swfdec_net_stream_get_videocodec, NULL);
+}
+
 SWFDEC_AS_NATIVE (2101, 200, swfdec_net_stream_construct)
 void
 swfdec_net_stream_construct (SwfdecAsContext *cx, SwfdecAsObject *object,
@@ -283,6 +381,8 @@ swfdec_net_stream_construct (SwfdecAsContext *cx, SwfdecAsObject *object,
   SwfdecRtmpConnection *conn;
 
   SWFDEC_AS_CHECK (0, NULL, "oo", &o, &oconn);
+
+  swfdec_net_stream_install_properties (o);
 
   if (!cx->frame->next || !cx->frame->next->construct)
     return;
@@ -298,6 +398,7 @@ swfdec_net_stream_construct (SwfdecAsContext *cx, SwfdecAsObject *object,
   stream->conn = conn;
   stream->rpc = swfdec_rtmp_rpc_new (conn, SWFDEC_AS_RELAY (stream));
   stream->video = swfdec_net_stream_video_new (SWFDEC_PLAYER (cx));
+  g_object_ref (stream->video);
   g_signal_connect (stream->video, "notify::playing", 
       G_CALLBACK (swfdec_net_stream_video_buffer_status), stream);
   swfdec_as_context_get_time (cx, &stream->rpc->last_send);

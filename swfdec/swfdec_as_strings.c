@@ -526,7 +526,7 @@ const SwfdecAsConstantStringValue swfdec_as_strings[] = {
   SWFDEC_AS_CONSTANT_STRING ("currentFps")
   SWFDEC_AS_CONSTANT_STRING ("decodedFrames")
   SWFDEC_AS_CONSTANT_STRING ("liveDelay")
-  SWFDEC_AS_CONSTANT_STRING ("videoCodec")
+  SWFDEC_AS_CONSTANT_STRING ("videocodec")
   SWFDEC_AS_CONSTANT_STRING ("System")
   SWFDEC_AS_CONSTANT_STRING ("__resolve")
   SWFDEC_AS_CONSTANT_STRING ("Rectangle")
