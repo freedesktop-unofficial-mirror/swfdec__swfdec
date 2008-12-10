@@ -70,12 +70,24 @@ swfdec_net_stream_rtmp_stream_receive (SwfdecRtmpStream *rtmp_stream,
 }
 
 static SwfdecRtmpPacket *
-swfdec_net_stream_rtmp_stream_sent (SwfdecRtmpStream *stream,
+swfdec_net_stream_rtmp_stream_sent (SwfdecRtmpStream *rtmp_stream,
     const SwfdecRtmpPacket *packet)
 {
-  SWFDEC_FIXME ("implement");
+  SwfdecNetStream *stream = SWFDEC_NET_STREAM (rtmp_stream);
+  SwfdecRtmpPacket *result;
 
-  return NULL;
+  if (packet->header.channel == SWFDEC_NET_STREAM_RPC_CHANNEL (stream)) {
+    result = swfdec_rtmp_rpc_pop (stream->rpc, TRUE);
+    if (result) {
+      result->header.channel = SWFDEC_NET_STREAM_RPC_CHANNEL (stream);
+      result->header.stream = stream->stream;
+    }
+  } else {
+    result = NULL;
+    g_assert_not_reached ();
+  }
+
+  return result;
 }
 
 static void
