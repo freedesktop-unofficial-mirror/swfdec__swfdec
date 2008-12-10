@@ -41,6 +41,7 @@ typedef struct _SwfdecNetStreamVideoClass SwfdecNetStreamVideoClass;
 struct _SwfdecNetStreamVideo {
   SwfdecGcObject		object;
 
+  guint				time;		/* time as reported by NetStream.getTime() in ms */
   gulong			buffer_time;	/* time to buffer before starting to play */
   GQueue *			next;		/* queue of pending packets */
   gulong			next_length;	/* number of milliseconds in the next queue */

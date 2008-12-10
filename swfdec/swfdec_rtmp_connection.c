@@ -356,6 +356,7 @@ swfdec_rtmp_connection_init (SwfdecRtmpConnection *conn)
 
   conn->control_packets = g_queue_new ();
   conn->rpc = swfdec_rtmp_rpc_new (conn, SWFDEC_AS_RELAY (conn));
+  conn->rpc->id = 1;
 
   conn->read_size = SWFDEC_RTMP_BLOCK_SIZE;
   conn->write_size = SWFDEC_RTMP_BLOCK_SIZE;
@@ -488,7 +489,7 @@ swfdec_rtmp_connection_send (SwfdecRtmpConnection *conn, SwfdecRtmpPacket *packe
   g_assert (packet->header.size == packet->buffer->length);
   packet->buffer->length = 0;
   send = g_queue_is_empty (conn->packets);
-  g_queue_push_tail (conn->packets, packet);
+  g_queue_push_head (conn->packets, packet);
   SWFDEC_LOG ("pushed channel %u - %u packets now", packet->header.channel, 
       g_queue_get_length (conn->packets));
   if (send)

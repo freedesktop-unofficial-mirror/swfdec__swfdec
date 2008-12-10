@@ -137,7 +137,6 @@ swfdec_net_stream_video_class_init (SwfdecNetStreamVideoClass * g_class)
 static void
 swfdec_net_stream_video_init (SwfdecNetStreamVideo *video)
 {
-  video->buffer_time = 100;
   video->next = g_queue_new ();
 }
 
@@ -262,6 +261,7 @@ swfdec_net_stream_video_decode (SwfdecNetStreamVideo *video)
     }
     swfdec_net_stream_video_decode_one (video, packet->buffer);
     video->next_length -= packet->header.timestamp;
+    video->time += packet->header.timestamp;
     swfdec_rtmp_packet_free (packet);
   }
 }
@@ -269,6 +269,7 @@ swfdec_net_stream_video_decode (SwfdecNetStreamVideo *video)
 static void
 swfdec_net_stream_video_start (SwfdecNetStreamVideo *video)
 {
+  video->time = 0;
   video->playing = TRUE;
   video->timeout.timestamp = SWFDEC_PLAYER (swfdec_gc_object_get_context (video))->priv->time;
   g_object_notify (G_OBJECT (video), "playing");

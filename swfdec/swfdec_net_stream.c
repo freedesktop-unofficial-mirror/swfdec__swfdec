@@ -334,7 +334,11 @@ static void
 swfdec_net_stream_get_time (SwfdecAsContext *cx, SwfdecAsObject *object,
     guint argc, SwfdecAsValue *argv, SwfdecAsValue *rval)
 {
-  SWFDEC_STUB ("NetStream.time (get)");
+  SwfdecNetStream *stream;
+
+  SWFDEC_AS_CHECK (SWFDEC_TYPE_NET_STREAM, &stream, "");
+
+  *rval = swfdec_as_value_from_number (cx, stream->video->time / 1000.);
 }
 
 static void
@@ -348,6 +352,8 @@ static void
 swfdec_net_stream_install_properties (SwfdecAsObject *object)
 {
   object = object->prototype;
+  if (object == NULL)
+    return;
 
   swfdec_as_object_add_native_variable (object, SWFDEC_AS_STR_audiocodec,
       swfdec_net_stream_get_audiocodec, NULL);
