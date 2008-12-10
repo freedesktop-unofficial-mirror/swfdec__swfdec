@@ -73,7 +73,27 @@ static SwfdecRtmpPacket *
 swfdec_net_stream_rtmp_stream_sent (SwfdecRtmpStream *stream,
     const SwfdecRtmpPacket *packet)
 {
+  SWFDEC_FIXME ("implement");
+
   return NULL;
+}
+
+static void
+swfdec_net_stream_rtmp_stream_sync (SwfdecRtmpStream *stream)
+{
+  SWFDEC_FIXME ("implement");
+}
+
+static void
+swfdec_net_stream_rtmp_stream_flush (SwfdecRtmpStream *stream)
+{
+  SWFDEC_FIXME ("implement");
+}
+
+static void
+swfdec_net_stream_rtmp_stream_clear (SwfdecRtmpStream *stream)
+{
+  SWFDEC_FIXME ("implement");
 }
 
 static void
@@ -81,6 +101,9 @@ swfdec_net_stream_rtmp_stream_init (SwfdecRtmpStreamInterface *iface)
 {
   iface->receive = swfdec_net_stream_rtmp_stream_receive;
   iface->sent = swfdec_net_stream_rtmp_stream_sent;
+  iface->sync = swfdec_net_stream_rtmp_stream_sync;
+  iface->flush = swfdec_net_stream_rtmp_stream_flush;
+  iface->clear = swfdec_net_stream_rtmp_stream_clear;
 }
 
 /*** NET STREAM ***/

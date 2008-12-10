@@ -36,12 +36,16 @@ typedef struct _SwfdecRtmpStreamInterface SwfdecRtmpStreamInterface;
 struct _SwfdecRtmpStreamInterface {
   GTypeInterface	parent;
 
-  /* mandatory vfunc */
+  /* mandatory vfuncs */
   void			(* receive)      	(SwfdecRtmpStream *		stream,
 						 const SwfdecRtmpHeader *	header,
 						 SwfdecBuffer *			buffer);
   SwfdecRtmpPacket *	(* sent)		(SwfdecRtmpStream *		stream,
 						 const SwfdecRtmpPacket *	packet);
+
+  void			(* sync)		(SwfdecRtmpStream *		stream);
+  void			(* flush)		(SwfdecRtmpStream *		stream);
+  void			(* clear)		(SwfdecRtmpStream *		stream);
 };
 
 GType			swfdec_rtmp_stream_get_type	(void) G_GNUC_CONST;
@@ -50,6 +54,13 @@ void			swfdec_rtmp_stream_receive	(SwfdecRtmpStream *	stream,
 							 const SwfdecRtmpPacket *packet);
 SwfdecRtmpPacket *	swfdec_rtmp_stream_sent		(SwfdecRtmpStream *	stream,
 						  	 const SwfdecRtmpPacket *packet);
+
+/* Ping type 0 */
+void			swfdec_rtmp_stream_sync		(SwfdecRtmpStream *	stream);
+/* Ping type 1 */
+void			swfdec_rtmp_stream_flush	(SwfdecRtmpStream *	stream);
+/* Ping type 4 */
+void			swfdec_rtmp_stream_clear	(SwfdecRtmpStream *	stream);
 
 
 G_END_DECLS

@@ -100,6 +100,8 @@ void			swfdec_rtmp_connection_register_stream	(SwfdecRtmpConnection *	conn,
 								 SwfdecRtmpStream *	stream);
 void			swfdec_rtmp_connection_unregister_stream(SwfdecRtmpConnection *	conn,
 								 guint			id);
+SwfdecRtmpStream *	swfdec_rtmp_connection_get_stream	(SwfdecRtmpConnection *	conn,
+								 guint			id);
 
 
 G_END_DECLS

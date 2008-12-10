@@ -66,16 +66,57 @@ swfdec_rtmp_connection_handle_chunk_size (SwfdecRtmpConnection *conn, SwfdecBuff
   }
 }
 
+enum {
+  SWFDEC_RTMP_PING_SYNC = 0,
+  SWFDEC_RTMP_PING_FLUSH = 1,
+  SWFDEC_RTMP_PING_BUFFERTIME = 3,
+  SWFDEC_RTMP_PING_CLEAR = 4,
+  SWFDEC_RTMP_PING_PING = 6,
+  SWFDEC_RTMP_PING_PONG = 7
+};
+
 static void
 swfdec_rtmp_connection_handle_ping (SwfdecRtmpConnection *conn, SwfdecBuffer *buffer)
 {
   SwfdecBits bits;
   guint type, target;
+  SwfdecRtmpStream *stream;
 
   swfdec_bits_init (&bits, buffer);
   type = swfdec_bits_get_bu16 (&bits);
   target = swfdec_bits_get_bu32 (&bits);
-  SWFDEC_FIXME ("handle ping type %u for target %u", type, target);
+  switch (type) {
+    case SWFDEC_RTMP_PING_SYNC:
+      stream = swfdec_rtmp_connection_get_stream (conn, target);
+      if (stream) {
+	swfdec_rtmp_stream_sync (stream);
+      } else {
+	SWFDEC_ERROR ("got sync ping for stream %u, but no such stream", target);
+      }
+      break;
+    case SWFDEC_RTMP_PING_FLUSH:
+      stream = swfdec_rtmp_connection_get_stream (conn, target);
+      if (stream) {
+	swfdec_rtmp_stream_flush (stream);
+      } else {
+	SWFDEC_ERROR ("got flush ping for stream %u, but no such stream", target);
+      }
+      break;
+    case SWFDEC_RTMP_PING_CLEAR:
+      stream = swfdec_rtmp_connection_get_stream (conn, target);
+      if (stream) {
+	swfdec_rtmp_stream_clear (stream);
+      } else {
+	SWFDEC_ERROR ("got clear ping for stream %u, but no such stream", target);
+      }
+      break;
+    case SWFDEC_RTMP_PING_BUFFERTIME:
+    case SWFDEC_RTMP_PING_PING:
+    case SWFDEC_RTMP_PING_PONG:
+    default:
+      SWFDEC_FIXME ("handle ping type %u for target %u", type, target);
+      break;
+  }
 }
 
 static void
@@ -203,10 +244,31 @@ swfdec_rtmp_connection_rtmp_stream_sent (SwfdecRtmpStream *stream,
 }
 
 static void
+swfdec_rtmp_connection_rtmp_stream_sync (SwfdecRtmpStream *stream)
+{
+  SWFDEC_FIXME ("implement");
+}
+
+static void
+swfdec_rtmp_connection_rtmp_stream_flush (SwfdecRtmpStream *stream)
+{
+  SWFDEC_FIXME ("implement");
+}
+
+static void
+swfdec_rtmp_connection_rtmp_stream_clear (SwfdecRtmpStream *stream)
+{
+  SWFDEC_FIXME ("implement");
+}
+
+static void
 swfdec_rtmp_connection_rtmp_stream_init (SwfdecRtmpStreamInterface *iface)
 {
   iface->receive = swfdec_rtmp_connection_rtmp_stream_receive;
   iface->sent = swfdec_rtmp_connection_rtmp_stream_sent;
+  iface->sync = swfdec_rtmp_connection_rtmp_stream_sync;
+  iface->flush = swfdec_rtmp_connection_rtmp_stream_flush;
+  iface->clear = swfdec_rtmp_connection_rtmp_stream_clear;
 }
 
 /*** SwfdecRtmpConnection ***/
@@ -401,6 +463,14 @@ swfdec_rtmp_connection_unregister_stream (SwfdecRtmpConnection *conn, guint id)
   if (!g_hash_table_remove (conn->streams, GUINT_TO_POINTER (id))) {
     g_assert_not_reached ();
   }
+}
+
+SwfdecRtmpStream *
+swfdec_rtmp_connection_get_stream (SwfdecRtmpConnection *conn, guint id)
+{
+  g_return_val_if_fail (SWFDEC_IS_RTMP_CONNECTION (conn), NULL);
+
+  return g_hash_table_lookup (conn->streams, GUINT_TO_POINTER (id));
 }
 
 void

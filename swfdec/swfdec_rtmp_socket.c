@@ -139,7 +139,7 @@ next_packet:
     SwfdecRtmpStream *stream;
     SwfdecRtmpPacket *next;
     
-    stream = g_hash_table_lookup (conn->streams, GUINT_TO_POINTER (packet->header.stream));
+    stream = swfdec_rtmp_connection_get_stream (conn, packet->header.stream);
     if (stream == NULL) {
       swfdec_rtmp_packet_free (packet);
       goto next_packet;

@@ -86,3 +86,36 @@ swfdec_rtmp_stream_sent (SwfdecRtmpStream *stream, const SwfdecRtmpPacket *packe
   iface = SWFDEC_RTMP_STREAM_GET_INTERFACE (stream);
   return iface->sent (stream, packet);
 }
+
+void
+swfdec_rtmp_stream_sync (SwfdecRtmpStream *stream)
+{
+  SwfdecRtmpStreamInterface *iface;
+  
+  g_return_if_fail (SWFDEC_IS_RTMP_STREAM (stream));
+
+  iface = SWFDEC_RTMP_STREAM_GET_INTERFACE (stream);
+  iface->sync (stream);
+}
+
+void
+swfdec_rtmp_stream_flush (SwfdecRtmpStream *stream)
+{
+  SwfdecRtmpStreamInterface *iface;
+  
+  g_return_if_fail (SWFDEC_IS_RTMP_STREAM (stream));
+
+  iface = SWFDEC_RTMP_STREAM_GET_INTERFACE (stream);
+  iface->flush (stream);
+}
+
+void
+swfdec_rtmp_stream_clear (SwfdecRtmpStream *stream)
+{
+  SwfdecRtmpStreamInterface *iface;
+  
+  g_return_if_fail (SWFDEC_IS_RTMP_STREAM (stream));
+
+  iface = SWFDEC_RTMP_STREAM_GET_INTERFACE (stream);
+  iface->clear (stream);
+}
