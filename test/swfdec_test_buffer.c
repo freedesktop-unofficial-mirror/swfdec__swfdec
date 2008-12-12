@@ -21,7 +21,6 @@
 #include "config.h"
 #endif
 
-#include <ctype.h>
 #include <string.h>
 #include <unistd.h>
 
@@ -289,9 +288,9 @@ swfdec_test_buffer_toString (SwfdecAsContext *cx, SwfdecAsObject *object, guint 
 	g_string_append_c (string, 'v');
 	break;
       default:
-	if (isprint(c)) {
+	if (g_ascii_isprint(c)) {
 	  g_string_append_c (string, (char) c);
-	} else if (i < b->length - 1 && isdigit(b->data[i + 1])) {
+	} else if (i < b->length - 1 && g_ascii_isdigit(b->data[i + 1])) {
 	  g_string_append_printf (string, "\\%03o", (guint) c);
 	} else {
 	  g_string_append_printf (string, "\\%o",(guint) c);
