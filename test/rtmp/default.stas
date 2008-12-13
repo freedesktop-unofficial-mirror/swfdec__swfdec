@@ -39,12 +39,8 @@ Socket.prototype.nextCommand = function (required_command) {
 };
 
 Socket.prototype.onData = function (data) {
-  if (this.commands[this.commands.length - 1].indexOf ("send ") == 0)
-    this.commands[this.commands.length - 1] += data;
-  else
-    this.commands.push ("send " + data);
-  if (this.buffer.find (10) <= this.commands[this.commands.length - 1].length)
-    this.nextCommand ("send");
+  this.commands.push ("send " + data);
+  this.nextCommand ("send");
   this.do_send ();
 };
 
@@ -52,10 +48,7 @@ Socket.prototype.do_send = function () {
   tmp = this.nextCommand ("recv");
   while (tmp) {
     this.send (tmp.data);
-    if (this.commands[this.commands.length - 1].indexOf ("recv ") == 0)
-      this.commands[this.commands.length - 1] += tmp.data;
-    else
-      this.commands.push ("recv " + tmp.data);
+    this.commands.push ("recv " + tmp.data);
     tmp = this.nextCommand ("recv");
   }
 };
