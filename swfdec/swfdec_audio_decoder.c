@@ -256,3 +256,10 @@ swfdec_audio_decoder_uses_format (SwfdecAudioDecoder *decoder, guint codec,
   return decoder->codec == codec && decoder->format == format;
 }
 
+guint
+swfdec_audio_decoder_get_codec (SwfdecAudioDecoder *decoder)
+{
+  g_return_val_if_fail (SWFDEC_IS_AUDIO_DECODER (decoder), 0);
+
+  return decoder->codec;
+}

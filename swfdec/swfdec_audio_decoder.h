@@ -100,6 +100,8 @@ gboolean		swfdec_audio_decoder_uses_format(SwfdecAudioDecoder *	decoder,
 							 guint			codec,
 							 SwfdecAudioFormat	format);
 
+guint			swfdec_audio_decoder_get_codec	(SwfdecAudioDecoder *	decoder);
+
 /* for subclasses */
 void			swfdec_audio_decoder_error	(SwfdecAudioDecoder *	decoder,
 							 const char *		error,
