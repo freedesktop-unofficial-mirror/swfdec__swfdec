@@ -138,6 +138,7 @@ static void
 swfdec_net_stream_video_init (SwfdecNetStreamVideo *video)
 {
   video->next = g_queue_new ();
+  video->buffer_time = 100;
 }
 
 SwfdecNetStreamVideo *
