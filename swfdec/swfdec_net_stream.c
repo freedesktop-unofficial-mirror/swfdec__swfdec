@@ -187,8 +187,6 @@ swfdec_net_stream_video_buffer_status (SwfdecNetStreamVideo *video, GParamSpec *
 {
   if (video->playing) {
     swfdec_net_stream_onstatus (stream, SWFDEC_AS_STR_NetStream_Buffer_Full);
-    swfdec_audio_add (SWFDEC_AUDIO (stream->audio),
-	SWFDEC_PLAYER (swfdec_gc_object_get_context (stream)));
   } else {
     swfdec_net_stream_onstatus (stream, SWFDEC_AS_STR_NetStream_Buffer_Empty);
   }
@@ -292,21 +290,40 @@ static void
 swfdec_net_stream_get_audiocodec (SwfdecAsContext *cx, SwfdecAsObject *object,
     guint argc, SwfdecAsValue *argv, SwfdecAsValue *rval)
 {
-  SWFDEC_STUB ("NetStream.audiocodec (get)");
+  SwfdecNetStream *stream;
+  SwfdecAudioStream *audio;
+
+  SWFDEC_AS_CHECK (SWFDEC_TYPE_NET_STREAM, &stream, "");
+
+  audio = SWFDEC_AUDIO_STREAM (stream->audio);
+  if (audio->decoder) {
+    *rval = swfdec_as_value_from_integer (cx,
+	swfdec_audio_decoder_get_codec (audio->decoder));
+  } else {
+    *rval = swfdec_as_value_from_integer (cx, 0);
+  }
 }
 
 static void
 swfdec_net_stream_get_bufferLength (SwfdecAsContext *cx, SwfdecAsObject *object,
     guint argc, SwfdecAsValue *argv, SwfdecAsValue *rval)
 {
-  SWFDEC_STUB ("NetStream.bufferLength (get)");
+  SwfdecNetStream *stream;
+
+  SWFDEC_AS_CHECK (SWFDEC_TYPE_NET_STREAM, &stream, "");
+
+  *rval = swfdec_as_value_from_number (cx, stream->video->next_length / 1000.);
 }
 
 static void
 swfdec_net_stream_get_bufferTime (SwfdecAsContext *cx, SwfdecAsObject *object,
     guint argc, SwfdecAsValue *argv, SwfdecAsValue *rval)
 {
-  SWFDEC_STUB ("NetStream.bufferTime (get)");
+  SwfdecNetStream *stream;
+
+  SWFDEC_AS_CHECK (SWFDEC_TYPE_NET_STREAM, &stream, "");
+
+  *rval = swfdec_as_value_from_number (cx, stream->video->buffer_time / 1000.);
 }
 
 static void
@@ -359,7 +376,16 @@ static void
 swfdec_net_stream_get_videocodec (SwfdecAsContext *cx, SwfdecAsObject *object,
     guint argc, SwfdecAsValue *argv, SwfdecAsValue *rval)
 {
-  SWFDEC_STUB ("NetStream.videocodec (get)");
+  SwfdecNetStream *stream;
+
+  SWFDEC_AS_CHECK (SWFDEC_TYPE_NET_STREAM, &stream, "");
+
+  if (stream->video->decoder) {
+    *rval = swfdec_as_value_from_integer (cx,
+	swfdec_video_decoder_get_codec (stream->video->decoder));
+  } else {
+    *rval = swfdec_as_value_from_integer (cx, 0);
+  }
 }
 
 static void
@@ -427,7 +453,7 @@ swfdec_net_stream_construct (SwfdecAsContext *cx, SwfdecAsObject *object,
 }
 
 static void
-swfdec_net_stream_send_buffer_time (SwfdecNetStream *stream)
+swfdec_net_stream_send_buffer_time (SwfdecNetStream *stream, guint buffer_time)
 {
   SwfdecRtmpPacket *packet;
   SwfdecBots *bots;
@@ -436,7 +462,7 @@ swfdec_net_stream_send_buffer_time (SwfdecNetStream *stream)
   bots = swfdec_bots_new ();
   swfdec_bots_put_bu16 (bots, 3);
   swfdec_bots_put_bu32 (bots, stream->stream);
-  swfdec_bots_put_bu32 (bots, stream->video->buffer_time);
+  swfdec_bots_put_bu32 (bots, buffer_time);
   buffer = swfdec_bots_close (bots);
 
   packet = swfdec_rtmp_packet_new (2, 0, SWFDEC_RTMP_PACKET_PING, 0, buffer);
@@ -470,7 +496,7 @@ swfdec_net_stream_onCreate (SwfdecAsContext *cx, SwfdecAsObject *object,
     packet->header.stream = stream->stream;
     swfdec_rtmp_connection_send (stream->conn, packet);
   }
-  swfdec_net_stream_send_buffer_time (stream);
+  swfdec_net_stream_send_buffer_time (stream, 0);
 }
 
 SWFDEC_AS_NATIVE (2101, 202, swfdec_net_stream_send_connection)
