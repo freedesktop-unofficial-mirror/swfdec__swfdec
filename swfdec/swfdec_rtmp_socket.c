@@ -138,7 +138,7 @@ next_packet:
   if (packet->header.size == packet->buffer->length) {
     SwfdecRtmpStream *stream;
     SwfdecRtmpPacket *next;
-    
+
     stream = swfdec_rtmp_connection_get_stream (conn, packet->header.stream);
     if (stream == NULL) {
       swfdec_rtmp_packet_free (packet);
@@ -238,7 +238,7 @@ swfdec_rtmp_socket_receive (SwfdecRtmpSocket *sock, SwfdecBufferQueue *queue)
     swfdec_buffer_queue_flush (queue, header_size);
     buffer = swfdec_buffer_queue_pull (queue, remaining);
     g_assert (buffer);
-    /* we allocate the buffer so it's big enough */
+    /* we allocated the buffer so we know it's big enough */
     memcpy (packet->buffer->data + packet->buffer->length, buffer->data, remaining);
     packet->buffer->length += remaining;
     swfdec_buffer_unref (buffer);
