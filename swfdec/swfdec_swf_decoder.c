@@ -27,7 +27,6 @@
 #include <math.h>
 #include <string.h>
 #include <stdlib.h>
-#include <liboil/liboil.h>
 
 #include "swfdec_swf_decoder.h"
 #include "swfdec.h"

@@ -22,7 +22,6 @@
 #endif
 
 #include <swfdec_sound_matrix.h>
-#include <liboil/liboil.h>
 #include <swfdec_debug.h>
 
 void
