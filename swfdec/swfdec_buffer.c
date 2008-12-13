@@ -24,7 +24,6 @@
 #endif
 
 #include <swfdec_buffer.h>
-#include <liboil/liboil.h>
 #include <glib.h>
 #include <string.h>
 #include <swfdec_debug.h>
@@ -491,7 +490,7 @@ swfdec_buffer_queue_peek (SwfdecBufferQueue * queue, gsize length)
     while (offset < length) {
       buffer = g->data;
       amount = MIN (length - offset, buffer->length);
-      oil_copy_u8 (newbuffer->data + offset, buffer->data, amount);
+      memcpy (newbuffer->data + offset, buffer->data, amount);
       offset += amount;
       g = g->next;
     }
