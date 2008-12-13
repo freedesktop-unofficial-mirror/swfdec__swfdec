@@ -155,12 +155,36 @@ swfdec_buffer_from_string (const char *s)
   return buffer;
 }
 
+typedef struct _RtmpConn {
+  SwfdecBufferQueue *	queue;
+  GHashTable *		pending;
+  guint			packet_size;
+} RtmpConn;
+
+static RtmpConn *
+rtmp_conn_new (void)
+{
+  RtmpConn *conn = g_slice_new (RtmpConn);
+
+  conn->queue = swfdec_buffer_queue_new ();
+  conn->pending = g_hash_table_new (g_direct_hash, g_direct_equal);
+  conn->packet_size = 128;
+
+  return conn;
+}
+
+static void
+rtmp_conn_free (RtmpConn *conn)
+{
+  swfdec_buffer_queue_unref (conn->queue);
+  g_hash_table_destroy (conn->pending);
+  g_slice_free (RtmpConn, conn);
+}
+
 typedef struct _RtmpState {
   guint			handshake;
-  SwfdecBufferQueue *	send;
-  GHashTable *		send_pending;
-  SwfdecBufferQueue *	recv;
-  GHashTable *		recv_pending;
+  RtmpConn *		send;
+  RtmpConn *		recv;
 } RtmpState;
 
 static RtmpState *
@@ -169,10 +193,8 @@ rtmp_state_new (void)
   RtmpState *state = g_slice_new0 (RtmpState);
 
   state->handshake = 3;
-  state->send = swfdec_buffer_queue_new ();
-  state->send_pending = g_hash_table_new (g_direct_hash, g_direct_equal);
-  state->recv = swfdec_buffer_queue_new ();
-  state->recv_pending = g_hash_table_new (g_direct_hash, g_direct_equal);
+  state->send = rtmp_conn_new ();
+  state->recv = rtmp_conn_new ();
 
   return state;
 }
@@ -180,10 +202,7 @@ rtmp_state_new (void)
 static void
 rtmp_state_free (RtmpState *state)
 {
-  swfdec_buffer_queue_unref (state->send);
-  g_hash_table_destroy (state->send_pending);
-  swfdec_buffer_queue_unref (state->recv);
-  g_hash_table_destroy (state->recv_pending);
+  rtmp_conn_free (state->recv);
   g_slice_free (RtmpState, state);
 }
 
@@ -198,8 +217,7 @@ write_line (GPtrArray *lines, const char *type, SwfdecBuffer *buffer)
 }
 
 static gboolean
-process_one_packet (GPtrArray *lines, const char *type,
-    GHashTable *lookup, SwfdecBufferQueue *queue, guint packet_size)
+process_one_packet (GPtrArray *lines, const char *type, RtmpConn *conn)
 {
   SwfdecRtmpPacket *packet;
   SwfdecRtmpHeader header = { 0, };
@@ -208,22 +226,22 @@ process_one_packet (GPtrArray *lines, const char *type,
   gsize header_size, i, remaining;
 
   /* determine size of header */
-  buffer = swfdec_buffer_queue_peek (queue, 1);
+  buffer = swfdec_buffer_queue_peek (conn->queue, 1);
   if (buffer == NULL)
     return FALSE;
   header_size = swfdec_rtmp_header_peek_size (buffer->data[0]);
   swfdec_buffer_unref (buffer);
 
   /* read header */
-  buffer = swfdec_buffer_queue_peek (queue, header_size);
+  buffer = swfdec_buffer_queue_peek (conn->queue, header_size);
   if (buffer == NULL)
     return FALSE;
   swfdec_bits_init (&bits, buffer);
   i = swfdec_rtmp_header_peek_channel (&bits);
-  packet = g_hash_table_lookup (lookup, GUINT_TO_POINTER (i));
+  packet = g_hash_table_lookup (conn->pending, GUINT_TO_POINTER (i));
   if (packet == NULL) {
     packet = swfdec_rtmp_packet_new_empty ();
-    g_hash_table_insert (lookup, GUINT_TO_POINTER (i), packet);
+    g_hash_table_insert (conn->pending, GUINT_TO_POINTER (i), packet);
   } else {
     swfdec_rtmp_header_copy (&header, &packet->header);
   }
@@ -240,18 +258,18 @@ process_one_packet (GPtrArray *lines, const char *type,
   } else {
     remaining = header.size;
   }
-  if (header_size + MIN (packet_size, remaining) > swfdec_buffer_queue_get_depth (queue))
+  if (header_size + MIN (conn->packet_size, remaining) > swfdec_buffer_queue_get_depth (conn->queue))
     return FALSE;
 
   swfdec_rtmp_header_copy (&packet->header, &header);
-  if (remaining <= packet_size) {
+  if (remaining <= conn->packet_size) {
     packet->buffer = GSIZE_TO_POINTER (0);
   } else {
-    packet->buffer = GSIZE_TO_POINTER (remaining - packet_size);
-    remaining = packet_size;
+    packet->buffer = GSIZE_TO_POINTER (remaining - conn->packet_size);
+    remaining = conn->packet_size;
   }
 
-  buffer = swfdec_buffer_queue_pull (queue, header_size + remaining);
+  buffer = swfdec_buffer_queue_pull (conn->queue, header_size + remaining);
   g_assert (buffer);
   write_line (lines, type, buffer);
   return TRUE;
@@ -260,13 +278,13 @@ process_one_packet (GPtrArray *lines, const char *type,
 static void
 rtmp_process_send (RtmpState *state, GPtrArray *lines, SwfdecBuffer *buffer)
 {
-  swfdec_buffer_queue_push (state->send, buffer);
+  swfdec_buffer_queue_push (state->send->queue, buffer);
 
   switch (state->handshake) {
     case 0:
       break;
     case 1:
-      buffer = swfdec_buffer_queue_pull (state->send, 1536);
+      buffer = swfdec_buffer_queue_pull (state->send->queue, 1536);
       if (buffer == NULL)
 	return;
       write_line (lines, "send", buffer);
@@ -276,7 +294,7 @@ rtmp_process_send (RtmpState *state, GPtrArray *lines, SwfdecBuffer *buffer)
       g_printerr ("sent data when waiting for RTMP handshake reply?");
       return;
     case 3:
-      buffer = swfdec_buffer_queue_pull (state->send, 1537);
+      buffer = swfdec_buffer_queue_pull (state->send->queue, 1537);
       if (buffer) {
 	write_line (lines, "send", buffer);
 	state->handshake--;
@@ -287,14 +305,13 @@ rtmp_process_send (RtmpState *state, GPtrArray *lines, SwfdecBuffer *buffer)
       break;
   }
 
-  while (process_one_packet (lines, "send", state->send_pending, state->send, 128))
-    ;
+  while (process_one_packet (lines, "send", state->send));
 }
 
 static void
 rtmp_process_recv (RtmpState *state, GPtrArray *lines, SwfdecBuffer *buffer)
 {
-  swfdec_buffer_queue_push (state->recv, buffer);
+  swfdec_buffer_queue_push (state->recv->queue, buffer);
 
   switch (state->handshake) {
     case 0:
@@ -303,7 +320,7 @@ rtmp_process_recv (RtmpState *state, GPtrArray *lines, SwfdecBuffer *buffer)
       g_printerr ("received data when waiting for RTMP handshake data?");
       return;
     case 2:
-      buffer = swfdec_buffer_queue_pull (state->recv, 1536 * 2 + 1);
+      buffer = swfdec_buffer_queue_pull (state->recv->queue, 1536 * 2 + 1);
       if (buffer) {
 	write_line (lines, "recv", buffer);
 	state->handshake--;
@@ -317,8 +334,7 @@ rtmp_process_recv (RtmpState *state, GPtrArray *lines, SwfdecBuffer *buffer)
       break;
   }
 
-  while (process_one_packet (lines, "recv", state->recv_pending, state->recv, 128))
-    ;
+  while (process_one_packet (lines, "recv", state->recv));
 }
 
 static char **
