@@ -220,7 +220,7 @@ static gboolean
 process_one_packet (GPtrArray *lines, const char *type, RtmpConn *conn)
 {
   SwfdecRtmpPacket *packet;
-  SwfdecRtmpHeader header = { 0, };
+  SwfdecRtmpHeader header;
   SwfdecBuffer *buffer;
   SwfdecBits bits;
   gsize header_size, i, remaining;
@@ -242,9 +242,8 @@ process_one_packet (GPtrArray *lines, const char *type, RtmpConn *conn)
   if (packet == NULL) {
     packet = swfdec_rtmp_packet_new_empty ();
     g_hash_table_insert (conn->pending, GUINT_TO_POINTER (i), packet);
-  } else {
-    swfdec_rtmp_header_copy (&header, &packet->header);
   }
+  swfdec_rtmp_header_copy (&header, &packet->header);
   swfdec_rtmp_header_read (&header, &bits);
   swfdec_buffer_unref (buffer);
 
@@ -272,6 +271,15 @@ process_one_packet (GPtrArray *lines, const char *type, RtmpConn *conn)
   buffer = swfdec_buffer_queue_pull (conn->queue, header_size + remaining);
   g_assert (buffer);
   write_line (lines, type, buffer);
+
+  /* adjust packet size if this was a packet size adjustment packet */
+  if (header.type == SWFDEC_RTMP_PACKET_SIZE) {
+    swfdec_bits_init (&bits, buffer);
+    swfdec_bits_skip_bytes (&bits, header_size);
+    conn->packet_size = swfdec_bits_get_bu32 (&bits);
+  }
+
+  swfdec_buffer_unref (buffer);
   return TRUE;
 }
 
