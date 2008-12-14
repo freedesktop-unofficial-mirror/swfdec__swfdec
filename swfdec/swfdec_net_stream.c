@@ -262,12 +262,45 @@ swfdec_net_stream_send (SwfdecAsContext *cx, SwfdecAsObject *object,
   SWFDEC_STUB ("NetStream.send");
 }
 
+static void
+swfdec_net_stream_send_buffer_time (SwfdecNetStream *stream, guint buffer_time)
+{
+  SwfdecRtmpPacket *packet;
+  SwfdecBots *bots;
+  SwfdecBuffer *buffer;
+
+  bots = swfdec_bots_new ();
+  swfdec_bots_put_bu16 (bots, 3);
+  swfdec_bots_put_bu32 (bots, stream->stream);
+  swfdec_bots_put_bu32 (bots, buffer_time);
+  buffer = swfdec_bots_close (bots);
+
+  packet = swfdec_rtmp_packet_new (2, 0, SWFDEC_RTMP_PACKET_PING, 0, buffer);
+  swfdec_buffer_unref (buffer);
+  swfdec_rtmp_connection_queue_control_packet (stream->conn, packet);
+}
+
 SWFDEC_AS_NATIVE (2101, 4, swfdec_net_stream_setBufferTime)
 void
 swfdec_net_stream_setBufferTime (SwfdecAsContext *cx, SwfdecAsObject *object,
     guint argc, SwfdecAsValue *argv, SwfdecAsValue *rval)
 {
-  SWFDEC_STUB ("NetStream.setBufferTime");
+  SwfdecNetStream *stream;
+  double d;
+  int i;
+
+  SWFDEC_AS_CHECK (SWFDEC_TYPE_NET_STREAM, &stream, "n", &d);
+
+  if (d < 0) {
+    i = 0;
+  } else {
+    i = swfdec_as_double_to_integer (d * 1000);
+  }
+
+  if (stream->video->buffer_time != (guint) i) {
+    stream->video->buffer_time = i;
+    swfdec_net_stream_send_buffer_time (stream, i);
+  }
 }
 
 SWFDEC_AS_NATIVE (2101, 5, swfdec_net_stream_get_checkPolicyFile)
@@ -450,24 +483,6 @@ swfdec_net_stream_construct (SwfdecAsContext *cx, SwfdecAsObject *object,
       G_CALLBACK (swfdec_net_stream_video_buffer_status), stream);
   swfdec_as_context_get_time (cx, &stream->rpc->last_send);
   swfdec_as_object_set_relay (o, SWFDEC_AS_RELAY (stream));
-}
-
-static void
-swfdec_net_stream_send_buffer_time (SwfdecNetStream *stream, guint buffer_time)
-{
-  SwfdecRtmpPacket *packet;
-  SwfdecBots *bots;
-  SwfdecBuffer *buffer;
-
-  bots = swfdec_bots_new ();
-  swfdec_bots_put_bu16 (bots, 3);
-  swfdec_bots_put_bu32 (bots, stream->stream);
-  swfdec_bots_put_bu32 (bots, buffer_time);
-  buffer = swfdec_bots_close (bots);
-
-  packet = swfdec_rtmp_packet_new (2, 0, SWFDEC_RTMP_PACKET_PING, 0, buffer);
-  swfdec_buffer_unref (buffer);
-  swfdec_rtmp_connection_queue_control_packet (stream->conn, packet);
 }
 
 SWFDEC_AS_NATIVE (2101, 201, swfdec_net_stream_onCreate)
