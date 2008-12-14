@@ -149,9 +149,12 @@ swfdec_net_stream_rtmp_stream_flush (SwfdecRtmpStream *rtmp_stream)
 }
 
 static void
-swfdec_net_stream_rtmp_stream_clear (SwfdecRtmpStream *stream)
+swfdec_net_stream_rtmp_stream_clear (SwfdecRtmpStream *rtmp_stream)
 {
-  SWFDEC_FIXME ("implement");
+  SwfdecNetStream *stream = SWFDEC_NET_STREAM (rtmp_stream);
+
+  swfdec_net_stream_video_clear (stream->video);
+  swfdec_audio_clear (SWFDEC_AUDIO (stream->audio));
 }
 
 static void
@@ -187,8 +190,11 @@ swfdec_net_stream_video_buffer_status (SwfdecNetStreamVideo *video, GParamSpec *
 {
   if (video->playing) {
     swfdec_net_stream_onstatus (stream, SWFDEC_AS_STR_NetStream_Buffer_Full);
+    swfdec_audio_add (SWFDEC_AUDIO (stream->audio),
+	SWFDEC_PLAYER (swfdec_gc_object_get_context (stream)));
   } else {
     swfdec_net_stream_onstatus (stream, SWFDEC_AS_STR_NetStream_Buffer_Empty);
+    swfdec_audio_remove (SWFDEC_AUDIO (stream->audio));
   }
 }
 

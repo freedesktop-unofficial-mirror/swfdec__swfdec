@@ -78,6 +78,12 @@ swfdec_audio_dispose (GObject *object)
 }
 
 static void
+swfdec_audio_do_clear (SwfdecAudio *audio)
+{
+  g_signal_emit (audio, signals[CHANGED], 0);
+}
+
+static void
 swfdec_audio_class_init (SwfdecAudioClass *klass)
 {
   GObjectClass *object_class = G_OBJECT_CLASS (klass);
@@ -106,6 +112,8 @@ swfdec_audio_class_init (SwfdecAudioClass *klass)
       G_TYPE_NONE, 0);
 
   object_class->dispose = swfdec_audio_dispose;
+
+  klass->clear = swfdec_audio_do_clear;
 }
 
 static void
@@ -404,3 +412,20 @@ swfdec_audio_format_get_bytes_per_sample (SwfdecAudioFormat format)
   return bps [format & 0x3];
 }
 
+/**
+ * swfdec_audio_clear:
+ * @audio: the audio to clear
+ *
+ * Clears all caches of the given @audio output to prepare it for using with 
+ * a different audio stream. This is useful i.e. after a seek.
+ **/
+void
+swfdec_audio_clear (SwfdecAudio *audio)
+{
+  SwfdecAudioClass *klass;
+
+  g_return_if_fail (SWFDEC_IS_AUDIO (audio));
+
+  klass = SWFDEC_AUDIO_GET_CLASS (audio);
+  klass->clear (audio);
+}

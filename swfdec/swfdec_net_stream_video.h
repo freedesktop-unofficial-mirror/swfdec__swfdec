@@ -58,6 +58,7 @@ GType			swfdec_net_stream_video_get_type	(void);
 
 SwfdecNetStreamVideo *	swfdec_net_stream_video_new		(SwfdecPlayer *		player);
 
+void			swfdec_net_stream_video_clear		(SwfdecNetStreamVideo *	video);
 void			swfdec_net_stream_video_push		(SwfdecNetStreamVideo *	video,
 								 const SwfdecRtmpHeader *header,
 								 SwfdecBuffer *		buffer);

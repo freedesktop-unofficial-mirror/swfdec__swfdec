@@ -33,6 +33,24 @@
 G_DEFINE_TYPE (SwfdecAudioStream, swfdec_audio_stream, SWFDEC_TYPE_AUDIO)
 
 static void
+swfdec_audio_stream_clear (SwfdecAudio *audio)
+{
+  SwfdecAudioStream *stream = SWFDEC_AUDIO_STREAM (audio);
+
+  if (stream->decoder) {
+    /* FIXME: don't discard the decoder for smoother sounding seeks? */
+    g_object_unref (stream->decoder);
+    stream->decoder = NULL;
+  }
+  g_queue_foreach (stream->queue, (GFunc) swfdec_buffer_unref, NULL);
+  g_queue_clear (stream->queue);
+  stream->done = FALSE;
+  stream->buffering = FALSE;
+
+  SWFDEC_AUDIO_CLASS (swfdec_audio_stream_parent_class)->clear (audio);
+}
+
+static void
 swfdec_audio_stream_dispose (GObject *object)
 {
   SwfdecAudioStream *stream = SWFDEC_AUDIO_STREAM (object);
@@ -178,6 +196,7 @@ swfdec_audio_stream_class_init (SwfdecAudioStreamClass *klass)
 
   object_class->dispose = swfdec_audio_stream_dispose;
 
+  audio_class->clear = swfdec_audio_stream_clear;
   audio_class->iterate = swfdec_audio_stream_iterate;
   audio_class->render = swfdec_audio_stream_render;
 }

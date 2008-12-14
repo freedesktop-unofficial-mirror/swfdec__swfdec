@@ -47,6 +47,19 @@ swfdec_net_stream_audio_dispose (GObject *object)
   G_OBJECT_CLASS (swfdec_net_stream_audio_parent_class)->dispose (object);
 }
 
+static void
+swfdec_net_stream_audio_clear (SwfdecAudio *audio)
+{
+  SwfdecNetStreamAudio *stream = SWFDEC_NET_STREAM_AUDIO (audio);
+
+  /* pop eventual NULL buffer indicating end of data */
+  if (g_queue_peek_tail (stream->queue) == NULL)
+    g_queue_pop_tail (stream->queue);
+  g_queue_foreach (stream->queue, (GFunc) swfdec_buffer_unref, NULL);
+
+  SWFDEC_AUDIO_CLASS (swfdec_net_stream_audio_parent_class)->clear (audio);
+}
+
 static SwfdecBuffer *
 swfdec_net_stream_audio_pull (SwfdecAudioStream *audio)
 {
@@ -78,9 +91,12 @@ static void
 swfdec_net_stream_audio_class_init (SwfdecNetStreamAudioClass *klass)
 {
   GObjectClass *object_class = G_OBJECT_CLASS (klass);
+  SwfdecAudioClass *audio_class = SWFDEC_AUDIO_CLASS (klass);
   SwfdecAudioStreamClass *stream_class = SWFDEC_AUDIO_STREAM_CLASS (klass);
 
   object_class->dispose = swfdec_net_stream_audio_dispose;
+
+  audio_class->clear = swfdec_net_stream_audio_clear;
 
   stream_class->pull = swfdec_net_stream_audio_pull;
 }
@@ -113,5 +129,11 @@ swfdec_net_stream_audio_push (SwfdecNetStreamAudio *audio, SwfdecBuffer *buffer)
     swfdec_buffer_unref (buffer);
     return;
   };
+  if (!g_queue_is_empty (audio->queue) && g_queue_peek_tail (audio->queue) == NULL) {
+    SWFDEC_ERROR ("pushing data onto an audio stream that is done. Ignoring.");
+    if (buffer)
+      swfdec_buffer_unref (buffer);
+    return;
+  }
   g_queue_push_tail (audio->queue, buffer);
 }

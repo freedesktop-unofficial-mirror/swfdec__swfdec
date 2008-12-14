@@ -116,6 +116,7 @@ swfdec_net_stream_video_dispose (GObject *object)
   if (video->timeout.callback) {
     swfdec_player_remove_timeout (SWFDEC_PLAYER (swfdec_gc_object_get_context (video)),
 	&video->timeout);
+    video->timeout.callback = NULL;
   }
 
   G_OBJECT_CLASS (swfdec_net_stream_video_parent_class)->dispose (object);
@@ -151,6 +152,24 @@ swfdec_net_stream_video_new (SwfdecPlayer *player)
   ret = g_object_new (SWFDEC_TYPE_NET_STREAM_VIDEO, "context", player, NULL);
 
   return ret;
+}
+
+void
+swfdec_net_stream_video_clear (SwfdecNetStreamVideo *video)
+{
+  g_return_if_fail (SWFDEC_IS_NET_STREAM_VIDEO (video));
+
+  video->time = 0;
+  g_queue_foreach (video->next, (GFunc) swfdec_rtmp_packet_free, NULL);
+  g_queue_clear (video->next);
+  video->next_length = 0;
+  video->playing = FALSE;
+  if (video->timeout.callback) {
+    swfdec_player_remove_timeout (SWFDEC_PLAYER (swfdec_gc_object_get_context (video)),
+	&video->timeout);
+    video->timeout.callback = NULL;
+  }
+  /* FIXME: clear decoder, too? currently it's needed for getting the current image */
 }
 
 static void
