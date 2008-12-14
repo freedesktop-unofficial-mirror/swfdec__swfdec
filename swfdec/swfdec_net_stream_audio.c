@@ -108,5 +108,10 @@ swfdec_net_stream_audio_push (SwfdecNetStreamAudio *audio, SwfdecBuffer *buffer)
 {
   g_return_if_fail (SWFDEC_IS_NET_STREAM_AUDIO (audio));
 
+  if (buffer && buffer->length < 2) {
+    SWFDEC_WARNING ("buffer too small, ignoring");
+    swfdec_buffer_unref (buffer);
+    return;
+  };
   g_queue_push_tail (audio->queue, buffer);
 }
