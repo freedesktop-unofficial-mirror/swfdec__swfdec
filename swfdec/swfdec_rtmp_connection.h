@@ -76,7 +76,8 @@ struct _SwfdecRtmpConnectionClass {
 
 GType			swfdec_rtmp_connection_get_type		(void);
 
-#define swfdec_rtmp_connection_is_connected(conn) ((conn)->socket != NULL && (conn)->error == NULL)
+#define swfdec_rtmp_connection_is_connected(conn) ((conn)->socket != NULL)
+#define swfdec_rtmp_connection_in_error(conn) ((conn)->error != NULL)
 void			swfdec_rtmp_connection_connect	  	(SwfdecRtmpConnection *	conn,
 								 const SwfdecURL *	url);
 void			swfdec_rtmp_connection_close		(SwfdecRtmpConnection *	conn);

@@ -489,8 +489,9 @@ swfdec_rtmp_connection_send (SwfdecRtmpConnection *conn, SwfdecRtmpPacket *packe
    * but that requires a g_queue_find_custom () and that's slow */
 
   g_assert (packet->header.size == packet->buffer->length);
-  if (!swfdec_rtmp_connection_is_connected (conn)) {
-    SWFDEC_DEBUG ("ignoring send on closed connection");
+  if (!swfdec_rtmp_connection_is_connected (conn) || 
+      swfdec_rtmp_connection_in_error (conn)) {
+    SWFDEC_DEBUG ("ignoring send on broken connection");
     return;
   }
 
