@@ -63,8 +63,12 @@ static void
 swfdec_rtmp_socket_rtmp_stream_target_open (SwfdecStreamTarget *target, SwfdecStream *stream)
 {
   SwfdecRtmpSocketRtmp *rtmp = SWFDEC_RTMP_SOCKET_RTMP (target);
+  SwfdecRtmpSocket *sock = SWFDEC_RTMP_SOCKET (target);
 
-  rtmp->next = swfdec_rtmp_socket_next_buffer (SWFDEC_RTMP_SOCKET (target));
+  swfdec_rtmp_connection_set_connected (sock->conn, 
+      swfdec_as_context_get_string (swfdec_gc_object_get_context (sock->conn),
+	swfdec_url_get_url (sock->conn->url)));
+  rtmp->next = swfdec_rtmp_socket_next_buffer (sock);
   swfdec_rtmp_socket_rtmp_do_send (rtmp);
 }
 

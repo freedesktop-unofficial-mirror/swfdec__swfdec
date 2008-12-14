@@ -25,6 +25,7 @@
 
 #include <string.h>
 
+#include "swfdec_as_internal.h"
 #include "swfdec_as_strings.h"
 #include "swfdec_bots.h"
 #include "swfdec_debug.h"
@@ -399,6 +400,7 @@ swfdec_rtmp_connection_close (SwfdecRtmpConnection *conn)
   conn->socket = NULL;
   swfdec_url_free (conn->url);
   conn->url = NULL;
+  swfdec_rtmp_connection_set_connected (conn, NULL);
 }
 
 void
@@ -487,6 +489,11 @@ swfdec_rtmp_connection_send (SwfdecRtmpConnection *conn, SwfdecRtmpPacket *packe
    * but that requires a g_queue_find_custom () and that's slow */
 
   g_assert (packet->header.size == packet->buffer->length);
+  if (!swfdec_rtmp_connection_is_connected (conn)) {
+    SWFDEC_DEBUG ("ignoring send on closed connection");
+    return;
+  }
+
   packet->buffer->length = 0;
   send = g_queue_is_empty (conn->packets);
   g_queue_push_head (conn->packets, packet);
@@ -495,3 +502,29 @@ swfdec_rtmp_connection_send (SwfdecRtmpConnection *conn, SwfdecRtmpPacket *packe
   if (send)
     swfdec_rtmp_socket_send (conn->socket);
 }
+
+void
+swfdec_rtmp_connection_set_connected (SwfdecRtmpConnection *conn,
+    const char *url)
+{
+  SwfdecAsObject *object;
+  SwfdecAsValue *val, tmp;
+
+  g_return_if_fail (SWFDEC_IS_RTMP_CONNECTION (conn));
+
+  object = swfdec_as_relay_get_as_object (SWFDEC_AS_RELAY (conn));
+  val = swfdec_as_object_peek_variable (object, SWFDEC_AS_STR_isConnected);
+  if (val) {
+    SWFDEC_AS_VALUE_SET_BOOLEAN (val, url != NULL);
+  } else {
+    SWFDEC_FIXME ("something weird happens when isConnected was deleted");
+  }
+  /* FIXME: should not fail if variable exists but is constant */
+  if (url) {
+    SWFDEC_AS_VALUE_SET_STRING (&tmp, url);
+  } else {
+    SWFDEC_AS_VALUE_SET_UNDEFINED (&tmp);
+  }
+  swfdec_as_object_set_variable (object, SWFDEC_AS_STR_uri, &tmp);
+}
+
