@@ -190,11 +190,8 @@ swfdec_net_stream_video_buffer_status (SwfdecNetStreamVideo *video, GParamSpec *
 {
   if (video->playing) {
     swfdec_net_stream_onstatus (stream, SWFDEC_AS_STR_NetStream_Buffer_Full);
-    swfdec_audio_add (SWFDEC_AUDIO (stream->audio),
-	SWFDEC_PLAYER (swfdec_gc_object_get_context (stream)));
   } else {
     swfdec_net_stream_onstatus (stream, SWFDEC_AS_STR_NetStream_Buffer_Empty);
-    swfdec_audio_remove (SWFDEC_AUDIO (stream->audio));
   }
 }
 
@@ -483,10 +480,12 @@ swfdec_net_stream_construct (SwfdecAsContext *cx, SwfdecAsObject *object,
   stream->conn = conn;
   stream->rpc = swfdec_rtmp_rpc_new (conn, SWFDEC_AS_RELAY (stream));
   stream->video = swfdec_net_stream_video_new (SWFDEC_PLAYER (cx));
-  stream->audio = swfdec_net_stream_audio_new (SWFDEC_PLAYER (cx));
   g_object_ref (stream->video);
   g_signal_connect (stream->video, "notify::playing", 
       G_CALLBACK (swfdec_net_stream_video_buffer_status), stream);
+  stream->audio = swfdec_net_stream_audio_new (SWFDEC_PLAYER (cx));
+  swfdec_audio_add (SWFDEC_AUDIO (stream->audio),
+      SWFDEC_PLAYER (swfdec_gc_object_get_context (stream)));
   swfdec_as_context_get_time (cx, &stream->rpc->last_send);
   swfdec_as_object_set_relay (o, SWFDEC_AS_RELAY (stream));
 }
