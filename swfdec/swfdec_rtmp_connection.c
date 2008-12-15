@@ -120,6 +120,9 @@ swfdec_rtmp_connection_handle_ping (SwfdecRtmpConnection *conn, SwfdecBuffer *bu
       SWFDEC_FIXME ("handle ping type %u for target %u", type, target);
       break;
   }
+  if (swfdec_bits_left (&bits)) {
+    SWFDEC_FIXME ("bytes left in ping type %u", type);
+  }
 }
 
 static void
