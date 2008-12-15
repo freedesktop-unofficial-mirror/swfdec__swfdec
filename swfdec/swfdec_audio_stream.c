@@ -44,6 +44,7 @@ swfdec_audio_stream_clear (SwfdecAudio *audio)
   }
   g_queue_foreach (stream->queue, (GFunc) swfdec_buffer_unref, NULL);
   g_queue_clear (stream->queue);
+  stream->queue_size = 0;
   stream->done = FALSE;
   stream->buffering = FALSE;
 

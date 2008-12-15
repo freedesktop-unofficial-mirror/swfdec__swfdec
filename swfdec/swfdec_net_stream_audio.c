@@ -56,6 +56,7 @@ swfdec_net_stream_audio_clear (SwfdecAudio *audio)
   if (g_queue_peek_tail (stream->queue) == NULL)
     g_queue_pop_tail (stream->queue);
   g_queue_foreach (stream->queue, (GFunc) swfdec_buffer_unref, NULL);
+  g_queue_clear (stream->queue);
 
   SWFDEC_AUDIO_CLASS (swfdec_net_stream_audio_parent_class)->clear (audio);
 }
