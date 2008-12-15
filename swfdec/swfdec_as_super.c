@@ -86,6 +86,8 @@ swfdec_as_super_new (SwfdecAsFrame *frame, SwfdecAsObject *thisp, SwfdecAsObject
   
   if (frame->super != NULL)
     return;
+  if (frame->script->flags & SWFDEC_SCRIPT_SUPPRESS_SUPER)
+    return;
   context = thisp->context;
   if (context->version <= 5)
     return;
