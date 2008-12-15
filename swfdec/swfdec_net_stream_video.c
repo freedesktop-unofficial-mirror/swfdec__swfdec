@@ -302,7 +302,7 @@ swfdec_net_stream_video_push (SwfdecNetStreamVideo *video,
   SwfdecRtmpPacket *packet;
 
   g_return_if_fail (SWFDEC_IS_NET_STREAM_VIDEO (video));
-  g_return_if_fail (packet != NULL);
+  g_return_if_fail (buffer != NULL);
 
   packet = swfdec_rtmp_packet_new (header->channel, header->stream,
       header->type, header->timestamp, buffer);
