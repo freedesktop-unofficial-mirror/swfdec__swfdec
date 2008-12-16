@@ -119,6 +119,7 @@ libswfdec_source_files = \
 	swfdec_movie_clip_loader.c \
 	swfdec_net_connection.c \
 	swfdec_net_stream.c \
+	swfdec_net_stream_video.c \
 	swfdec_path.c \
 	swfdec_pattern.c \
 	swfdec_player.c \
@@ -321,6 +322,7 @@ noinst_HEADERS = \
 	swfdec_movie.h \
 	swfdec_movie_clip_loader.h \
 	swfdec_net_stream.h \
+	swfdec_net_stream_video.h \
 	swfdec_path.h \
 	swfdec_pattern.h \
 	swfdec_player_internal.h \

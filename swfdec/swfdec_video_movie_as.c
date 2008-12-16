@@ -25,6 +25,7 @@
 #include "swfdec_as_internal.h"
 #include "swfdec_as_strings.h"
 #include "swfdec_debug.h"
+#include "swfdec_net_stream.h"
 #include "swfdec_player_internal.h"
 #include "swfdec_sandbox.h"
 
@@ -38,13 +39,15 @@ swfdec_video_attach_video (SwfdecAsContext *cx, SwfdecAsObject *object,
 
   SWFDEC_AS_CHECK (SWFDEC_TYPE_VIDEO_MOVIE, &video, "O", &o);
 
-  if (o == NULL || !SWFDEC_IS_VIDEO_PROVIDER (o->relay)) {
+  if (o == NULL) {
+    swfdec_video_movie_set_provider (video, NULL);
+  } else if (SWFDEC_IS_NET_STREAM (o->relay)) {
+    swfdec_video_movie_set_provider (video, 
+	SWFDEC_VIDEO_PROVIDER (SWFDEC_NET_STREAM (o->relay)->video));
+  } else {
     SWFDEC_WARNING ("calling attachVideo without a NetStream object");
     swfdec_video_movie_set_provider (video, NULL);
-    return;
   }
-
-  swfdec_video_movie_set_provider (video, SWFDEC_VIDEO_PROVIDER (o->relay));
 }
 
 SWFDEC_AS_NATIVE (667, 2, swfdec_video_clear)

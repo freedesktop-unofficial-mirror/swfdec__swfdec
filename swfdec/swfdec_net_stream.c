@@ -26,6 +26,7 @@
 #include "swfdec_as_frame_internal.h"
 #include "swfdec_as_internal.h"
 #include "swfdec_debug.h"
+#include "swfdec_net_stream_video.h"
 #include "swfdec_sandbox.h"
 #include "swfdec_rtmp_rpc.h"
 #include "swfdec_rtmp_stream.h"
@@ -41,6 +42,9 @@ swfdec_net_stream_rtmp_stream_receive (SwfdecRtmpStream *rtmp_stream,
   SwfdecNetStream *stream = SWFDEC_NET_STREAM (rtmp_stream);
 
   switch ((guint) header->type) {
+    case SWFDEC_RTMP_PACKET_VIDEO:
+      swfdec_net_stream_video_push (stream->video, header, buffer);
+      break;
     case SWFDEC_RTMP_PACKET_NOTIFY:
       swfdec_sandbox_use (stream->conn->sandbox);
       swfdec_rtmp_rpc_notify (stream->rpc, buffer);
@@ -90,7 +94,8 @@ swfdec_net_stream_mark (SwfdecGcObject *object)
   SwfdecNetStream *stream = SWFDEC_NET_STREAM (object);
 
   swfdec_gc_object_mark (stream->conn);
-  /* no need to handle the channels, the connection manages them */
+  swfdec_rtmp_rpc_mark (stream->rpc);
+  swfdec_gc_object_mark (stream->video);
 
   SWFDEC_GC_OBJECT_CLASS (swfdec_net_stream_parent_class)->mark (object);
 }
@@ -206,6 +211,7 @@ swfdec_net_stream_construct (SwfdecAsContext *cx, SwfdecAsObject *object,
   stream = g_object_new (SWFDEC_TYPE_NET_STREAM, "context", cx, NULL);
   stream->conn = conn;
   stream->rpc = swfdec_rtmp_rpc_new (conn, SWFDEC_AS_RELAY (stream));
+  stream->video = swfdec_net_stream_video_new (SWFDEC_PLAYER (cx));
   swfdec_as_context_get_time (cx, &stream->rpc->last_send);
   swfdec_as_object_set_relay (o, SWFDEC_AS_RELAY (stream));
 }
