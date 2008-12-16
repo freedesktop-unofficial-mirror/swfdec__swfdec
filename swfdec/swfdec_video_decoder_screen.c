@@ -55,7 +55,7 @@ swfdec_video_decoder_screen_decode (SwfdecVideoDecoder *dec, SwfdecBuffer *buffe
   h = swfdec_bits_getbits (&bits, 12);
   if (dec->width == 0 || dec->height == 0) {
     if (w == 0 || h == 0) {
-      swfdec_video_decoder_error (dec, "width or height is 0: %ux%u", w, h);
+      SWFDEC_ERROR ("width or height is 0: %ux%u", w, h);
       return;
     }
     /* check for overflow */
@@ -72,7 +72,7 @@ swfdec_video_decoder_screen_decode (SwfdecVideoDecoder *dec, SwfdecBuffer *buffe
     dec->height = h;
     dec->rowstride[0] = w * 4;
   } else if (dec->width != w || dec->height != h) {
-    swfdec_video_decoder_error (dec, "width or height differ from original: was %ux%u, is %ux%u",
+    SWFDEC_ERROR ("width or height differ from original: was %ux%u, is %ux%u",
 	dec->width, dec->height, w, h);
     /* FIXME: this is what ffmpeg does, should we be more forgiving? */
     return;
