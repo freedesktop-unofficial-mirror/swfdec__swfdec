@@ -526,15 +526,34 @@ swfdec_net_stream_send_connection (SwfdecAsContext *cx, SwfdecAsObject *object,
 {
   SwfdecNetStream *stream;
   SwfdecAsObject *o, *ret_cb = NULL;
-  SwfdecAsValue name;
+  SwfdecAsValue name_value;
+  const char *name;
 
-  SWFDEC_AS_CHECK (0, NULL, "ov|O", &o, &name, &ret_cb);
+  SWFDEC_AS_CHECK (0, NULL, "ov|O", &o, &name_value, &ret_cb);
 
   if (!SWFDEC_IS_NET_STREAM (o->relay))
     return;
   stream = SWFDEC_NET_STREAM (o->relay);
 
-  swfdec_rtmp_rpc_send (stream->rpc, name, ret_cb, MAX (3, argc) - 3, argv + 3);
+  if (SWFDEC_AS_VALUE_IS_STRING (name_value)) {
+    name = SWFDEC_AS_VALUE_GET_STRING (name_value);
+    if (name == SWFDEC_AS_STR_pause) {
+      SWFDEC_STUB ("NetStream.pause");
+    } else if (name == SWFDEC_AS_STR_play) {
+      SWFDEC_STUB ("NetStream.play");
+    } else if (name == SWFDEC_AS_STR_publish) {
+      SWFDEC_STUB ("NetStream.publish");
+    } else if (name == SWFDEC_AS_STR_seek) {
+      SWFDEC_STUB ("NetStream.seek");
+    } else if (name == SWFDEC_AS_STR_receiveAudio) {
+      SWFDEC_STUB ("NetStream.receiveAudio");
+    } else if (name == SWFDEC_AS_STR_receiveVideo) {
+      SWFDEC_STUB ("NetStream.receiveVideo");
+    } else {
+      SWFDEC_WARNING ("NetStream.%s does not exist.", name);
+    }
+  }
+  swfdec_rtmp_rpc_send (stream->rpc, name_value, ret_cb, MAX (3, argc) - 3, argv + 3);
   /* FIXME: This should be done by some smart API */
   if (stream->stream) {
     SwfdecRtmpPacket *packet = swfdec_rtmp_rpc_pop (stream->rpc, FALSE);
