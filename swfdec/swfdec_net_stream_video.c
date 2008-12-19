@@ -295,7 +295,7 @@ swfdec_net_stream_video_start (SwfdecNetStreamVideo *video)
   g_assert (!video->playing);
 
   video->time = 0;
-  video->next->length += packet->header.timestamp;
+  video->next_length += packet->header.timestamp;
   video->playing = TRUE;
   video->timeout.timestamp = SWFDEC_PLAYER (swfdec_gc_object_get_context (video))->priv->time;
   video->timeout.timestamp -= SWFDEC_TICKS_PER_SECOND * packet->header.timestamp / 1000;
